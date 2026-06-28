@@ -11,12 +11,13 @@ Description: Layers three storage models over Google Drive: versioned pins board
     sync-explicit, and delete-guarded.
 License: MIT + file LICENSE
 Encoding: UTF-8
+Depends:
+    R (>= 4.1.0)
 Roxygen: list(markdown = TRUE)
 Config/testthat/edition: 3
 Imports:
     pins,
     googledrive,
-    gargle,
     arrow,
     sf,
     dplyr,
@@ -24,10 +25,8 @@ Imports:
     tibble,
     purrr,
     rlang,
-    glue,
     cli,
     fs,
-    here,
     curl
 Suggests:
     testthat (>= 3.0.0),

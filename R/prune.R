@@ -2,13 +2,13 @@
 #'
 #' Functions for pruning old pin versions from boards. All Drive removals use
 #' `gd_trash()` (recoverable; never hard-deletes). Cache removals delete local
-#' directory trees. Raw files are **never** auto-deleted by any function —
+#' directory trees. Raw files are **never** auto-deleted by any function --
 #' removal is manual outside R.
 #'
 #' @name prune
 NULL
 
-# ── internal helpers ──────────────────────────────────────────────────────────
+# -- internal helpers ----------------------------------------------------------
 
 #' Resolve the authoritative sub-board for a given config
 #'
@@ -123,7 +123,7 @@ NULL
   }
 }
 
-# ── exported functions ────────────────────────────────────────────────────────
+# -- exported functions --------------------------------------------------------
 
 #' Prune old versions of a single pin
 #'
@@ -139,7 +139,7 @@ NULL
 #' interactive confirmation or `force = TRUE`. The threshold check is skipped
 #' during a dry run.
 #'
-#' **Raw files are never auto-deleted by any function** — removal is manual
+#' **Raw files are never auto-deleted by any function** -- removal is manual
 #' outside R.
 #'
 #' @param board A `gdpins_board` object.
@@ -164,7 +164,7 @@ gdpins_prune_pin_versions <- function(
     threshold = 10,
     force     = FALSE
 ) {
-  # ── input validation ──────────────────────────────────────────────────────
+  # -- input validation ------------------------------------------------------
   if (!inherits(board, "gdpins_board")) {
     cli::cli_abort(c(
       "{.arg board} must be a {.cls gdpins_board} object.",
@@ -179,7 +179,7 @@ gdpins_prune_pin_versions <- function(
     ))
   }
 
-  # ── determine old versions from the primary (authoritative) board ─────────
+  # -- determine old versions from the primary (authoritative) board ---------
   # The primary board (Drive or local_only) determines the reported version
   # labels. Each sub-board prunes independently because version timestamps may
   # differ slightly even for the same logical write.
@@ -194,21 +194,21 @@ gdpins_prune_pin_versions <- function(
     return(invisible(character(0L)))
   }
 
-  # ── dry run: show plan, change nothing ───────────────────────────────────
+  # -- dry run: show plan, change nothing -----------------------------------
   if (dry_run) {
     cli::cli_inform(c(
-      i = "DRY RUN — would remove {n_remove} version{?s} of pin {.val {name}}:",
+      i = "DRY RUN -- would remove {n_remove} version{?s} of pin {.val {name}}:",
       " " = paste(old_versions, collapse = "\n  ")
     ))
     return(invisible(old_versions))
   }
 
-  # ── threshold guard (only for actual removals) ────────────────────────────
+  # -- threshold guard (only for actual removals) ----------------------------
   if (n_remove > threshold && !force) {
     .prune_check_threshold(n_remove, threshold, paste0("pin '", name, "'"))
   }
 
-  # ── perform removals — each board prunes its own version list ────────────
+  # -- perform removals -- each board prunes its own version list ------------
   # Each sub-board independently determines which of its versions are "old"
   # (i.e., all but the newest `keep`). This is necessary because pins generates
   # version labels from timestamp + content hash, and the timestamp may differ
@@ -216,7 +216,7 @@ gdpins_prune_pin_versions <- function(
   config <- board$config
 
   if (config %in% c("drive_cache", "drive_cache_local")) {
-    # Trash old versions from Drive (recoverable — NEVER hard-delete)
+    # Trash old versions from Drive (recoverable -- NEVER hard-delete)
     drive_old <- .versions_to_remove(board$drive_board, name, keep)
     for (v in drive_old) {
       .trash_drive_version(board$adapter, board$drive_path, name, v)
@@ -270,7 +270,7 @@ gdpins_prune_board_versions <- function(
     threshold = 10,
     force     = FALSE
 ) {
-  # ── input validation ──────────────────────────────────────────────────────
+  # -- input validation ------------------------------------------------------
   if (!inherits(board, "gdpins_board")) {
     cli::cli_abort(c(
       "{.arg board} must be a {.cls gdpins_board} object.",
@@ -285,7 +285,7 @@ gdpins_prune_board_versions <- function(
     ))
   }
 
-  # ── enumerate pins ────────────────────────────────────────────────────────
+  # -- enumerate pins --------------------------------------------------------
   primary  <- .prune_primary_board(board)
   all_pins <- pins::pin_list(primary)
 
@@ -294,7 +294,7 @@ gdpins_prune_board_versions <- function(
     return(invisible(list()))
   }
 
-  # ── pre-flight threshold check (actual removal only) ─────────────────────
+  # -- pre-flight threshold check (actual removal only) ---------------------
   # Compute removals for every pin up front so we can abort before touching
   # anything if any pin would exceed the threshold.
   if (!dry_run && !force) {
@@ -311,7 +311,7 @@ gdpins_prune_board_versions <- function(
     }
   }
 
-  # ── prune each pin (threshold already cleared above) ─────────────────────
+  # -- prune each pin (threshold already cleared above) ---------------------
   result <- lapply(all_pins, function(nm) {
     gdpins_prune_pin_versions(
       board     = board,

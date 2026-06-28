@@ -6,6 +6,7 @@
 *.Rcheck/
 /doc/
 /Meta/
+/man/
 
 # renv
 renv/library/

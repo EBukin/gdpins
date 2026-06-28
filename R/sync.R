@@ -1,6 +1,6 @@
 #' Synchronisation engine
 #'
-#' User-invokable sync between Drive and local. Never automatic — the user
+#' User-invokable sync between Drive and local. Never automatic -- the user
 #' decides when to synchronise. Conflict resolution:
 #' - Versioned boards: both writes become versions (no loss).
 #' - Raw / unversioned: interactive prompt or stop + report.
@@ -8,7 +8,7 @@
 #' @name sync
 NULL
 
-# ── Status engine (shared by init_board/WS3 via gdpins_board_status) ──────────
+# -- Status engine (shared by init_board/WS3 via gdpins_board_status) ----------
 
 #' Report sync status of a board or raw connection
 #'
@@ -26,8 +26,8 @@ NULL
 #' @param x A `gdpins_board` or `gdpins_raw_conn` object.
 #'
 #' @return A [tibble::tibble()] with at least columns:
-#'   - `name` — pin/file name (character).
-#'   - `state` — one of `"in_sync"`, `"local_ahead"`, `"drive_ahead"`,
+#'   - `name` -- pin/file name (character).
+#'   - `state` -- one of `"in_sync"`, `"local_ahead"`, `"drive_ahead"`,
 #'     `"conflict"`, `"offline"` (character).
 #'   - Additional signal columns differ by object type (see Details).
 #'
@@ -61,7 +61,7 @@ gdpins_board_status.default <- function(x) {
   ))
 }
 
-# ── gdpins_sync ───────────────────────────────────────────────────────────────
+# -- gdpins_sync ---------------------------------------------------------------
 
 #' Synchronise a board or raw connection with Drive
 #'
@@ -137,11 +137,11 @@ gdpins_sync.default <- function(
   ))
 }
 
-# ── Board status internals ────────────────────────────────────────────────────
+# -- Board status internals ----------------------------------------------------
 
 #' @keywords internal
 .board_status_board <- function(x) {
-  # local-only boards have no drive_board — nothing to compare
+  # local-only boards have no drive_board -- nothing to compare
   if (is.null(x$drive_board)) {
     return(.empty_board_status_tbl())
   }
@@ -201,7 +201,7 @@ gdpins_sync.default <- function(
   } else if (!is.na(drive_hash) && !is.na(local_hash) && identical(drive_hash, local_hash)) {
     "in_sync"
   } else {
-    # Different hashes — compare timestamps
+    # Different hashes -- compare timestamps
     dc <- if (inherits(drive_created, "POSIXct") && !is.na(drive_created)) drive_created else NA
     lc <- if (inherits(local_created, "POSIXct") && !is.na(local_created)) local_created else NA
     if (is.na(dc) || is.na(lc)) {
@@ -211,7 +211,7 @@ gdpins_sync.default <- function(
     } else if (lc > dc) {
       "local_ahead"
     } else {
-      # Same timestamp, different hash — genuine conflict
+      # Same timestamp, different hash -- genuine conflict
       "conflict"
     }
   }
@@ -288,11 +288,11 @@ gdpins_sync.default <- function(
   do.call(rbind, rows)
 }
 
-# ── Raw connection status internals ───────────────────────────────────────────
+# -- Raw connection status internals -------------------------------------------
 
 #' @keywords internal
 .board_status_raw <- function(x) {
-  # local-only has no drive — nothing to compare
+  # local-only has no drive -- nothing to compare
   if (is.null(x$adapter) || x$config == "local_only") {
     return(.empty_raw_status_tbl())
   }
@@ -346,7 +346,7 @@ gdpins_sync.default <- function(
     } else if (!is.na(drv_md5) && !is.na(loc_md5) && identical(drv_md5, loc_md5)) {
       "in_sync"
     } else {
-      # Different md5 — use mtime tiebreaker
+      # Different md5 -- use mtime tiebreaker
       if (is.na(drv_mtime) || is.na(loc_mtime)) {
         "conflict"
       } else if (drv_mtime > loc_mtime) {
@@ -354,7 +354,7 @@ gdpins_sync.default <- function(
       } else if (loc_mtime > drv_mtime) {
         "local_ahead"
       } else {
-        # Same mtime, different md5 — genuine conflict
+        # Same mtime, different md5 -- genuine conflict
         "conflict"
       }
     }
@@ -447,12 +447,12 @@ gdpins_sync.default <- function(
 #' @keywords internal
 .drive_rel <- function(adapter, drive_path, path) {
   vapply(path, function(p) {
-    # Case 1: path starts with drive_path (real adapter — already relative)
+    # Case 1: path starts with drive_path (real adapter -- already relative)
     rel_prefix <- paste0(drive_path, "/")
     if (startsWith(p, rel_prefix)) {
       return(substring(p, nchar(rel_prefix) + 1L))
     }
-    # Case 2: absolute path (fake adapter) — use fs::path_rel
+    # Case 2: absolute path (fake adapter) -- use fs::path_rel
     drive_abs <- if (!is.null(adapter$root)) {
       file.path(adapter$root,
                 gsub("/", .Platform$file.sep, drive_path, fixed = TRUE))
@@ -478,17 +478,17 @@ gdpins_sync.default <- function(
   )
 }
 
-# ── Board sync internals ──────────────────────────────────────────────────────
+# -- Board sync internals ------------------------------------------------------
 
 #' @keywords internal
 .sync_board <- function(x, direction, on_conflict) {
-  # local_only boards — nothing to sync
+  # local_only boards -- nothing to sync
   if (is.null(x$drive_board)) {
     cli::cli_inform(c("i" = "Board {.val {x$name}} is local-only. Nothing to sync."))
     return(invisible(x))
   }
 
-  # Offline guard — blocks all writes
+  # Offline guard -- blocks all writes
   if (!gdpins_is_online()) {
     cli::cli_abort(c(
       "Cannot sync: no internet connection.",
@@ -512,7 +512,7 @@ gdpins_sync.default <- function(
     n_drive <- sum(status$state == "drive_ahead")
     cli::cli_inform(c(
       "i" = "New-computer setup detected: local cache is empty.",
-      "v" = "Pulling {n_drive} pin{?s} from Drive → local."
+      "v" = "Pulling {n_drive} pin{?s} from Drive -> local."
     ))
   }
 
@@ -529,7 +529,7 @@ gdpins_sync.default <- function(
 
     if (state == "conflict") {
       if (x$versioned) {
-        # Versioned boards: both writes become versions — no loss
+        # Versioned boards: both writes become versions -- no loss
         .copy_pin_to_board(drive_board, local_board, pin_name)
         .copy_pin_to_board(local_board, drive_board, pin_name)
         cli::cli_inform(c(
@@ -546,7 +546,7 @@ gdpins_sync.default <- function(
           .copy_pin_to_board(drive_board, local_board, pin_name)
         }
       } else {
-        # on_conflict == "version" on unversioned — copy both directions
+        # on_conflict == "version" on unversioned -- copy both directions
         .copy_pin_to_board(drive_board, local_board, pin_name)
         .copy_pin_to_board(local_board, drive_board, pin_name)
       }
@@ -556,14 +556,14 @@ gdpins_sync.default <- function(
     # Non-conflict directional copy
     if (effective_dir == "to_drive") {
       .copy_pin_to_board(local_board, drive_board, pin_name)
-      cli::cli_inform(c("v" = "Synced {.val {pin_name}}: local → Drive."))
+      cli::cli_inform(c("v" = "Synced {.val {pin_name}}: local -> Drive."))
     } else if (effective_dir == "from_drive") {
       .copy_pin_to_board(drive_board, local_board, pin_name)
-      cli::cli_inform(c("v" = "Synced {.val {pin_name}}: Drive → local."))
+      cli::cli_inform(c("v" = "Synced {.val {pin_name}}: Drive -> local."))
     }
   }
 
-  # Report conflicts that were stopped — abort after processing all items
+  # Report conflicts that were stopped -- abort after processing all items
   if (length(conflicts) > 0L) {
     cli::cli_abort(c(
       "Sync aborted: {length(conflicts)} conflict{?s} found.",
@@ -631,11 +631,11 @@ gdpins_sync.default <- function(
   else "skip"
 }
 
-# ── Raw connection sync internals ─────────────────────────────────────────────
+# -- Raw connection sync internals ---------------------------------------------
 
 #' @keywords internal
 .sync_raw <- function(x, direction, on_conflict) {
-  # local_only — nothing to sync
+  # local_only -- nothing to sync
   if (is.null(x$adapter) || x$config == "local_only") {
     cli::cli_inform(c("i" = "Raw connection is local-only. Nothing to sync."))
     return(invisible(x))
@@ -662,7 +662,7 @@ gdpins_sync.default <- function(
     n_drive <- sum(status$state == "drive_ahead")
     cli::cli_inform(c(
       "i" = "New-computer setup detected: local directory is empty.",
-      "v" = "Pulling {n_drive} file{?s} from Drive → local."
+      "v" = "Pulling {n_drive} file{?s} from Drive -> local."
     ))
   }
 
@@ -689,10 +689,10 @@ gdpins_sync.default <- function(
           .raw_copy_to_local(x, fname)
         }
       } else {
-        # on_conflict == "version" on raw — drive wins as safest default
+        # on_conflict == "version" on raw -- drive wins as safest default
         .raw_copy_to_local(x, fname)
         cli::cli_inform(c(
-          "i" = "File {.val {fname}}: conflict — Drive version kept (raw connection)."
+          "i" = "File {.val {fname}}: conflict -- Drive version kept (raw connection)."
         ))
       }
       next
@@ -700,10 +700,10 @@ gdpins_sync.default <- function(
 
     if (effective_dir == "to_drive") {
       .raw_copy_to_drive(x, fname)
-      cli::cli_inform(c("v" = "Synced {.val {fname}}: local → Drive."))
+      cli::cli_inform(c("v" = "Synced {.val {fname}}: local -> Drive."))
     } else if (effective_dir == "from_drive") {
       .raw_copy_to_local(x, fname)
-      cli::cli_inform(c("v" = "Synced {.val {fname}}: Drive → local."))
+      cli::cli_inform(c("v" = "Synced {.val {fname}}: Drive -> local."))
     }
   }
 

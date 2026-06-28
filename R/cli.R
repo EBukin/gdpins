@@ -1,6 +1,6 @@
 #' Compact CLI formatters for gdpins console output
 #'
-#' Internal helpers for formatting values in compact, ≤80-col `cli`-styled
+#' Internal helpers for formatting values in compact, <=80-col `cli`-styled
 #' output. Every public-facing print/summary method in the package uses these
 #' to stay consistent.
 #'
@@ -11,7 +11,7 @@ NULL
 #' Format a byte count as a human-readable string
 #'
 #' Converts a numeric byte count to a compact string with appropriate unit
-#' suffix (B, KB, MB, GB). Fits within ≤80-col output.
+#' suffix (B, KB, MB, GB). Fits within <=80-col output.
 #'
 #' @param n Numeric scalar. Number of bytes.
 #'
@@ -21,18 +21,28 @@ gd_fmt_bytes <- function(n) {
   if (!is.numeric(n) || length(n) != 1L) {
     cli::cli_abort("{.arg n} must be a numeric scalar.")
   }
-  if (is.na(n)) return("NA")
-  if (n < 0)    return(paste0(round(n), " B"))
-  if (n < 1e3)  return(paste0(round(n), " B"))
-  if (n < 1e6)  return(paste0(round(n / 1e3, 1L), " KB"))
-  if (n < 1e9)  return(paste0(round(n / 1e6, 1L), " MB"))
+  if (is.na(n)) {
+    return("NA")
+  }
+  if (n < 0) {
+    return(paste0(round(n), " B"))
+  }
+  if (n < 1e3) {
+    return(paste0(round(n), " B"))
+  }
+  if (n < 1e6) {
+    return(paste0(round(n / 1e3, 1L), " KB"))
+  }
+  if (n < 1e9) {
+    return(paste0(round(n / 1e6, 1L), " MB"))
+  }
   paste0(round(n / 1e9, 2L), " GB")
 }
 
 #' Format a POSIXct timestamp compactly
 #'
 #' Produces a short ISO-8601-like string (`"YYYY-MM-DD HH:MM"`) suitable for
-#' narrow console output. Returns `"—"` for `NA` values.
+#' narrow console output. Returns `"\u2014"` (em-dash) for `NA` values.
 #'
 #' @param t A `POSIXct` scalar (or something coercible via [as.POSIXct()]).
 #'
@@ -42,14 +52,16 @@ gd_fmt_mtime <- function(t) {
   if (!inherits(t, "POSIXct") && !inherits(t, "POSIXlt")) {
     t <- tryCatch(as.POSIXct(t), error = function(e) as.POSIXct(NA))
   }
-  if (is.na(t)) return("—")  # em-dash
+  if (is.na(t)) {
+    return("\u2014")
+  } # em-dash
   format(t, "%Y-%m-%d %H:%M")
 }
 
 #' Emit a compact key-value line via cli
 #'
 #' Formats each `name = value` pair as a `cli`-styled bullet:
-#' `  {.field name}: {.val value}`. Truncates long values to keep lines ≤80
+#' `  {.field name}: {.val value}`. Truncates long values to keep lines <=80
 #' characters. Passes `...` as named arguments where names become keys and
 #' values become the displayed values.
 #'
@@ -68,7 +80,7 @@ gd_cli_kv <- function(...) {
     key <- keys[[i]]
     val <- as.character(args[[i]])
     # Truncate to keep within 80 cols: key + ": " + val
-    max_val <- 80L - nchar(key) - 4L  # 4 = "  " prefix + ": "
+    max_val <- 80L - nchar(key) - 4L # 4 = "  " prefix + ": "
     if (nchar(val) > max_val && max_val > 3L) {
       val <- paste0(substr(val, 1L, max_val - 3L), "...")
     }
