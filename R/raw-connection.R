@@ -170,6 +170,21 @@ NULL
   unique(norm[nzchar(norm) & !.is_sync_sidecar(norm)])
 }
 
+# Build a Drive URL from a Drive ID and a logical is_dir flag (vectorised).
+# Returns NA_character_ wherever drive_id is NA.
+.make_drive_url <- function(drive_id, is_dir) {
+  url <- ifelse(
+    is.na(drive_id),
+    NA_character_,
+    ifelse(
+      is_dir,
+      paste0("https://drive.google.com/drive/folders/", drive_id),
+      paste0("https://drive.google.com/file/d/", drive_id, "/view")
+    )
+  )
+  as.character(url)
+}
+
 # ── gdpins_raw_connect ────────────────────────────────────────────────────────
 
 #' Connect to a raw-exogenous Drive folder
@@ -546,15 +561,44 @@ gdpins_raw_get <- function(conn, name, force_refresh = FALSE) {
 #' @param conn A `gdpins_raw_conn` object.
 #' @param depth Integer scalar. Maximum directory depth to display. Default `2`.
 #'
-#' @return A [tibble::tibble()] describing the folder tree.
+#' @return A [tibble::tibble()] with 8 columns:
+#'   \describe{
+#'     \item{`name`}{chr. Relative path within the raw-root.}
+#'     \item{`is_dir`}{lgl. `TRUE` for directories, `FALSE` for files.}
+#'     \item{`size`}{dbl. File size in bytes (0 for directories).}
+#'     \item{`mtime`}{POSIXct. Last-modified time.}
+#'     \item{`depth`}{int. Directory depth (1 = top-level).}
+#'     \item{`local_path`}{chr. Absolute local filesystem path.}
+#'     \item{`drive_id`}{chr. Google Drive file/folder ID, or `NA_character_`
+#'       for local-only connections and the fake adapter.}
+#'     \item{`drive_url`}{chr. Browser URL for the entry
+#'       (`https://drive.google.com/file/d/<id>/view` for files,
+#'       `https://drive.google.com/drive/folders/<id>` for folders), or
+#'       `NA_character_` when `drive_id` is `NA`.}
+#'   }
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' conn <- gdpins_raw_connect(
+#'   drive_path = "worldbank-api",
+#'   local_path = tempfile("raw_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_raw_put_object(conn, mtcars, "cars.csv")
+#' tbl <- gdpins_raw_ls(conn)
+#' tbl$local_path   # absolute local path
+#' tbl$drive_id     # NA for fake adapter; real Drive ID with real adapter
 #' @export
 gdpins_raw_ls <- function(conn, depth = 2) {
   empty <- tibble::tibble(
-    name   = character(),
-    is_dir = logical(),
-    size   = double(),
-    mtime  = as.POSIXct(character()),
-    depth  = integer()
+    name       = character(),
+    is_dir     = logical(),
+    size       = double(),
+    mtime      = as.POSIXct(character()),
+    depth      = integer(),
+    local_path = character(),
+    drive_id   = character(),
+    drive_url  = character()
   )
 
   if (!is.null(conn$adapter)) {
@@ -576,12 +620,22 @@ gdpins_raw_ls <- function(conn, depth = 2) {
     entry_depth <- entry_depth[keep]
     listing     <- listing[keep, , drop = FALSE]
 
+    local_path_col <- file.path(
+      conn$local_path,
+      gsub("/", .Platform$file.sep, rel_path, fixed = TRUE)
+    )
+    drive_id_col  <- listing$drive_id
+    drive_url_col <- .make_drive_url(drive_id_col, listing$is_dir)
+
     tibble::tibble(
-      name   = rel_path,
-      is_dir = listing$is_dir,
-      size   = listing$size,
-      mtime  = listing$mtime,
-      depth  = entry_depth
+      name       = rel_path,
+      is_dir     = listing$is_dir,
+      size       = listing$size,
+      mtime      = listing$mtime,
+      depth      = entry_depth,
+      local_path = local_path_col,
+      drive_id   = drive_id_col,
+      drive_url  = drive_url_col
     )
   } else {
     # local_only
@@ -608,13 +662,16 @@ gdpins_raw_ls <- function(conn, depth = 2) {
     dep_keep <- entry_depth[keep]
 
     tibble::tibble(
-      name   = rel_keep,
-      is_dir = fs::is_dir(abs_keep),
-      size   = vapply(abs_keep, function(p) {
+      name       = rel_keep,
+      is_dir     = fs::is_dir(abs_keep),
+      size       = vapply(abs_keep, function(p) {
         if (fs::is_dir(p)) 0 else as.double(file.size(p))
       }, double(1L), USE.NAMES = FALSE),
-      mtime  = file.mtime(abs_keep),
-      depth  = dep_keep
+      mtime      = file.mtime(abs_keep),
+      depth      = dep_keep,
+      local_path = abs_keep,
+      drive_id   = rep(NA_character_, length(rel_keep)),
+      drive_url  = rep(NA_character_, length(rel_keep))
     )
   }
 }
