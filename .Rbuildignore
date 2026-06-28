@@ -1,3 +1,7 @@
 ^renv$
 ^renv\.lock$
 ^\.posit$
+^_pkgdown\.yml$
+^docs$
+^\.github$
+^pkgdown$

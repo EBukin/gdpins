@@ -1,0 +1,66 @@
+url: https://ebukin.github.io/gdpins/
+template:
+  bootstrap: 5
+home:
+  title: gdpins – Google Drive + pins for R
+navbar:
+  structure:
+    left:
+    - intro
+    - reference
+    - articles
+    - news
+    right: github
+  components:
+    github:
+      icon: fab fa-github fa-lg
+      href: https://github.com/EBukin/gdpins
+      aria-label: GitHub
+reference:
+- title: Board setup & auth
+  desc: |
+    Initialise a pins board backed by Google Drive and manage credentials.
+  contents:
+  - gdpins_init_board
+  - gdpins_ensure_drive_auth
+  - gdpins_is_online
+  - gdpins_board_status
+  - gdpins_sync
+- title: Pin read / write
+  desc: |
+    Read and write versioned R objects (tibbles, sf, lists) to a board.
+  contents:
+  - gdpins_pin_read
+  - gdpins_pin_write
+  - gdpins_pin_info
+  - gdpins_list_pins
+  - gdpins_detect_format
+- title: Versioning & pruning
+  desc: |
+    Manage historical versions stored on Drive and in the local cache.
+  contents:
+  - gdpins_prune_board_versions
+  - gdpins_prune_pin_versions
+- title: Raw-exogenous connection
+  desc: |
+    Plain-file interface for API/source data that should not be pinned.
+  contents:
+  - gdpins_raw_connect
+  - gdpins_raw_ls
+  - gdpins_raw_get
+  - gdpins_raw_put_file
+  - gdpins_raw_put_object
+  - gdpins_refresh_disconnect
+- title: Output layer
+  desc: |
+    Save figures and publish tabular output locally then to Drive.
+  contents:
+  - gdpins_save_figure
+  - gdpins_publish_output
+- title: Spatial helpers
+  desc: |
+    Convert between sf objects and Parquet files.
+  contents:
+  - gdpins_sf_to_parquet
+  - gdpins_parquet_to_sf
+
