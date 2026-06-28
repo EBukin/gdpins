@@ -1,0 +1,17 @@
+# R
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rcheck/
+/doc/
+/Meta/
+
+# renv
+renv/library/
+renv/staging/
+renv/sandbox/
+
+# OS
+.DS_Store
+Thumbs.db

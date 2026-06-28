@@ -1,0 +1,39 @@
+Package: gdpins
+Title: Google Drive + pins Data Management for R Projects
+Version: 0.0.0.9000
+Authors@R:
+    person("Eduard", "Bukin", email = "ebukin@worldbank.org",
+           role = c("aut", "cre"))
+Description: Layers three storage models over Google Drive: versioned pins boards
+    for processed data (data-raw, data-interm, data-clean, output-tables), a
+    plain-file raw-exogenous connection for API/source data, and a local-first
+    output layer. All Drive access is lazy-authenticated, offline-aware,
+    sync-explicit, and delete-guarded.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Config/testthat/edition: 3
+Imports:
+    pins,
+    googledrive,
+    gargle,
+    arrow,
+    sf,
+    dplyr,
+    readr,
+    tibble,
+    purrr,
+    rlang,
+    glue,
+    cli,
+    fs,
+    here,
+    curl
+Suggests:
+    testthat (>= 3.0.0),
+    covr,
+    tidyr,
+    ggplot2,
+    withr
+Config/roxygen2/version: 8.0.0
+RoxygenNote: 7.3.3
