@@ -1,0 +1,241 @@
+---
+title: "Getting Started with gdpins"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with gdpins}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  eval     = FALSE   # Drive operations need auth; keep chunks non-executable in CI
+)
+```
+
+`gdpins` is a package that layers **Google Drive + pins** for reproducible,
+offline-capable data management. Drive is the source of truth; a local cache
+mirrors it. Reads are local-first; writes fan out; sync and delete are
+explicit and guarded.
+
+## Installation
+
+`gdpins` is a package-in-place — load it from the project root:
+
+```{r load}
+pkgload::load_all(".")
+# or, once installed:
+# library(gdpins)
+```
+
+## Authentication
+
+Drive operations use lazy, CLI-guided auth. Set your email once in
+`.Renviron`:
+
+```
+GDRIVE_EMAIL=you@example.com
+```
+
+Then auth is triggered automatically on the first Drive operation, or call it
+explicitly:
+
+```{r auth}
+gdpins_ensure_drive_auth()
+```
+
+Check connectivity:
+
+```{r online}
+gdpins_is_online()
+```
+
+## Board initialisation
+
+A board wraps a layer of the data pipeline. Three configurations:
+
+```{r board-local-only}
+# Local only — no Drive, works fully offline
+bd_local <- gdpins_init_board(
+  name      = "scratch",
+  local_dir = file.path(Sys.getenv("OD_PRIV_ROOT"), "scratch")
+)
+```
+
+```{r board-drive-cache}
+# Drive + cache — standard production configuration
+bd_raw <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "kazLandEconImpact-data/data-raw",
+  cache_dir  = file.path(Sys.getenv("OD_PRIV_ROOT"),
+                         "kazLandEconImpact-data", "data-raw-cache"),
+  versioned  = TRUE,
+  create     = NA,          # prompt to create if absent
+  on_discrepancy = NULL     # "prompt" interactively / "warn" in scripts
+)
+```
+
+```{r board-super}
+# Drive + cache + standalone local (super config)
+bd_clean <- gdpins_init_board(
+  name       = "data_clean",
+  drive_path = "kazLandEconImpact-data/data-clean",
+  cache_dir  = file.path(Sys.getenv("OD_PRIV_ROOT"),
+                         "kazLandEconImpact-data", "data-clean-cache"),
+  local_dir  = file.path(Sys.getenv("OD_PRIV_ROOT"),
+                         "kazLandEconImpact-data", "data-clean-local"),
+  versioned  = TRUE
+)
+```
+
+## Writing and reading pins
+
+Pin names are **bare snake_case** — the board encodes the layer.
+
+```{r pin-write}
+library(dplyr)
+
+# Any R object — tibble, sf, list, nested tibble
+gdpins_pin_write(bd_raw, my_tibble, "gdp_panel")
+gdpins_pin_write(bd_raw, my_sf,     "parcels")    # sf auto-encoded as parquet
+```
+
+```{r pin-read}
+gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")
+parcels   <- gdpins_pin_read(bd_raw, "parcels")   # sf decoded with CRS intact
+```
+
+## Raw-exogenous connection
+
+For data as received from APIs — plain files, no pins metadata.
+
+```{r raw-connect}
+conn <- gdpins_raw_connect(
+  drive_path = "kazLandEconImpact-data/raw-exogenous/worldbank-api",
+  local_path = file.path(Sys.getenv("OD_PRIV_ROOT"),
+                         "kazLandEconImpact-data", "raw-exogenous",
+                         "worldbank-api"),
+  create     = TRUE
+)
+```
+
+```{r raw-verbs}
+# Store an R object (serialised to the appropriate format by extension)
+gdpins_raw_put_object(conn, api_response_tbl, "gdp_2024.parquet")
+
+# Upload a file verbatim (byte-faithful)
+gdpins_raw_put_file(conn, path = "downloads/kadaster_raw.geojson",
+                    name = "kadaster_raw.geojson")
+
+# Retrieve (reads from local mirror; Drive only if absent locally)
+gdp_raw  <- gdpins_raw_get(conn, "gdp_2024.parquet")
+kad_raw  <- gdpins_raw_get(conn, "kadaster_raw.geojson")
+
+# List contents
+gdpins_raw_ls(conn, depth = 2)
+```
+
+## Sync
+
+Sync is **always explicit** — never automatic.
+
+```{r sync}
+# Auto: newer side wins, both directions
+gdpins_sync(bd_raw)
+
+# Explicit direction
+gdpins_sync(bd_raw, direction = "from_drive")   # pull Drive → local
+gdpins_sync(bd_raw, direction = "to_drive")     # push local → Drive
+
+# Check status first
+gdpins_board_status(bd_raw)
+```
+
+Conflict handling for versioned boards: both sides simply become new versions
+(zero data loss). For raw/unversioned boards: `on_conflict = "stop"` halts
+and reports; `"prompt"` asks per conflict.
+
+## Discovery
+
+```{r discovery}
+# List all pins
+gdpins_list_pins(bd_clean)
+
+# Detailed info for one pin
+gdpins_pin_info(bd_clean, "parcels")
+```
+
+## Output
+
+```{r output}
+library(ggplot2)
+
+# Save a figure (PNG or SVG — ggplot object is NOT stored)
+gdpins_save_figure(
+  plot   = ggplot(gdp_panel, aes(year, value)) + geom_line(),
+  name   = "gdp_trend",
+  dir    = here::here("output", "figures"),
+  width  = 8,
+  height = 5,
+  device = "png"
+)
+
+# Write output table to output board
+gdpins_pin_write(bd_output, summary_tbl, "regional_summary")
+
+# Publish local output to Drive (deliberate final step)
+gdpins_publish_output(
+  tables_board  = bd_output,
+  figures_dir   = here::here("output", "figures"),
+  drive_tables  = "output-tables",
+  drive_figures = "output-figures",
+  dry_run       = TRUE   # preview first
+)
+
+# Then actually publish:
+gdpins_publish_output(
+  tables_board  = bd_output,
+  figures_dir   = here::here("output", "figures"),
+  dry_run       = FALSE
+)
+```
+
+## Pruning old versions
+
+```{r prune}
+# Preview what would be removed (dry_run = TRUE by default)
+gdpins_prune_pin_versions(bd_raw, "gdp_panel", keep = 3, dry_run = TRUE)
+
+# Actually prune
+gdpins_prune_board_versions(bd_raw, keep = 2, dry_run = FALSE, force = TRUE)
+```
+
+## Console output
+
+`gdpins` objects print compactly (≤80 cols):
+
+```{r print}
+print(bd_raw)
+summary(bd_raw)
+gdpins_list_pins(bd_raw)
+gdpins_pin_info(bd_raw, "gdp_panel")
+```
+
+## Layered data flow
+
+```
+API/source  ─►  raw-exogenous  ─►  data-raw  ─►  data-interm  ─►  data-clean
+  (gdpins_raw_*)                    (gdpins_pin_write / gdpins_pin_read on each board)
+                                                                        ▼
+                                          output-tables board + output-figures folder
+                                                   (gdpins_publish_output)
+```
+
+Pin names are bare snake_case. The board encodes the layer. A concept keeps
+its name (`parcels`, `gdp_panel`) as it flows `raw → interm → clean`,
+giving readable lineage without renaming.
+
+See [`docs/adr/0001-gdpins-data-architecture.md`](../docs/adr/0001-gdpins-data-architecture.md)
+for the full architectural decision record.
