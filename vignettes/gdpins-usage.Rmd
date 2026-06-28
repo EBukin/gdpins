@@ -52,12 +52,52 @@ Check connectivity:
 gdpins_is_online()
 ```
 
+## Drive adapter
+
+All Drive operations go through an adapter. Create one with `gdpins_real_drive()`
+by supplying your **project root folder ID** (visible in the folder's Drive URL):
+
+```
+https://drive.google.com/drive/folders/<your-folder-id-here>
+```
+
+```{r adapter}
+# Accepts a Drive folder ID:
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+
+# Or a path string (resolved automatically via googledrive::drive_get):
+adapter <- gdpins_real_drive("My Drive/kazLandEconImpact-data")
+```
+
+### Verify folder locations
+
+Before wiring up boards, confirm you have the right folder:
+
+```{r drive-url}
+# Returns a clickable browser URL for any folder in the adapter root
+gdpins_drive_url(adapter)                              # root folder
+gdpins_drive_url(adapter, "kazLandEconImpact-data/data-raw")  # subfolder
+```
+
+You can also pass a Drive folder ID directly as `drive_path` when you know
+exactly which folder to use — `gdpins` will verify it exists and error
+immediately if not:
+
+```{r adapter-id-as-path}
+bd_raw <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456",  # folder ID directly
+  cache_dir  = file.path(Sys.getenv("OD_PRIV_ROOT"), "data-raw-cache"),
+  adapter    = adapter
+)
+```
+
 ## Board initialisation
 
 A board wraps a layer of the data pipeline. Three configurations:
 
 ```{r board-local-only}
-# Local only — no Drive, works fully offline
+# Local only — no Drive, works fully offline (no adapter needed)
 bd_local <- gdpins_init_board(
   name      = "scratch",
   local_dir = file.path(Sys.getenv("OD_PRIV_ROOT"), "scratch")
@@ -71,6 +111,7 @@ bd_raw <- gdpins_init_board(
   drive_path = "kazLandEconImpact-data/data-raw",
   cache_dir  = file.path(Sys.getenv("OD_PRIV_ROOT"),
                          "kazLandEconImpact-data", "data-raw-cache"),
+  adapter    = adapter,
   versioned  = TRUE,
   create     = NA,          # prompt to create if absent
   on_discrepancy = NULL     # "prompt" interactively / "warn" in scripts
@@ -86,6 +127,7 @@ bd_clean <- gdpins_init_board(
                          "kazLandEconImpact-data", "data-clean-cache"),
   local_dir  = file.path(Sys.getenv("OD_PRIV_ROOT"),
                          "kazLandEconImpact-data", "data-clean-local"),
+  adapter    = adapter,
   versioned  = TRUE
 )
 ```
@@ -117,6 +159,7 @@ conn <- gdpins_raw_connect(
   local_path = file.path(Sys.getenv("OD_PRIV_ROOT"),
                          "kazLandEconImpact-data", "raw-exogenous",
                          "worldbank-api"),
+  adapter    = adapter,
   create     = TRUE
 )
 ```
@@ -191,6 +234,7 @@ gdpins_publish_output(
   figures_dir   = here::here("output", "figures"),
   drive_tables  = "output-tables",
   drive_figures = "output-figures",
+  adapter       = adapter,
   dry_run       = TRUE   # preview first
 )
 
@@ -198,6 +242,7 @@ gdpins_publish_output(
 gdpins_publish_output(
   tables_board  = bd_output,
   figures_dir   = here::here("output", "figures"),
+  adapter       = adapter,
   dry_run       = FALSE
 )
 ```
@@ -239,3 +284,6 @@ giving readable lineage without renaming.
 
 See [`docs/adr/0001-gdpins-data-architecture.md`](../docs/adr/0001-gdpins-data-architecture.md)
 for the full architectural decision record.
+
+See also the **[Google Drive Adapter](google-drive-adapter.html)** vignette for
+a deeper guide to adapter setup, folder ID lookup, and `gdpins_drive_url()`.

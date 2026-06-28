@@ -39,3 +39,32 @@ warning is emitted. No Drive calls are made offline.
 \strong{Raw connection signal columns}: \code{drive_md5}, \code{local_md5}, \code{drive_mtime},
 \code{local_mtime}.
 }
+\examples{
+# --- Fake adapter board ---
+adapter <- gdpins_fake_drive()
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_board_status(board)
+
+# --- Real adapter ---
+\dontrun{
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+board   <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = "~/.cache/gdpins/data-raw",
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_board_status(board)
+}
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter, \code{\link[=gdpins_init_board]{gdpins_init_board()}}
+and \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}} to create boards/connections.
+}

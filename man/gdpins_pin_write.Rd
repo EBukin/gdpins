@@ -31,3 +31,30 @@ Serialises \code{x} and writes it to every non-NULL component of \code{board}
 If \code{x} is an \code{sf} object, it is encoded with \code{\link[=gdpins_sf_to_parquet]{gdpins_sf_to_parquet()}}
 before writing (type \code{"arrow"}).
 }
+\examples{
+adapter <- gdpins_fake_drive()
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+
+gdpins_pin_write(board, mtcars, "cars")
+
+\dontrun{
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = "~/.cache/gdpins/data-raw",
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_pin_write(board, mtcars, "cars")
+}
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_pin_read]{gdpins_pin_read()}}.
+}

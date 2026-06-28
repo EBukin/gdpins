@@ -86,6 +86,28 @@ gdpins_save_figure <- function(
 #'   uploading. Default `FALSE`.
 #'
 #' @return Invisibly `NULL`. Called for its side effect.
+#' @seealso [gdpins_real_drive()] to create an adapter.
+#' @examples
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#'
+#' # Publish via adapter directly
+#' gdpins_publish_output(
+#'   figures_dir   = "output/figures",
+#'   adapter       = adapter,
+#'   drive_figures = "my-project/output-figures"
+#' )
+#'
+#' # Or pass a board that already holds the adapter
+#' board <- gdpins_init_board(
+#'   name       = "output",
+#'   drive_path = "my-project/output-tables",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_publish_output(tables_board = board, figures_dir = "output/figures")
+#' }
 #' @export
 gdpins_publish_output <- function(
     tables_board  = NULL,

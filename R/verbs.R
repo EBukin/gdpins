@@ -69,6 +69,30 @@ NULL
 #'   `NULL` auto-detects via [gdpins_detect_format()].
 #'
 #' @return Invisibly `NULL`. Called for its side effect.
+#' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_read()].
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#'
+#' gdpins_pin_write(board, mtcars, "cars")
+#'
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = "~/.cache/gdpins/data-raw",
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_pin_write(board, mtcars, "cars")
+#' }
 #' @export
 gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL) {
   if (!inherits(board, "gdpins_board")) {
@@ -152,6 +176,30 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL) {
 #' @param version Character scalar or `NULL`. Pin version; `NULL` = latest.
 #'
 #' @return The pinned R object.
+#' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_write()].
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_pin_write(board, mtcars, "cars")
+#' gdpins_pin_read(board, "cars")
+#'
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = "~/.cache/gdpins/data-raw",
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_pin_read(board, "cars")
+#' }
 #' @export
 gdpins_pin_read <- function(board, name, version = NULL) {
   if (!inherits(board, "gdpins_board")) {

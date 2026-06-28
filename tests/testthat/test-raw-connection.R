@@ -233,6 +233,21 @@ test_that("get errors when local file absent and no force_refresh", {
   )
 })
 
+test_that("gdpins_raw_connect: fake adapter with ID-like drive_path still works as path", {
+  adapter <- gdpins_fake_drive()
+  local_path <- withr::local_tempdir()
+
+  conn <- gdpins_raw_connect(
+    drive_path = "nodash",
+    local_path = local_path,
+    adapter    = adapter,
+    create     = TRUE
+  )
+
+  expect_s3_class(conn, "gdpins_raw_conn")
+  expect_equal(conn$drive_path, "nodash")
+})
+
 # ── raw_ls depth ──────────────────────────────────────────────────────────────
 
 test_that("raw_ls returns tibble with expected columns", {

@@ -32,3 +32,17 @@ removed (or would-be-removed) version labels.
 Applies \code{\link[=gdpins_prune_pin_versions]{gdpins_prune_pin_versions()}} to every pin in \code{board}. Defaults to
 \code{dry_run = TRUE}.
 }
+\examples{
+adapter <- gdpins_fake_drive()
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_prune_board_versions(board, keep = 2L, dry_run = TRUE)
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}.
+}

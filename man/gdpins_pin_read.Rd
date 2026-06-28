@@ -24,3 +24,30 @@ else Drive board. Hits the network only if the pin is absent locally.
 If the stored object contains \verb{__<epsg>__}-suffixed geometry columns (WKT
 encoding), the geometry is automatically restored via \code{\link[=gdpins_parquet_to_sf]{gdpins_parquet_to_sf()}}.
 }
+\examples{
+adapter <- gdpins_fake_drive()
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_pin_write(board, mtcars, "cars")
+gdpins_pin_read(board, "cars")
+
+\dontrun{
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = "~/.cache/gdpins/data-raw",
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_pin_read(board, "cars")
+}
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_pin_write]{gdpins_pin_write()}}.
+}

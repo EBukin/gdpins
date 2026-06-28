@@ -7,15 +7,31 @@
 gdpins_real_drive(root_id)
 }
 \arguments{
-\item{root_id}{Character scalar. Drive file ID of the project root folder
-(e.g. from the folder URL or \code{googledrive::drive_get("name")$id}).}
+\item{root_id}{Character scalar. Drive folder ID of the project root folder,
+or a Drive path string (for example \code{"My Drive/projects/myproject"}).}
 }
 \value{
 An object of class \code{gdpins_drive_adapter}.
 }
 \description{
-Wraps \code{googledrive} functions via Drive-ID-based navigation. Only exercised
-in the live tier. The root folder is identified by its Drive file ID so the
-adapter works regardless of the folder's location in My Drive.
+Wraps \code{googledrive} functions via Drive-ID-based navigation. Supply either a
+Google Drive folder ID or a path string to the project root folder.
 }
-\keyword{internal}
+\details{
+If \code{root_id} looks like a Drive path (contains \code{"/"} or spaces),
+\code{gdpins_real_drive()} resolves it via \code{\link[googledrive:drive_get]{googledrive::drive_get()}}. Otherwise
+it is treated as a Drive folder ID directly.
+}
+\examples{
+\dontrun{
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+adapter
+
+# Path strings are auto-resolved via googledrive::drive_get()
+adapter2 <- gdpins_real_drive("My Drive/projects/myproject")
+adapter2
+}
+}
+\seealso{
+\code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}}
+}

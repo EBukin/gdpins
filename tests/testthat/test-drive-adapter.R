@@ -313,10 +313,54 @@ test_that("gd_ls() relative paths use forward-slash separator", {
   expect_true(any(grepl("subdir", result$path, fixed = TRUE)))
 })
 
+test_that(".is_drive_id detects IDs vs paths", {
+  # Real Drive IDs: alphanumeric only, >= 25 chars
+  expect_true(.is_drive_id("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"))
+  expect_true(.is_drive_id("0B5q9muIMiDRoOWlFTjgzXzZLSkE"))  # old-style 28-char
+  # Path strings
+  expect_false(.is_drive_id("folder/subfolder"))
+  expect_false(.is_drive_id("My Drive"))
+  expect_false(.is_drive_id("disc-20260628T151324"))   # timestamped, has hyphen
+  expect_false(.is_drive_id("geo3857"))                # short name
+  # Edge cases
+  expect_false(.is_drive_id(""))
+  expect_false(.is_drive_id(NA_character_))
+  expect_false(.is_drive_id("shortalphanumeric"))      # too short (< 25 chars)
+})
+
+test_that("gdpins_drive_url returns NA for fake adapter with message", {
+  adapter <- gdpins_fake_drive()
+  expect_message(
+    url <- gdpins_drive_url(adapter),
+    "Fake Drive"
+  )
+  expect_true(is.na(url))
+})
+
+test_that("gdpins_drive_url returns NA for fake adapter with path", {
+  adapter <- gdpins_fake_drive()
+  expect_message(
+    url <- gdpins_drive_url(adapter, "some/path"),
+    "Fake Drive"
+  )
+  expect_true(is.na(url))
+})
+
+test_that("gdpins_real_drive is exported and creates adapter", {
+  adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+  expect_s3_class(adapter, "gdpins_drive_adapter")
+  expect_equal(adapter$kind, "real")
+  expect_equal(adapter$root_id, "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+})
+
 # ── Real adapter (skip unless live) ──────────────────────────────────────────
 
 test_that("gdpins_real_drive() returns a gdpins_drive_adapter", {
   skip_on_ci()
+  skip_if(
+    nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")),
+    "Skipping live Drive auth during R CMD check"
+  )
   skip_if_offline()
   folder_id <- Sys.getenv("GDRIVE_TEST_FOLDER")
   skip_if(!nzchar(folder_id), "GDRIVE_TEST_FOLDER not set")

@@ -58,3 +58,39 @@ On init the board checks for sync discrepancies between Drive and local
 (governed by \code{on_discrepancy}). Non-existent Drive boards are never
 auto-created unless \code{create = TRUE}.
 }
+\examples{
+# --- Fake adapter (no network) ---
+adapter <- gdpins_fake_drive()
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+board
+
+# --- Real adapter (requires Google Drive auth) ---
+\dontrun{
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = "~/.cache/gdpins/data-raw",
+  adapter    = adapter,
+  create     = TRUE
+)
+
+# Supply a Drive folder ID directly as drive_path
+board2 <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  cache_dir  = "~/.cache/gdpins/data-raw",
+  adapter    = adapter,
+  create     = TRUE
+)
+}
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter.
+}

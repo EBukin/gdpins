@@ -38,6 +38,32 @@ NULL
 #' **Raw connection signal columns**: `drive_md5`, `local_md5`, `drive_mtime`,
 #' `local_mtime`.
 #'
+#' @seealso [gdpins_real_drive()] to create an adapter, [gdpins_init_board()]
+#'   and [gdpins_raw_connect()] to create boards/connections.
+#' @examples
+#' # --- Fake adapter board ---
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_board_status(board)
+#'
+#' # --- Real adapter ---
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' board   <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = "~/.cache/gdpins/data-raw",
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_board_status(board)
+#' }
 #' @export
 gdpins_board_status <- function(x) {
   UseMethod("gdpins_board_status")
@@ -92,6 +118,30 @@ gdpins_board_status.default <- function(x) {
 #'   "stop")`. Default `"version"`.
 #'
 #' @return Invisibly `x`. Called for its side effect.
+#' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_raw_connect()].
+#' @examples
+#' # --- Fake adapter board ---
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_sync(board)
+#'
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' board   <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = "~/.cache/gdpins/data-raw",
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_sync(board, direction = "from_drive")
+#' }
 #' @export
 gdpins_sync <- function(
     x,

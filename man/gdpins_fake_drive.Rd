@@ -23,4 +23,11 @@ the default test seam — \strong{never hits the network}.
 never calls \code{unlink()}. \code{gd_md5()} uses \code{tools::md5sum()}. \code{gd_ls()}
 excludes trashed entries.
 }
-\keyword{internal}
+\examples{
+adapter <- gdpins_fake_drive()
+adapter$mkdir("project/data-raw")
+adapter$exists("project/data-raw")
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} for the live Google Drive adapter.
+}

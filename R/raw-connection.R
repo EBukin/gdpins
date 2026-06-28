@@ -159,6 +159,35 @@ NULL
 #' @param adapter A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
 #'
 #' @return A `gdpins_raw_conn` object.
+#' @seealso [gdpins_real_drive()] to create an adapter.
+#' @examples
+#' # --- Fake adapter (no network) ---
+#' adapter <- gdpins_fake_drive()
+#' conn <- gdpins_raw_connect(
+#'   drive_path = "worldbank-api",
+#'   local_path = tempfile("raw_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' conn
+#'
+#' # --- Real adapter ---
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' conn <- gdpins_raw_connect(
+#'   drive_path = "worldbank-api",
+#'   local_path = "data/raw/worldbank-api",
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#'
+#' # Supply a Drive folder ID directly as drive_path
+#' conn2 <- gdpins_raw_connect(
+#'   drive_path = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+#'   local_path = "data/raw/worldbank-api",
+#'   adapter    = adapter
+#' )
+#' }
 #' @export
 gdpins_raw_connect <- function(
     drive_path,
@@ -195,6 +224,30 @@ gdpins_raw_connect <- function(
 
   # Create-confirm logic for Drive folder
   drive_exists <- gd_exists(adapter, drive_path)
+
+  # Real adapter + drive_path looks like a Drive ID: verify directly, no create
+  if (!drive_exists && identical(adapter$kind, "real") && .is_drive_id(drive_path)) {
+    # nocov start
+    d <- tryCatch(
+      googledrive::drive_get(googledrive::as_id(drive_path)),
+      error = function(e) NULL
+    )
+    if (is.null(d) || nrow(d) == 0L) {
+      cli::cli_abort(c(
+        "Drive folder ID not found: {.val {drive_path}}",
+        x = "Folder does not exist or is not accessible.",
+        i = "Verify the ID in your Google Drive URL."
+      ))
+    }
+    fs::dir_create(local_path)
+    return(new_gdpins_raw_conn(
+      config     = "drive_local",
+      drive_path = drive_path,
+      local_path = local_path,
+      adapter    = adapter
+    ))
+    # nocov end
+  }
 
   if (!drive_exists) {
     if (isTRUE(create)) {

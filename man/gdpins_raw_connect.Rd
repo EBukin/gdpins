@@ -35,3 +35,35 @@ Creates a \code{gdpins_raw_conn} object pointing at a Drive raw-root and its
 local mirror. On connect, checks for sync discrepancies and whether the
 Drive folder exists (controlled by \code{create} and \code{on_discrepancy}).
 }
+\examples{
+# --- Fake adapter (no network) ---
+adapter <- gdpins_fake_drive()
+conn <- gdpins_raw_connect(
+  drive_path = "worldbank-api",
+  local_path = tempfile("raw_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+conn
+
+# --- Real adapter ---
+\dontrun{
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+conn <- gdpins_raw_connect(
+  drive_path = "worldbank-api",
+  local_path = "data/raw/worldbank-api",
+  adapter    = adapter,
+  create     = TRUE
+)
+
+# Supply a Drive folder ID directly as drive_path
+conn2 <- gdpins_raw_connect(
+  drive_path = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  local_path = "data/raw/worldbank-api",
+  adapter    = adapter
+)
+}
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter.
+}

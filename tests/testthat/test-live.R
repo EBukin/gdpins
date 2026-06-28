@@ -13,6 +13,10 @@
 .skip_live <- function() {
   testthat::skip_on_ci()
   testthat::skip_if(
+    nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")),
+    message = "Skipping live tier during R CMD check."
+  )
+  testthat::skip_if(
     !gdpins_is_online(),
     message = "No internet connection — skipping live tier."
   )

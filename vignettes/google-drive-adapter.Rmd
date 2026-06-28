@@ -1,0 +1,118 @@
+---
+title: "Setting up the Google Drive Adapter"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Setting up the Google Drive Adapter}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(gdpins)
+```
+
+## What is the Drive adapter?
+
+The `gdpins` package isolates all Google Drive operations behind a *Drive adapter* (`gdpins_drive_adapter`). Every function that touches Drive — boards, raw connections, sync, publish — receives the adapter rather than calling `googledrive` directly. This seam lets you swap a real adapter for a fake (tempdir-backed) one in tests without any network calls.
+
+## Creating a real adapter
+
+Use `gdpins_real_drive()` to create a real adapter. You must supply the **Drive folder ID** of your project root folder — or a path string to look it up.
+
+### Finding your folder ID
+
+Open the folder in Google Drive in a browser. The URL looks like:
+
+```
+https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms
+```
+
+The last segment is the folder ID.
+
+### Creating the adapter
+
+```{r, eval=FALSE}
+# Using a Drive folder ID (recommended):
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+
+# Using a path string (resolved via googledrive::drive_get):
+adapter <- gdpins_real_drive("My Drive/projects/myproject")
+```
+
+## Verifying the folder location
+
+Use `gdpins_drive_url()` to get a clickable URL for any folder within the adapter root:
+
+```{r, eval=FALSE}
+# Root folder URL:
+gdpins_drive_url(adapter)
+
+# Subfolder URL:
+gdpins_drive_url(adapter, "data-raw")
+```
+
+Copy-paste the URL into your browser to visually confirm the location before connecting boards.
+
+## Setting up a board
+
+```{r, eval=FALSE}
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",   # relative to adapter root
+  cache_dir  = "~/.cache/gdpins/data-raw",
+  adapter    = adapter,
+  create     = TRUE
+)
+board
+```
+
+You can also supply a Drive folder ID directly as `drive_path` — useful when you know the exact folder ID:
+
+```{r, eval=FALSE}
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456",
+  cache_dir  = "~/.cache/gdpins/data-raw",
+  adapter    = adapter
+)
+```
+
+When `drive_path` is a folder ID, `gdpins` verifies it exists and errors immediately if not found. The `create` argument is ignored — folder IDs cannot be auto-created.
+
+## Setting up a raw connection
+
+```{r, eval=FALSE}
+conn <- gdpins_raw_connect(
+  drive_path = "worldbank-api",
+  local_path = "data/raw/worldbank-api",
+  adapter    = adapter,
+  create     = TRUE
+)
+conn
+```
+
+## Testing with a fake adapter
+
+In scripts and packages, use `gdpins_fake_drive()` for offline testing:
+
+```{r}
+adapter <- gdpins_fake_drive()
+
+board <- gdpins_init_board(
+  name       = "test_board",
+  drive_path = "project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+board
+```
+
+The fake adapter mirrors Drive operations on the local filesystem — no credentials, no network, fully reproducible.

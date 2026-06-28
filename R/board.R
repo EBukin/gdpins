@@ -140,6 +140,39 @@ NULL
 #' @param adapter A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
 #'
 #' @return A `gdpins_board` object.
+#' @seealso [gdpins_real_drive()] to create an adapter.
+#' @examples
+#' # --- Fake adapter (no network) ---
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' board
+#'
+#' # --- Real adapter (requires Google Drive auth) ---
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = "~/.cache/gdpins/data-raw",
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#'
+#' # Supply a Drive folder ID directly as drive_path
+#' board2 <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+#'   cache_dir  = "~/.cache/gdpins/data-raw",
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' }
 #' @export
 gdpins_init_board <- function(
     name,
@@ -263,6 +296,62 @@ gdpins_init_board <- function(
 
   # ── create-confirm logic ─────────────────────────────────────────────────────
   drive_exists <- gd_exists(adapter, drive_path)
+
+  # ── Drive ID fast-path (real adapter only) ────────────────────────────────
+  # If drive_path looks like a Drive folder ID and does not already resolve
+  # relative to the adapter root, verify directly.
+  if (!drive_exists && identical(adapter$kind, "real") && .is_drive_id(drive_path)) {
+    # nocov start
+    d <- tryCatch(
+      googledrive::drive_get(googledrive::as_id(drive_path)),
+      error = function(e) NULL
+    )
+    if (is.null(d) || nrow(d) == 0L) {
+      cli::cli_abort(c(
+        "Drive folder ID not found: {.val {drive_path}}",
+        x = "Folder does not exist or is not accessible.",
+        i = "Verify the ID in your Google Drive URL."
+      ))
+    }
+    drive_folder_id <- drive_path
+    if (!dir.exists(cache_dir)) fs::dir_create(cache_dir)
+    drive_board <- pins::board_gdrive(
+      googledrive::as_id(drive_folder_id),
+      cache = cache_dir
+    )
+    cache_board <- pins::board_folder(cache_dir, versioned = versioned)
+    if (config == "drive_cache") {
+      board <- new_gdpins_board(
+        config      = "drive_cache",
+        name        = name,
+        drive_board = drive_board,
+        cache_board = cache_board,
+        cache_dir   = cache_dir,
+        drive_path  = drive_path,
+        adapter     = adapter,
+        versioned   = versioned
+      )
+      .handle_init_sync(board, on_discrepancy)
+      return(board)
+    }
+    if (!dir.exists(local_dir)) fs::dir_create(local_dir)
+    local_board <- pins::board_folder(local_dir, versioned = versioned)
+    board <- new_gdpins_board(
+      config      = "drive_cache_local",
+      name        = name,
+      drive_board = drive_board,
+      cache_board = cache_board,
+      local_board = local_board,
+      cache_dir   = cache_dir,
+      local_dir   = local_dir,
+      drive_path  = drive_path,
+      adapter     = adapter,
+      versioned   = versioned
+    )
+    .handle_init_sync(board, on_discrepancy)
+    return(board)
+    # nocov end
+  }
 
   if (!drive_exists) {
     if (isTRUE(create)) {

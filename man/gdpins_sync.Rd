@@ -46,3 +46,30 @@ interactively per conflict.
 Writes and syncs are blocked when offline (\code{gdpins_is_online()} is
 \code{FALSE}). An informative error is raised.
 }
+\examples{
+# --- Fake adapter board ---
+adapter <- gdpins_fake_drive()
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_sync(board)
+
+\dontrun{
+adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+board   <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = "~/.cache/gdpins/data-raw",
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_sync(board, direction = "from_drive")
+}
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}}.
+}

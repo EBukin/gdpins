@@ -14,6 +14,7 @@ test_that("save_figure renders PNG to a file", {
 
 test_that("save_figure renders SVG to a file", {
   skip_if_not_installed("ggplot2")
+  skip_if_not_installed("svglite")
   dir <- withr::local_tempdir()
   p   <- fx_ggplot()
   out <- gdpins_save_figure(p, "my_fig", dir, device = "svg", dpi = 72)
@@ -351,6 +352,7 @@ test_that(".collect_figures_work: nonexistent dir returns empty tibble", {
 
 test_that(".collect_figures_work: lists only png/svg files", {
   skip_if_not_installed("ggplot2")
+  skip_if_not_installed("svglite")
   dir <- withr::local_tempdir()
   gdpins_save_figure(fx_ggplot(), "a", dir, device = "png", dpi = 72)
   gdpins_save_figure(fx_ggplot(), "b", dir, device = "svg", dpi = 72)

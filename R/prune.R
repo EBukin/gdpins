@@ -155,6 +155,19 @@ NULL
 #'
 #' @return Invisibly, a character vector of the version labels that were (or
 #'   would be) removed (as reported by the primary / Drive board).
+#' @seealso [gdpins_real_drive()], [gdpins_init_board()].
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' \dontrun{
+#' gdpins_prune_pin_versions(board, name = "my-pin", keep = 3L)
+#' }
 #' @export
 gdpins_prune_pin_versions <- function(
     board,
@@ -262,6 +275,17 @@ gdpins_prune_pin_versions <- function(
 #'
 #' @return Invisibly, a named list of character vectors (one per pin) of
 #'   removed (or would-be-removed) version labels.
+#' @seealso [gdpins_real_drive()], [gdpins_init_board()].
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_prune_board_versions(board, keep = 2L, dry_run = TRUE)
 #' @export
 gdpins_prune_board_versions <- function(
     board,

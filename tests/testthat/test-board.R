@@ -237,6 +237,29 @@ test_that("non-existent Drive path + create=NA + non-interactive -> error", {
   )
 })
 
+test_that("gdpins_init_board: fake adapter ignores .is_drive_id heuristic (path works)", {
+  adapter <- gdpins_fake_drive()
+  cache_dir <- withr::local_tempdir()
+
+  testthat::local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
+    .package = "gdpins"
+  )
+
+  board <- gdpins_init_board(
+    name           = "test",
+    drive_path     = "nodash",
+    cache_dir      = cache_dir,
+    adapter        = adapter,
+    create         = TRUE,
+    on_discrepancy = "ignore"
+  )
+
+  expect_s3_class(board, "gdpins_board")
+  expect_equal(board$drive_path, "nodash")
+})
+
 # ── 5. Offline fallback ───────────────────────────────────────────────────────
 
 test_that("drive_cache offline -> falls back to local-only (cache dir), warns", {

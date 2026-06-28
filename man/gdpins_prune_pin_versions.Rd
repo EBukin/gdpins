@@ -51,3 +51,19 @@ during a dry run.
 \strong{Raw files are never auto-deleted by any function} -- removal is manual
 outside R.
 }
+\examples{
+adapter <- gdpins_fake_drive()
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "my-project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+\dontrun{
+gdpins_prune_pin_versions(board, name = "my-pin", keep = 3L)
+}
+}
+\seealso{
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}.
+}

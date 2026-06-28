@@ -18,19 +18,40 @@ NULL
 
 #' Create a real Google Drive adapter
 #'
-#' Wraps `googledrive` functions via Drive-ID-based navigation. Only exercised
-#' in the live tier. The root folder is identified by its Drive file ID so the
-#' adapter works regardless of the folder's location in My Drive.
+#' Wraps `googledrive` functions via Drive-ID-based navigation. Supply either a
+#' Google Drive folder ID or a path string to the project root folder.
 #'
-#' @param root_id Character scalar. Drive file ID of the project root folder
-#'   (e.g. from the folder URL or `googledrive::drive_get("name")$id`).
+#' If `root_id` looks like a Drive path (contains `"/"` or spaces),
+#' `gdpins_real_drive()` resolves it via [googledrive::drive_get()]. Otherwise
+#' it is treated as a Drive folder ID directly.
+#'
+#' @param root_id Character scalar. Drive folder ID of the project root folder,
+#'   or a Drive path string (for example `"My Drive/projects/myproject"`).
 #'
 #' @return An object of class `gdpins_drive_adapter`.
-#' @keywords internal
+#' @seealso [gdpins_init_board()], [gdpins_raw_connect()]
+#' @export
+#' @examples
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' adapter
+#'
+#' # Path strings are auto-resolved via googledrive::drive_get()
+#' adapter2 <- gdpins_real_drive("My Drive/projects/myproject")
+#' adapter2
+#' }
 gdpins_real_drive <- function(root_id) {
   stopifnot(is.character(root_id), length(root_id) == 1L)
 
   # nocov start
+  if (grepl("/", root_id, fixed = TRUE) || grepl(" ", root_id, fixed = TRUE)) {
+    d <- googledrive::drive_get(root_id)
+    if (nrow(d) == 0L) {
+      cli::cli_abort("Drive folder not found for path: {.val {root_id}}")
+    }
+    root_id <- d$id[[1L]]
+  }
+
   # Lazy root dribble — fetched from Drive on first operation.
   state <- new.env(parent = emptyenv())
   state$root_dribble <- NULL
@@ -55,6 +76,17 @@ gdpins_real_drive <- function(root_id) {
       drib <- .resolve_real_path(.root(), path)
       if (is.null(drib)) return(NA_character_)
       drib$id[[1L]]
+    },
+
+    get_url = function(path) {
+      id <- if (nzchar(path)) {
+        drib <- .resolve_real_path(.root(), path)
+        if (is.null(drib)) return(NA_character_)
+        drib$id[[1L]]
+      } else {
+        root_id
+      }
+      paste0("https://drive.google.com/drive/folders/", id)
     },
 
     exists = function(path) {
@@ -176,7 +208,12 @@ gdpins_real_drive <- function(root_id) {
 #'   a fresh `tempfile()` path (created on first use).
 #'
 #' @return An object of class `gdpins_drive_adapter`.
-#' @keywords internal
+#' @seealso [gdpins_real_drive()] for the live Google Drive adapter.
+#' @export
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' adapter$mkdir("project/data-raw")
+#' adapter$exists("project/data-raw")
 gdpins_fake_drive <- function(root = tempfile("gdpins_fake_drive_")) {
   stopifnot(is.character(root), length(root) == 1L)
 
@@ -207,6 +244,11 @@ gdpins_fake_drive <- function(root = tempfile("gdpins_fake_drive_")) {
     kind = "fake",
     root = root,
     state = state,  # exposed for test inspection
+
+    get_url = function(path) {
+      cli::cli_inform("Fake Drive adapter has no real URL.")
+      NA_character_
+    },
 
     exists = function(path) {
       abs <- .abs(path)
@@ -448,7 +490,48 @@ gd_ls <- function(adapter, path = "", recursive = FALSE) {
   adapter$ls(path, recursive)
 }
 
+#' Return the Google Drive URL for a folder
+#'
+#' Returns the browser URL for the Drive folder at `path` (relative to the
+#' adapter root). Useful for visually verifying folder locations before
+#' setting up boards.
+#'
+#' For fake adapters (test seams), returns `NA_character_` and emits an
+#' informative message.
+#'
+#' @param adapter A `gdpins_drive_adapter` object.
+#' @param path Character scalar. Path relative to the adapter root. Default
+#'   `""` returns the URL for the root folder itself.
+#'
+#' @return Character scalar URL, or `NA_character_` for fake adapters.
+#' @seealso [gdpins_real_drive()] to create a real adapter.
+#' @export
+#' @examples
+#' \dontrun{
+#' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' gdpins_drive_url(adapter)             # root folder URL
+#' gdpins_drive_url(adapter, "data-raw") # subfolder URL
+#' }
+gdpins_drive_url <- function(adapter, path = "") {
+  adapter$get_url(path)
+}
+
 # ── Internal helpers ──────────────────────────────────────────────────────────
+
+#' Detect whether a string looks like a Drive folder ID
+#'
+#' Heuristic: no `"/"` and no spaces -> Drive ID; otherwise -> path string.
+#'
+#' @param x Character scalar.
+#' @return Logical scalar.
+#' @keywords internal
+.is_drive_id <- function(x) {
+  # Drive folder IDs are purely alphanumeric (no hyphens, slashes, or spaces)
+  # and at least 25 characters long. This distinguishes them from folder path
+  # strings (which contain "/" or "-") and short folder names.
+  is.character(x) && length(x) == 1L && !is.na(x) && nchar(x) >= 25L &&
+    grepl("^[A-Za-z0-9_]+$", x)
+}
 
 #' Walk path segments from root_dribble; return the final dribble or NULL
 #' @keywords internal
