@@ -140,6 +140,36 @@ NULL
   paths
 }
 
+# Normalize relative path vectors for stable comparison across platforms/shells.
+.normalize_rel_paths <- function(paths, dedupe = TRUE) {
+  if (length(paths) == 0L) return(character(0L))
+  norm <- as.character(paths)
+  norm <- gsub("\\\\", "/", norm)
+  norm <- gsub("^\\./+", "", norm)
+  norm <- gsub("/+", "/", norm)
+  norm <- sub("^/+", "", norm)
+  norm <- sub("/+$", "", norm)
+  if (.Platform$OS.type == "windows") {
+    norm <- tolower(norm)
+  }
+  if (isTRUE(dedupe)) {
+    norm <- unique(norm[nzchar(norm)])
+  }
+  norm
+}
+
+# Ignore common sync/system sidecars that should not trigger raw sync decisions.
+.is_sync_sidecar <- function(paths) {
+  if (length(paths) == 0L) return(logical(0L))
+  base <- tolower(basename(.normalize_rel_paths(paths, dedupe = FALSE)))
+  base %in% c("desktop.ini", "thumbs.db", ".ds_store") | grepl("^~\\$", base)
+}
+
+.discrepancy_paths <- function(paths) {
+  norm <- .normalize_rel_paths(paths, dedupe = FALSE)
+  unique(norm[nzchar(norm) & !.is_sync_sidecar(norm)])
+}
+
 # ── gdpins_raw_connect ────────────────────────────────────────────────────────
 
 #' Connect to a raw-exogenous Drive folder
@@ -159,7 +189,7 @@ NULL
 #' @param adapter A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
 #'
 #' @return A `gdpins_raw_conn` object.
-#' @seealso [gdpins_real_drive()] to create an adapter.
+#' @seealso [gdpins_real_drive()] to create an adapter, [gdpins_raw_remove()].
 #' @examples
 #' # --- Fake adapter (no network) ---
 #' adapter <- gdpins_fake_drive()
@@ -302,7 +332,10 @@ gdpins_raw_connect <- function(
     }, character(1L), USE.NAMES = FALSE)
   }
 
-  has_discrepancy <- !setequal(drive_files, local_rel)
+  drive_cmp <- .discrepancy_paths(drive_files)
+  local_cmp <- .discrepancy_paths(local_rel)
+
+  has_discrepancy <- !setequal(drive_cmp, local_cmp)
 
   if (has_discrepancy) {
     switch(
@@ -314,7 +347,7 @@ gdpins_raw_connect <- function(
           )
           answer <- .raw_readline("Sync from Drive? [y/N] ")
           if (tolower(trimws(answer)) == "y") {
-            for (f in drive_files) {
+            for (f in drive_files[!.is_sync_sidecar(drive_files)]) {
               local_dest <- file.path(local_path,
                                       gsub("/", .Platform$file.sep, f, fixed = TRUE))
               fs::dir_create(dirname(local_dest))
@@ -333,7 +366,7 @@ gdpins_raw_connect <- function(
         )
       },
       "sync_from_drive" = {
-        for (f in drive_files) {
+        for (f in drive_files[!.is_sync_sidecar(drive_files)]) {
           local_dest <- file.path(local_path,
                                   gsub("/", .Platform$file.sep, f, fixed = TRUE))
           fs::dir_create(dirname(local_dest))
@@ -341,7 +374,7 @@ gdpins_raw_connect <- function(
         }
       },
       "sync_to_drive" = {
-        for (f in local_rel) {
+        for (f in local_rel[!.is_sync_sidecar(local_rel)]) {
           local_src  <- file.path(local_path,
                                   gsub("/", .Platform$file.sep, f, fixed = TRUE))
           drive_dest <- paste0(drive_path, "/", f)
@@ -419,6 +452,52 @@ gdpins_raw_put_file <- function(conn, path, name) {
   if (!is.null(conn$adapter)) {
     drive_dest <- .drive_full_path(conn, name)
     gd_upload(conn$adapter, local_dest, drive_dest)
+  }
+
+  invisible(NULL)
+}
+
+#' Remove a file from a raw connection
+#'
+#' Deletes a single file from the local mirror and, when Drive is configured,
+#' moves the Drive file to trash (recoverable). Missing files are ignored
+#' (idempotent no-op). Folder-recursive deletion is not supported.
+#'
+#' @param conn A `gdpins_raw_conn` object.
+#' @param name Character scalar. Relative file path within the raw-root.
+#'
+#' @return Invisibly `NULL`.
+#' @seealso [gdpins_raw_put_object()], [gdpins_raw_put_file()], [gdpins_raw_get()].
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' conn <- gdpins_raw_connect(
+#'   drive_path = "worldbank-api",
+#'   local_path = tempfile("raw_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_raw_put_object(conn, mtcars, "cars.csv")
+#' gdpins_raw_remove(conn, "cars.csv")
+#' @export
+gdpins_raw_remove <- function(conn, name) {
+  if (!inherits(conn, "gdpins_raw_conn")) {
+    cli::cli_abort(c(
+      "{.arg conn} must be a {.cls gdpins_raw_conn}.",
+      x = "Got {.cls {class(conn)}}."
+    ))
+  }
+  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
+    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
+  }
+
+  local_file <- .local_full_path(conn, name)
+  if (file.exists(local_file)) {
+    fs::file_delete(local_file)
+  }
+
+  if (!is.null(conn$adapter)) {
+    drive_file <- .drive_full_path(conn, name)
+    gd_trash(conn$adapter, drive_file)
   }
 
   invisible(NULL)

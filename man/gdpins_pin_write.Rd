@@ -56,5 +56,6 @@ gdpins_pin_write(board, mtcars, "cars")
 }
 }
 \seealso{
-\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_pin_read]{gdpins_pin_read()}}.
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_pin_read]{gdpins_pin_read()}},
+\code{\link[=gdpins_pin_remove]{gdpins_pin_remove()}}.
 }

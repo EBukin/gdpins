@@ -185,6 +185,38 @@ test_that("[LIVE] raw connection: sf parquet round-trip preserves CRS", {
   expect_equal(sf::st_crs(result)$epsg, 4326L)
 })
 
+test_that("[LIVE] raw connection: nested put_object creates missing Drive parents", {
+  .skip_live()
+  gdpins_ensure_drive_auth()
+
+  root_id    <- .live_test_root()
+  local_path <- tempfile("gdpins_live_raw_nested_")
+  fs::dir_create(local_path)
+
+  adapter  <- gdpins_real_drive(root_id)
+  test_sub <- paste0("raw-nested-", format(Sys.time(), "%Y%m%dT%H%M%S"))
+  withr::defer(tryCatch(adapter$trash(test_sub), error = function(e) NULL))
+
+  conn <- gdpins_raw_connect(
+    drive_path     = test_sub,
+    local_path     = local_path,
+    adapter        = adapter,
+    create         = TRUE,
+    on_discrepancy = "ignore"
+  )
+
+  obj1 <- list(v = 1L)
+  obj2 <- list(v = 2L)
+  suppressMessages(gdpins_raw_put_object(conn, obj1, "kazsub/00-smoke-test.rds"))
+  suppressMessages(gdpins_raw_put_object(conn, obj2, "sub/sub/folder/file.rds"))
+
+  got1 <- suppressMessages(gdpins_raw_get(conn, "kazsub/00-smoke-test.rds", force_refresh = TRUE))
+  got2 <- suppressMessages(gdpins_raw_get(conn, "sub/sub/folder/file.rds", force_refresh = TRUE))
+
+  expect_equal(got1, obj1)
+  expect_equal(got2, obj2)
+})
+
 # ── Sync direction: Drive-ahead ("new computer" case) ─────────────────────────
 
 test_that("[LIVE] sync: drive-ahead pin syncs to cache after from_drive", {

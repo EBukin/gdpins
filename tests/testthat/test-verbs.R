@@ -319,6 +319,57 @@ test_that("pin_read errors when pin not found in any component", {
   )
 })
 
+test_that("pin_remove deletes across drive_cache_local board components", {
+  board <- new_fake_board(config = "drive_cache_local")
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    .package = "gdpins"
+  )
+
+  gdpins_pin_write(board, fx_plain_tbl(), name = "to_remove")
+  expect_true(pins::pin_exists(board$drive_board, "to_remove"))
+  expect_true(pins::pin_exists(board$cache_board, "to_remove"))
+  expect_true(pins::pin_exists(board$local_board, "to_remove"))
+
+  gdpins_pin_remove(board, "to_remove")
+
+  expect_false(pins::pin_exists(board$drive_board, "to_remove"))
+  expect_false(pins::pin_exists(board$cache_board, "to_remove"))
+  expect_false(pins::pin_exists(board$local_board, "to_remove"))
+})
+
+test_that("pin_remove deletes local-only pin", {
+  board <- new_fake_board(config = "local_only")
+  gdpins_pin_write(board, fx_plain_tbl(), name = "local_pin")
+
+  expect_true(pins::pin_exists(board$local_board, "local_pin"))
+  gdpins_pin_remove(board, "local_pin")
+  expect_false(pins::pin_exists(board$local_board, "local_pin"))
+})
+
+test_that("pin_remove ignores missing pin (idempotent no-op)", {
+  board <- new_fake_board(config = "drive_cache")
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    .package = "gdpins"
+  )
+
+  expect_no_error(gdpins_pin_remove(board, "missing_pin"))
+})
+
+test_that("pin_remove validates board and name", {
+  expect_error(
+    gdpins_pin_remove(list(), "x"),
+    "gdpins_board"
+  )
+
+  board <- new_fake_board(config = "local_only")
+  expect_error(
+    gdpins_pin_remove(board, ""),
+    "non-empty"
+  )
+})
+
 # ── 9. Versioned vs unversioned ───────────────────────────────────────────────
 
 test_that("versioned board accumulates multiple versions", {

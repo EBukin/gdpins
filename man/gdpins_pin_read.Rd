@@ -49,5 +49,6 @@ gdpins_pin_read(board, "cars")
 }
 }
 \seealso{
-\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_pin_write]{gdpins_pin_write()}}.
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_pin_write]{gdpins_pin_write()}},
+\code{\link[=gdpins_pin_remove]{gdpins_pin_remove()}}.
 }

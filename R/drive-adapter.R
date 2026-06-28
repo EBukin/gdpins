@@ -67,6 +67,24 @@ gdpins_real_drive <- function(root_id) {
     state$root_dribble
   }
 
+  .ensure_dir <- function(path) {
+    parts <- strsplit(path, "/", fixed = TRUE)[[1L]]
+    parts <- parts[nzchar(parts)]
+    current <- .root()
+    for (part in parts) {
+      hits <- tryCatch(
+        googledrive::drive_ls(current, pattern = paste0("^", part, "$")),
+        error = function(e) NULL
+      )
+      if (is.null(hits) || nrow(hits) == 0L) {
+        current <- googledrive::drive_mkdir(part, path = current)
+      } else {
+        current <- hits[1L, ]
+      }
+    }
+    current
+  }
+
   adapter <- list(
     kind      = "real",
     root_id   = root_id,
@@ -94,20 +112,7 @@ gdpins_real_drive <- function(root_id) {
     },
 
     mkdir = function(path) {
-      parts <- strsplit(path, "/", fixed = TRUE)[[1L]]
-      parts <- parts[nzchar(parts)]
-      current <- .root()
-      for (part in parts) {
-        hits <- tryCatch(
-          googledrive::drive_ls(current, pattern = paste0("^", part, "$")),
-          error = function(e) NULL
-        )
-        if (is.null(hits) || nrow(hits) == 0L) {
-          current <- googledrive::drive_mkdir(part, path = current)
-        } else {
-          current <- hits[1L, ]
-        }
-      }
+      .ensure_dir(path)
       invisible(NULL)
     },
 
@@ -116,7 +121,7 @@ gdpins_real_drive <- function(root_id) {
       if (identical(dir_part, ".")) dir_part <- ""
       name_part <- basename(path)
       parent <- if (nzchar(dir_part)) {
-        .resolve_real_path(.root(), dir_part)
+        .ensure_dir(dir_part)
       } else {
         .root()
       }

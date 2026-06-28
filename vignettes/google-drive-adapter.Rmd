@@ -98,6 +98,26 @@ conn <- gdpins_raw_connect(
 conn
 ```
 
+Nested uploads via `gdpins_raw_put_object()` and `gdpins_raw_put_file()` create
+missing intermediate Drive folders automatically (for example
+`"sub/sub/folder/file.rds"`).
+
+## Removal behavior (full vs partial)
+
+`gdpins` supports explicit, idempotent remove verbs:
+
+```{r, eval=FALSE}
+# Boards: removes a pin from all configured board layers
+gdpins_pin_remove(board, "cars")
+
+# Raw connections: removes one file (flat or nested path)
+gdpins_raw_remove(conn, "sub/sub/file.rds")
+```
+
+Drive removals are recoverable: files are moved to Drive trash (not hard-deleted).
+For raw connections, removal scope is single files only; recursive folder deletion
+is intentionally unsupported.
+
 ## Testing with a fake adapter
 
 In scripts and packages, use `gdpins_fake_drive()` for offline testing:

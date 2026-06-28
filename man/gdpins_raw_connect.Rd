@@ -65,5 +65,5 @@ conn2 <- gdpins_raw_connect(
 }
 }
 \seealso{
-\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter.
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter, \code{\link[=gdpins_raw_remove]{gdpins_raw_remove()}}.
 }

@@ -149,6 +149,11 @@ gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")
 parcels   <- gdpins_pin_read(bd_raw, "parcels")   # sf decoded with CRS intact
 ```
 
+```{r pin-remove}
+# Remove a pin across all configured board layers (idempotent if missing)
+gdpins_pin_remove(bd_raw, "gdp_panel")
+```
+
 ## Raw-exogenous connection
 
 For data as received from APIs — plain files, no pins metadata.
@@ -178,6 +183,9 @@ kad_raw  <- gdpins_raw_get(conn, "kadaster_raw.geojson")
 
 # List contents
 gdpins_raw_ls(conn, depth = 2)
+
+# Remove one file (flat or nested path). Missing files are ignored.
+gdpins_raw_remove(conn, "kadaster_raw.geojson")
 ```
 
 ## Sync

@@ -173,6 +173,68 @@ test_that("deeply nested subfolder paths work", {
   expect_equal(result, obj)
 })
 
+test_that("raw_remove deletes flat file from local and Drive", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "flat.csv")
+
+  local_file <- file.path(conn$local_path, "flat.csv")
+  drive_file <- paste0(conn$drive_path, "/flat.csv")
+  expect_true(file.exists(local_file))
+  expect_true(gd_exists(conn$adapter, drive_file))
+
+  gdpins_raw_remove(conn, "flat.csv")
+
+  expect_false(file.exists(local_file))
+  expect_false(gd_exists(conn$adapter, drive_file))
+  expect_false(any(gdpins_raw_ls(conn)$name == "flat.csv"))
+})
+
+test_that("raw_remove deletes nested file from local and Drive", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, list(v = 1L), "sub/sub/file.rds")
+
+  local_file <- file.path(conn$local_path, "sub", "sub", "file.rds")
+  drive_file <- paste0(conn$drive_path, "/sub/sub/file.rds")
+  expect_true(file.exists(local_file))
+  expect_true(gd_exists(conn$adapter, drive_file))
+
+  gdpins_raw_remove(conn, "sub/sub/file.rds")
+
+  expect_false(file.exists(local_file))
+  expect_false(gd_exists(conn$adapter, drive_file))
+  expect_false(any(gdpins_raw_ls(conn)$name == "sub/sub/file.rds"))
+})
+
+test_that("raw_remove works for local_only connections", {
+  conn <- new_fake_raw_conn("local_only")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "local.csv")
+  expect_true(file.exists(file.path(conn$local_path, "local.csv")))
+
+  expect_no_error(gdpins_raw_remove(conn, "local.csv"))
+  expect_false(file.exists(file.path(conn$local_path, "local.csv")))
+})
+
+test_that("raw_remove ignores missing targets (idempotent no-op)", {
+  conn_drive <- new_fake_raw_conn("drive_local")
+  conn_local <- new_fake_raw_conn("local_only")
+
+  expect_no_error(gdpins_raw_remove(conn_drive, "missing.csv"))
+  expect_no_error(gdpins_raw_remove(conn_local, "missing.csv"))
+})
+
+test_that("raw_remove validates conn and name", {
+  expect_error(
+    gdpins_raw_remove(list(), "x.csv"),
+    "gdpins_raw_conn"
+  )
+
+  conn <- new_fake_raw_conn("local_only")
+  expect_error(
+    gdpins_raw_remove(conn, ""),
+    "non-empty"
+  )
+})
+
 # ── force_refresh on/off ──────────────────────────────────────────────────────
 
 test_that("force_refresh = FALSE reads from local without calling gd_download", {
@@ -385,6 +447,86 @@ test_that("on_discrepancy='warn' emits a warning when drive and local differ", {
   tmp_src <- tempfile(fileext = ".csv")
   readr::write_csv(fx_plain_tbl(), tmp_src)
   gd_upload(adapter, tmp_src, paste0(drive_path, "/only_on_drive.csv"))
+
+  expect_warning(
+    gdpins_raw_connect(
+      drive_path     = drive_path,
+      local_path     = local_path,
+      create         = FALSE,
+      on_discrepancy = "warn",
+      adapter        = adapter
+    )
+  )
+})
+
+test_that("on_discrepancy compare ignores local sync sidecar files", {
+  fake_root  <- tempfile("gdpins_fake_")
+  fs::dir_create(fake_root)
+  adapter    <- gdpins_fake_drive(root = fake_root)
+  local_path <- tempfile("gdpins_raw_local_")
+  fs::dir_create(local_path)
+  drive_path <- "disc-ignore-local-sidecars"
+  gd_mkdir(adapter, drive_path)
+
+  tmp_src <- tempfile(fileext = ".csv")
+  readr::write_csv(fx_plain_tbl(), tmp_src)
+  gd_upload(adapter, tmp_src, paste0(drive_path, "/same.csv"))
+  fs::file_copy(tmp_src, file.path(local_path, "same.csv"), overwrite = TRUE)
+  writeLines("onedrive sidecar", file.path(local_path, "desktop.ini"))
+
+  expect_no_warning(
+    gdpins_raw_connect(
+      drive_path     = drive_path,
+      local_path     = local_path,
+      create         = FALSE,
+      on_discrepancy = "warn",
+      adapter        = adapter
+    )
+  )
+})
+
+test_that("on_discrepancy compare ignores drive sync sidecar files", {
+  fake_root  <- tempfile("gdpins_fake_")
+  fs::dir_create(fake_root)
+  adapter    <- gdpins_fake_drive(root = fake_root)
+  local_path <- tempfile("gdpins_raw_local_")
+  fs::dir_create(local_path)
+  drive_path <- "disc-ignore-drive-sidecars"
+  gd_mkdir(adapter, drive_path)
+
+  tmp_src <- tempfile(fileext = ".csv")
+  readr::write_csv(fx_plain_tbl(), tmp_src)
+  gd_upload(adapter, tmp_src, paste0(drive_path, "/same.csv"))
+  fs::file_copy(tmp_src, file.path(local_path, "same.csv"), overwrite = TRUE)
+
+  sidecar <- tempfile(fileext = ".ini")
+  writeLines("onedrive sidecar", sidecar)
+  gd_upload(adapter, sidecar, paste0(drive_path, "/desktop.ini"))
+
+  expect_no_warning(
+    gdpins_raw_connect(
+      drive_path     = drive_path,
+      local_path     = local_path,
+      create         = FALSE,
+      on_discrepancy = "warn",
+      adapter        = adapter
+    )
+  )
+})
+
+test_that("on_discrepancy='warn' still warns for real mismatch with sidecar noise", {
+  fake_root  <- tempfile("gdpins_fake_")
+  fs::dir_create(fake_root)
+  adapter    <- gdpins_fake_drive(root = fake_root)
+  local_path <- tempfile("gdpins_raw_local_")
+  fs::dir_create(local_path)
+  drive_path <- "disc-real-mismatch-with-sidecars"
+  gd_mkdir(adapter, drive_path)
+
+  tmp_src <- tempfile(fileext = ".csv")
+  readr::write_csv(fx_plain_tbl(), tmp_src)
+  gd_upload(adapter, tmp_src, paste0(drive_path, "/drive_only.csv"))
+  writeLines("onedrive sidecar", file.path(local_path, "desktop.ini"))
 
   expect_warning(
     gdpins_raw_connect(
