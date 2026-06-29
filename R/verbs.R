@@ -69,7 +69,8 @@ NULL
 #'   `NULL` auto-detects via [gdpins_detect_format()].
 #'
 #' @return Invisibly `NULL`. Called for its side effect.
-#' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_read()].
+#' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_read()],
+#'   [gdpins_pin_remove()].
 #' @examples
 #' adapter <- gdpins_fake_drive()
 #' board <- gdpins_init_board(
@@ -176,7 +177,8 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL) {
 #' @param version Character scalar or `NULL`. Pin version; `NULL` = latest.
 #'
 #' @return The pinned R object.
-#' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_write()].
+#' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_write()],
+#'   [gdpins_pin_remove()].
 #' @examples
 #' adapter <- gdpins_fake_drive()
 #' board <- gdpins_init_board(
@@ -279,4 +281,58 @@ gdpins_pin_read <- function(board, name, version = NULL) {
   }
 
   result
+}
+
+#' Remove a pin from a gdpins board
+#'
+#' Deletes `name` from every non-NULL board component (Drive, cache, local).
+#' Missing pins are ignored (idempotent no-op).
+#'
+#' @param board A `gdpins_board` object.
+#' @param name Character scalar. Pin name.
+#'
+#' @return Invisibly `NULL`.
+#' @seealso [gdpins_pin_write()], [gdpins_pin_read()], [gdpins_init_board()].
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_pin_write(board, mtcars, "cars")
+#' gdpins_pin_remove(board, "cars")
+#' @export
+gdpins_pin_remove <- function(board, name) {
+  if (!inherits(board, "gdpins_board")) {
+    cli::cli_abort(c(
+      "{.arg board} must be a {.cls gdpins_board}.",
+      x = "Got {.cls {class(board)}}."
+    ))
+  }
+  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
+    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
+  }
+
+  boards_to_remove <- list(
+    drive = board$drive_board,
+    cache = board$cache_board,
+    local = board$local_board
+  )
+
+  for (component in boards_to_remove) {
+    if (is.null(component)) next
+
+    exists <- tryCatch(
+      pins::pin_exists(component, name),
+      error = function(e) FALSE
+    )
+    if (exists) {
+      pins::pin_delete(component, name)
+    }
+  }
+
+  invisible(NULL)
 }

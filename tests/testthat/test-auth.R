@@ -41,14 +41,30 @@ test_that("gdpins_ensure_drive_auth() forwards explicit email to drive_auth", {
   expect_equal(auth_called_with, "other@example.com")
 })
 
-test_that("gdpins_ensure_drive_auth() aborts when email is empty", {
+test_that("gdpins_ensure_drive_auth() with empty email calls drive_auth without email", {
+  auth_called_with <- "sentinel"
   local_mocked_bindings(
     .gd_has_token  = function() FALSE,
-    .gd_drive_auth = function(email) stop("must not reach drive_auth"),
+    .gd_drive_auth = function(email) { auth_called_with <<- email; invisible(NULL) },
     .package = "gdpins"
   )
   withr::with_envvar(c(GDRIVE_EMAIL = ""), {
-    expect_error(
+    expect_message(
+      gdpins_ensure_drive_auth(),
+      regexp = "interactive account selection"
+    )
+  })
+  expect_null(auth_called_with)
+})
+
+test_that("gdpins_ensure_drive_auth() with empty email emits guidance", {
+  local_mocked_bindings(
+    .gd_has_token  = function() FALSE,
+    .gd_drive_auth = function(email) invisible(NULL),
+    .package = "gdpins"
+  )
+  withr::with_envvar(c(GDRIVE_EMAIL = ""), {
+    expect_message(
       gdpins_ensure_drive_auth(),
       regexp = "GDRIVE_EMAIL"
     )
@@ -89,6 +105,16 @@ test_that(".gd_drive_auth() delegates to googledrive::drive_auth", {
   )
   gdpins:::.gd_drive_auth("test@example.com")
   expect_equal(auth_email, "test@example.com")
+})
+
+test_that(".gd_drive_auth() delegates NULL email to googledrive::drive_auth", {
+  auth_email <- "sentinel"
+  local_mocked_bindings(
+    drive_auth = function(email) { auth_email <<- email; invisible(NULL) },
+    .package = "googledrive"
+  )
+  gdpins:::.gd_drive_auth()
+  expect_null(auth_email)
 })
 
 test_that(".nslookup_googleapis() delegates to curl::nslookup", {

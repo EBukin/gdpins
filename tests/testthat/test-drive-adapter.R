@@ -165,12 +165,13 @@ test_that("gd_ls() returns a tibble with correct columns", {
   result  <- gd_ls(adapter)
 
   expect_s3_class(result, "data.frame")
-  expect_named(result, c("path", "is_dir", "size", "md5", "mtime"))
+  expect_named(result, c("path", "is_dir", "size", "md5", "mtime", "drive_id"))
   expect_type(result$path,   "character")
   expect_type(result$is_dir, "logical")
   expect_type(result$size,   "double")
   expect_type(result$md5,    "character")
   expect_s3_class(result$mtime, "POSIXct")
+  expect_type(result$drive_id, "character")
 })
 
 test_that("gd_ls() lists uploaded files and directories", {
@@ -275,7 +276,7 @@ test_that("gd_ls() returns empty tibble for a non-existent path", {
   result  <- gd_ls(adapter, "no_such_dir")
   expect_s3_class(result, "data.frame")
   expect_equal(nrow(result), 0L)
-  expect_named(result, c("path", "is_dir", "size", "md5", "mtime"))
+  expect_named(result, c("path", "is_dir", "size", "md5", "mtime", "drive_id"))
 })
 
 test_that("gd_ls() returns empty tibble when all entries are trashed", {
@@ -347,10 +348,53 @@ test_that("gdpins_drive_url returns NA for fake adapter with path", {
 })
 
 test_that("gdpins_real_drive is exported and creates adapter", {
+  local_mocked_bindings(
+    gdpins_ensure_drive_auth = function(email) invisible(NULL),
+    .package = "gdpins"
+  )
   adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
   expect_s3_class(adapter, "gdpins_drive_adapter")
   expect_equal(adapter$kind, "real")
   expect_equal(adapter$root_id, "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+})
+
+test_that("gdpins_real_drive() calls gdpins_ensure_drive_auth with GDRIVE_EMAIL by default", {
+  auth_email <- NULL
+  local_mocked_bindings(
+    gdpins_ensure_drive_auth = function(email) { auth_email <<- email; invisible(NULL) },
+    .package = "gdpins"
+  )
+  withr::with_envvar(c(GDRIVE_EMAIL = "env@example.com"), {
+    gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+  })
+  expect_equal(auth_email, "env@example.com")
+})
+
+test_that("gdpins_real_drive() explicit email overrides GDRIVE_EMAIL", {
+  auth_email <- NULL
+  local_mocked_bindings(
+    gdpins_ensure_drive_auth = function(email) { auth_email <<- email; invisible(NULL) },
+    .package = "gdpins"
+  )
+  withr::with_envvar(c(GDRIVE_EMAIL = "env@example.com"), {
+    gdpins_real_drive(
+      "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+      email = "explicit@example.com"
+    )
+  })
+  expect_equal(auth_email, "explicit@example.com")
+})
+
+test_that("gdpins_real_drive() passes empty string when no email anywhere", {
+  auth_email <- "sentinel"
+  local_mocked_bindings(
+    gdpins_ensure_drive_auth = function(email) { auth_email <<- email; invisible(NULL) },
+    .package = "gdpins"
+  )
+  withr::with_envvar(c(GDRIVE_EMAIL = ""), {
+    gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+  })
+  expect_equal(auth_email, "")
 })
 
 # ── Real adapter (skip unless live) ──────────────────────────────────────────
@@ -369,4 +413,48 @@ test_that("gdpins_real_drive() returns a gdpins_drive_adapter", {
   expect_s3_class(adapter, "gdpins_drive_adapter")
   expect_equal(adapter$kind, "real")
   expect_equal(adapter$root_id, folder_id)
+})
+
+# ── Phase 1: drive_id column + fake get_id() ─────────────────────────────────
+
+test_that("gd_ls() fake adapter: drive_id column is NA_character_ for all entries", {
+  adapter   <- gdpins_fake_drive()
+  local_tmp <- tempfile(fileext = ".csv")
+  writeLines("a,b\n1,2", local_tmp)
+  gd_mkdir(adapter, "subdir")
+  gd_upload(adapter, local_tmp, "data.csv")
+
+  result <- gd_ls(adapter, recursive = TRUE)
+  expect_true("drive_id" %in% names(result))
+  expect_type(result$drive_id, "character")
+  expect_true(all(is.na(result$drive_id)))
+})
+
+test_that("gd_ls() empty path returns 6-column tibble including drive_id", {
+  adapter <- gdpins_fake_drive()
+  result  <- gd_ls(adapter, "empty_path_xyz")
+  expect_named(result, c("path", "is_dir", "size", "md5", "mtime", "drive_id"))
+  expect_equal(nrow(result), 0L)
+  expect_type(result$drive_id, "character")
+})
+
+test_that("fake adapter get_id() returns NA_character_", {
+  adapter <- gdpins_fake_drive()
+  expect_identical(adapter$get_id("any/path"),    NA_character_)
+  expect_identical(adapter$get_id(""),            NA_character_)
+  expect_identical(adapter$get_id("deeply/nested/file.csv"), NA_character_)
+})
+
+test_that("gd_ls() non-standard filenames: drive_id is NA for fake adapter", {
+  adapter   <- gdpins_fake_drive()
+  local_tmp <- tempfile(fileext = ".csv")
+  writeLines("x,y\n1,2", local_tmp)
+  # Files with spaces, parentheses, and special chars
+  gd_upload(adapter, local_tmp, "my data (2024).csv")
+  gd_upload(adapter, local_tmp, "report - final v2.csv")
+
+  result <- gd_ls(adapter, recursive = FALSE)
+  expect_true("drive_id" %in% names(result))
+  expect_true(all(is.na(result$drive_id)))
+  expect_true(any(grepl("my data", result$path, fixed = TRUE)))
 })

@@ -12,9 +12,36 @@ gdpins_raw_ls(conn, depth = 2)
 \item{depth}{Integer scalar. Maximum directory depth to display. Default \code{2}.}
 }
 \value{
-A \code{\link[tibble:tibble]{tibble::tibble()}} describing the folder tree.
+A \code{\link[tibble:tibble]{tibble::tibble()}} with 8 columns:
+\describe{
+\item{\code{name}}{chr. Relative path within the raw-root.}
+\item{\code{is_dir}}{lgl. \code{TRUE} for directories, \code{FALSE} for files.}
+\item{\code{size}}{dbl. File size in bytes (0 for directories).}
+\item{\code{mtime}}{POSIXct. Last-modified time.}
+\item{\code{depth}}{int. Directory depth (1 = top-level).}
+\item{\code{local_path}}{chr. Absolute local filesystem path.}
+\item{\code{drive_id}}{chr. Google Drive file/folder ID, or \code{NA_character_}
+for local-only connections and the fake adapter.}
+\item{\code{drive_url}}{chr. Browser URL for the entry
+(\verb{https://drive.google.com/file/d/<id>/view} for files,
+\verb{https://drive.google.com/drive/folders/<id>} for folders), or
+\code{NA_character_} when \code{drive_id} is \code{NA}.}
+}
 }
 \description{
 Returns a compact folder tree for the raw connection, defaulting to 2 levels
 of depth.
+}
+\examples{
+adapter <- gdpins_fake_drive()
+conn <- gdpins_raw_connect(
+  drive_path = "worldbank-api",
+  local_path = tempfile("raw_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+gdpins_raw_put_object(conn, mtcars, "cars.csv")
+tbl <- gdpins_raw_ls(conn)
+tbl$local_path   # absolute local path
+tbl$drive_id     # NA for fake adapter; real Drive ID with real adapter
 }

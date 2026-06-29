@@ -9,7 +9,8 @@ gdpins_ensure_drive_auth(email = Sys.getenv("GDRIVE_EMAIL"))
 \arguments{
 \item{email}{Character scalar. Google account email. Defaults to
 \code{Sys.getenv("GDRIVE_EMAIL")}. Set \code{GDRIVE_EMAIL} in your \code{.Renviron} to
-avoid repeated prompts.}
+avoid repeated prompts. If empty (\code{""}), authentication falls back to
+gargle's interactive account selector.}
 }
 \value{
 Invisibly \code{NULL}. Called for its side effect.
@@ -17,7 +18,8 @@ Invisibly \code{NULL}. Called for its side effect.
 \description{
 Checks whether the current session is authenticated to Google Drive. If not,
 prints clear \code{cli} instructions and authenticates using the email address
-from the \code{GDRIVE_EMAIL} environment variable. The token is cached and reused
+from the \code{GDRIVE_EMAIL} environment variable. If \code{email} is empty, falls
+back to gargle's interactive account selector. The token is cached and reused
 in subsequent calls.
 }
 \details{

@@ -4,11 +4,16 @@
 \alias{gdpins_real_drive}
 \title{Create a real Google Drive adapter}
 \usage{
-gdpins_real_drive(root_id)
+gdpins_real_drive(root_id, email = Sys.getenv("GDRIVE_EMAIL"))
 }
 \arguments{
 \item{root_id}{Character scalar. Drive folder ID of the project root folder,
 or a Drive path string (for example \code{"My Drive/projects/myproject"}).}
+
+\item{email}{Character scalar. Google account email used for authentication.
+Defaults to \code{Sys.getenv("GDRIVE_EMAIL")}. Set \code{GDRIVE_EMAIL} in your
+\code{.Renviron} to avoid repeated prompts. Pass \code{""} to use gargle's
+interactive account selector.}
 }
 \value{
 An object of class \code{gdpins_drive_adapter}.
@@ -21,6 +26,11 @@ Google Drive folder ID or a path string to the project root folder.
 If \code{root_id} looks like a Drive path (contains \code{"/"} or spaces),
 \code{gdpins_real_drive()} resolves it via \code{\link[googledrive:drive_get]{googledrive::drive_get()}}. Otherwise
 it is treated as a Drive folder ID directly.
+
+Authentication is handled automatically: \code{\link[=gdpins_ensure_drive_auth]{gdpins_ensure_drive_auth()}} is
+called when creating the adapter. If a valid token already exists it is
+reused. If \code{email} is non-empty, that account is requested; otherwise gargle
+shows interactive account selection.
 }
 \examples{
 \dontrun{
@@ -33,5 +43,6 @@ adapter2
 }
 }
 \seealso{
-\code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}}
+\code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}},
+\code{\link[=gdpins_ensure_drive_auth]{gdpins_ensure_drive_auth()}}
 }

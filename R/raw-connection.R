@@ -140,6 +140,51 @@ NULL
   paths
 }
 
+# Normalize relative path vectors for stable comparison across platforms/shells.
+.normalize_rel_paths <- function(paths, dedupe = TRUE) {
+  if (length(paths) == 0L) return(character(0L))
+  norm <- as.character(paths)
+  norm <- gsub("\\\\", "/", norm)
+  norm <- gsub("^\\./+", "", norm)
+  norm <- gsub("/+", "/", norm)
+  norm <- sub("^/+", "", norm)
+  norm <- sub("/+$", "", norm)
+  if (.Platform$OS.type == "windows") {
+    norm <- tolower(norm)
+  }
+  if (isTRUE(dedupe)) {
+    norm <- unique(norm[nzchar(norm)])
+  }
+  norm
+}
+
+# Ignore common sync/system sidecars that should not trigger raw sync decisions.
+.is_sync_sidecar <- function(paths) {
+  if (length(paths) == 0L) return(logical(0L))
+  base <- tolower(basename(.normalize_rel_paths(paths, dedupe = FALSE)))
+  base %in% c("desktop.ini", "thumbs.db", ".ds_store") | grepl("^~\\$", base)
+}
+
+.discrepancy_paths <- function(paths) {
+  norm <- .normalize_rel_paths(paths, dedupe = FALSE)
+  unique(norm[nzchar(norm) & !.is_sync_sidecar(norm)])
+}
+
+# Build a Drive URL from a Drive ID and a logical is_dir flag (vectorised).
+# Returns NA_character_ wherever drive_id is NA.
+.make_drive_url <- function(drive_id, is_dir) {
+  url <- ifelse(
+    is.na(drive_id),
+    NA_character_,
+    ifelse(
+      is_dir,
+      paste0("https://drive.google.com/drive/folders/", drive_id),
+      paste0("https://drive.google.com/file/d/", drive_id, "/view")
+    )
+  )
+  as.character(url)
+}
+
 # ── gdpins_raw_connect ────────────────────────────────────────────────────────
 
 #' Connect to a raw-exogenous Drive folder
@@ -159,7 +204,8 @@ NULL
 #' @param adapter A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
 #'
 #' @return A `gdpins_raw_conn` object.
-#' @seealso [gdpins_real_drive()] to create an adapter.
+#' @seealso [gdpins_real_drive()] and [gdpins_ensure_drive_auth()] for auth and
+#'   adapter setup, [gdpins_raw_remove()].
 #' @examples
 #' # --- Fake adapter (no network) ---
 #' adapter <- gdpins_fake_drive()
@@ -302,7 +348,10 @@ gdpins_raw_connect <- function(
     }, character(1L), USE.NAMES = FALSE)
   }
 
-  has_discrepancy <- !setequal(drive_files, local_rel)
+  drive_cmp <- .discrepancy_paths(drive_files)
+  local_cmp <- .discrepancy_paths(local_rel)
+
+  has_discrepancy <- !setequal(drive_cmp, local_cmp)
 
   if (has_discrepancy) {
     switch(
@@ -314,7 +363,7 @@ gdpins_raw_connect <- function(
           )
           answer <- .raw_readline("Sync from Drive? [y/N] ")
           if (tolower(trimws(answer)) == "y") {
-            for (f in drive_files) {
+            for (f in drive_files[!.is_sync_sidecar(drive_files)]) {
               local_dest <- file.path(local_path,
                                       gsub("/", .Platform$file.sep, f, fixed = TRUE))
               fs::dir_create(dirname(local_dest))
@@ -333,7 +382,7 @@ gdpins_raw_connect <- function(
         )
       },
       "sync_from_drive" = {
-        for (f in drive_files) {
+        for (f in drive_files[!.is_sync_sidecar(drive_files)]) {
           local_dest <- file.path(local_path,
                                   gsub("/", .Platform$file.sep, f, fixed = TRUE))
           fs::dir_create(dirname(local_dest))
@@ -341,7 +390,7 @@ gdpins_raw_connect <- function(
         }
       },
       "sync_to_drive" = {
-        for (f in local_rel) {
+        for (f in local_rel[!.is_sync_sidecar(local_rel)]) {
           local_src  <- file.path(local_path,
                                   gsub("/", .Platform$file.sep, f, fixed = TRUE))
           drive_dest <- paste0(drive_path, "/", f)
@@ -424,6 +473,201 @@ gdpins_raw_put_file <- function(conn, path, name) {
   invisible(NULL)
 }
 
+#' Remove a file from a raw connection
+#'
+#' Deletes a single file from the local mirror and, when Drive is configured,
+#' moves the Drive file to trash (recoverable). Missing files are ignored
+#' (idempotent no-op). Folder-recursive deletion is not supported.
+#'
+#' @param conn A `gdpins_raw_conn` object.
+#' @param name Character scalar. Relative file path within the raw-root.
+#'
+#' @return Invisibly `NULL`.
+#' @seealso [gdpins_raw_put_object()], [gdpins_raw_put_file()], [gdpins_raw_get()].
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' conn <- gdpins_raw_connect(
+#'   drive_path = "worldbank-api",
+#'   local_path = tempfile("raw_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_raw_put_object(conn, mtcars, "cars.csv")
+#' gdpins_raw_remove(conn, "cars.csv")
+#' @export
+gdpins_raw_remove <- function(conn, name) {
+  if (!inherits(conn, "gdpins_raw_conn")) {
+    cli::cli_abort(c(
+      "{.arg conn} must be a {.cls gdpins_raw_conn}.",
+      x = "Got {.cls {class(conn)}}."
+    ))
+  }
+  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
+    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
+  }
+
+  local_file <- .local_full_path(conn, name)
+  if (file.exists(local_file)) {
+    fs::file_delete(local_file)
+  }
+
+  if (!is.null(conn$adapter)) {
+    drive_file <- .drive_full_path(conn, name)
+    gd_trash(conn$adapter, drive_file)
+  }
+
+  invisible(NULL)
+}
+
+# ── gdpins_raw_path ───────────────────────────────────────────────────────────
+
+#' Resolve a raw file to its absolute local path
+#'
+#' Given either a relative path within the raw-root (e.g. `"sub/data.csv"`) or
+#' a Google Drive file ID, returns the absolute local filesystem path to the
+#' file, downloading it from Drive if it is not already present locally.
+#'
+#' Files that already exist in the local mirror are **never** re-downloaded.
+#' Call [gdpins_raw_get()] with `force_refresh = TRUE` if you need to guarantee
+#' freshness.
+#'
+#' @param conn A `gdpins_raw_conn` object created by [gdpins_raw_connect()].
+#' @param name_or_id Character scalar. Either:
+#'   \describe{
+#'     \item{Relative path}{A path within the raw-root, using `"/"` as
+#'       separator (e.g. `"api/gdp_2024.parquet"` or `"my data (2024).csv"`).}
+#'     \item{Drive file ID}{A Google Drive file ID (≥ 25 alphanumeric
+#'       characters, no slashes or hyphens). Only supported with a real adapter.}
+#'   }
+#'
+#' @return Character scalar. Absolute local filesystem path to the file.
+#'   The file is guaranteed to exist when a non-error value is returned.
+#'
+#' @details
+#' **Resolution order:**
+#' 1. If `name_or_id` looks like a Drive ID (≥ 25 purely alphanumeric chars):
+#'    - Errors on local-only connections (no Drive adapter).
+#'    - Errors on fake-adapter connections (fake adapter has no real IDs).
+#'    - On real adapters: fetches file metadata via `googledrive::drive_get()`,
+#'      downloads to `conn$local_path/<filename>`, and returns the path.
+#' 2. Otherwise treated as a relative path:
+#'    - Returns the local path immediately if the file already exists.
+#'    - Downloads from Drive if not present (drive-backed connections only).
+#'    - Errors if local-only and the file is missing.
+#'
+#' @seealso [gdpins_raw_ls()] to list files and obtain their paths,
+#'   [gdpins_raw_get()] to read a file as an R object,
+#'   [gdpins_raw_connect()] to create a connection.
+#'
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' conn <- gdpins_raw_connect(
+#'   drive_path = "worldbank-api",
+#'   local_path = tempfile("raw_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_raw_put_object(conn, mtcars, "cars.csv")
+#'
+#' # Already local — returns path immediately, no download
+#' path <- gdpins_raw_path(conn, "cars.csv")
+#' file.exists(path)   # TRUE
+#' read.csv(path)      # read directly with base R
+#'
+#' # Non-standard filenames work too
+#' gdpins_raw_put_object(conn, mtcars, "quarterly report (Q1 2024).csv")
+#' gdpins_raw_path(conn, "quarterly report (Q1 2024).csv")
+#'
+#' \dontrun{
+#' # Drive ID input — real adapter only
+#' adapter_real <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' conn_real <- gdpins_raw_connect(
+#'   drive_path = "worldbank-api",
+#'   local_path = "data/raw/worldbank-api",
+#'   adapter    = adapter_real
+#' )
+#' # Obtain drive_id from gdpins_raw_ls(), then fetch by ID
+#' listing <- gdpins_raw_ls(conn_real)
+#' file_id <- listing$drive_id[listing$name == "gdp_2024.parquet"]
+#' local_path <- gdpins_raw_path(conn_real, file_id)
+#' arrow::read_parquet(local_path)
+#' }
+#' @export
+gdpins_raw_path <- function(conn, name_or_id) {
+  if (!inherits(conn, "gdpins_raw_conn")) {
+    cli::cli_abort(c(
+      "{.arg conn} must be a {.cls gdpins_raw_conn}.",
+      x = "Got {.cls {class(conn)}}."
+    ))
+  }
+  if (!is.character(name_or_id) || length(name_or_id) != 1L || !nzchar(name_or_id)) {
+    cli::cli_abort("{.arg name_or_id} must be a non-empty character scalar.")
+  }
+
+  # ── Drive ID branch ──────────────────────────────────────────────────────────
+  if (.is_drive_id(name_or_id)) {
+    if (is.null(conn$adapter)) {
+      cli::cli_abort(c(
+        "Cannot resolve a Drive file ID from a local-only connection.",
+        i = "Use {.fn gdpins_raw_connect} with an adapter for Drive ID lookups.",
+        i = "Alternatively, supply a relative file path instead of a Drive ID."
+      ))
+    }
+    if (identical(conn$adapter$kind, "fake")) {
+      cli::cli_abort(c(
+        "The fake adapter carries no real Drive IDs.",
+        i = "Drive ID lookup requires a real adapter created by {.fn gdpins_real_drive}.",
+        i = "For tests or offline use, supply a relative file path."
+      ))
+    }
+
+    # nocov start — requires live Google Drive auth
+    d <- tryCatch(
+      googledrive::drive_get(googledrive::as_id(name_or_id)),
+      error = function(e) {
+        cli::cli_abort("Drive ID lookup failed: {conditionMessage(e)}")
+      }
+    )
+    if (is.null(d) || nrow(d) == 0L) {
+      cli::cli_abort(c(
+        "Drive file ID not found: {.val {name_or_id}}",
+        i = "Verify the ID exists and is accessible with your current credentials."
+      ))
+    }
+    filename   <- d$name[[1L]]
+    local_dest <- file.path(conn$local_path, filename)
+    if (file.exists(local_dest)) return(local_dest)
+    fs::dir_create(dirname(local_dest))
+    googledrive::drive_download(d, path = local_dest, overwrite = TRUE)
+    return(local_dest)
+    # nocov end
+  }
+
+  # ── Relative path branch ─────────────────────────────────────────────────────
+  local_dest <- .local_full_path(conn, name_or_id)
+
+  if (file.exists(local_dest)) return(local_dest)
+
+  if (!is.null(conn$adapter)) {
+    drive_src <- .drive_full_path(conn, name_or_id)
+    if (!gd_exists(conn$adapter, drive_src)) {
+      cli::cli_abort(c(
+        "File not found on Drive: {.path {name_or_id}}",
+        i = "Check the path with {.fn gdpins_raw_ls} or upload the file first."
+      ))
+    }
+    fs::dir_create(dirname(local_dest))
+    gd_download(conn$adapter, drive_src, local_dest)
+    return(local_dest)
+  }
+
+  cli::cli_abort(c(
+    "Local file not found: {.path {local_dest}}",
+    i = "This is a local-only connection; there is no Drive source to download from.",
+    i = "Use {.fn gdpins_raw_put_file} or {.fn gdpins_raw_put_object} to add the file."
+  ))
+}
+
 # ── gdpins_raw_get ────────────────────────────────────────────────────────────
 
 #' Read a file from a raw connection
@@ -467,15 +711,44 @@ gdpins_raw_get <- function(conn, name, force_refresh = FALSE) {
 #' @param conn A `gdpins_raw_conn` object.
 #' @param depth Integer scalar. Maximum directory depth to display. Default `2`.
 #'
-#' @return A [tibble::tibble()] describing the folder tree.
+#' @return A [tibble::tibble()] with 8 columns:
+#'   \describe{
+#'     \item{`name`}{chr. Relative path within the raw-root.}
+#'     \item{`is_dir`}{lgl. `TRUE` for directories, `FALSE` for files.}
+#'     \item{`size`}{dbl. File size in bytes (0 for directories).}
+#'     \item{`mtime`}{POSIXct. Last-modified time.}
+#'     \item{`depth`}{int. Directory depth (1 = top-level).}
+#'     \item{`local_path`}{chr. Absolute local filesystem path.}
+#'     \item{`drive_id`}{chr. Google Drive file/folder ID, or `NA_character_`
+#'       for local-only connections and the fake adapter.}
+#'     \item{`drive_url`}{chr. Browser URL for the entry
+#'       (`https://drive.google.com/file/d/<id>/view` for files,
+#'       `https://drive.google.com/drive/folders/<id>` for folders), or
+#'       `NA_character_` when `drive_id` is `NA`.}
+#'   }
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' conn <- gdpins_raw_connect(
+#'   drive_path = "worldbank-api",
+#'   local_path = tempfile("raw_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_raw_put_object(conn, mtcars, "cars.csv")
+#' tbl <- gdpins_raw_ls(conn)
+#' tbl$local_path   # absolute local path
+#' tbl$drive_id     # NA for fake adapter; real Drive ID with real adapter
 #' @export
 gdpins_raw_ls <- function(conn, depth = 2) {
   empty <- tibble::tibble(
-    name   = character(),
-    is_dir = logical(),
-    size   = double(),
-    mtime  = as.POSIXct(character()),
-    depth  = integer()
+    name       = character(),
+    is_dir     = logical(),
+    size       = double(),
+    mtime      = as.POSIXct(character()),
+    depth      = integer(),
+    local_path = character(),
+    drive_id   = character(),
+    drive_url  = character()
   )
 
   if (!is.null(conn$adapter)) {
@@ -497,12 +770,22 @@ gdpins_raw_ls <- function(conn, depth = 2) {
     entry_depth <- entry_depth[keep]
     listing     <- listing[keep, , drop = FALSE]
 
+    local_path_col <- file.path(
+      conn$local_path,
+      gsub("/", .Platform$file.sep, rel_path, fixed = TRUE)
+    )
+    drive_id_col  <- listing$drive_id
+    drive_url_col <- .make_drive_url(drive_id_col, listing$is_dir)
+
     tibble::tibble(
-      name   = rel_path,
-      is_dir = listing$is_dir,
-      size   = listing$size,
-      mtime  = listing$mtime,
-      depth  = entry_depth
+      name       = rel_path,
+      is_dir     = listing$is_dir,
+      size       = listing$size,
+      mtime      = listing$mtime,
+      depth      = entry_depth,
+      local_path = local_path_col,
+      drive_id   = drive_id_col,
+      drive_url  = drive_url_col
     )
   } else {
     # local_only
@@ -529,13 +812,16 @@ gdpins_raw_ls <- function(conn, depth = 2) {
     dep_keep <- entry_depth[keep]
 
     tibble::tibble(
-      name   = rel_keep,
-      is_dir = fs::is_dir(abs_keep),
-      size   = vapply(abs_keep, function(p) {
+      name       = rel_keep,
+      is_dir     = fs::is_dir(abs_keep),
+      size       = vapply(abs_keep, function(p) {
         if (fs::is_dir(p)) 0 else as.double(file.size(p))
       }, double(1L), USE.NAMES = FALSE),
-      mtime  = file.mtime(abs_keep),
-      depth  = dep_keep
+      mtime      = file.mtime(abs_keep),
+      depth      = dep_keep,
+      local_path = abs_keep,
+      drive_id   = rep(NA_character_, length(rel_keep)),
+      drive_url  = rep(NA_character_, length(rel_keep))
     )
   }
 }

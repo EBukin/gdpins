@@ -16,8 +16,9 @@ gd_ls(adapter, path = "", recursive = FALSE)
 }
 \value{
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns \code{path} (chr, relative),
-\code{is_dir} (lgl), \code{size} (dbl, bytes), \code{md5} (chr), \code{mtime} (POSIXct).
-Trashed entries are excluded.
+\code{is_dir} (lgl), \code{size} (dbl, bytes), \code{md5} (chr), \code{mtime} (POSIXct),
+\code{drive_id} (chr; \code{NA_character_} for fake adapter, Drive file/folder ID
+for real adapter). Trashed entries are excluded.
 }
 \description{
 List contents of a Drive directory
