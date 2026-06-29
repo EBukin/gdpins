@@ -47,10 +47,12 @@ reference:
   contents:
   - gdpins_raw_connect
   - gdpins_raw_ls
+  - gdpins_raw_path
   - gdpins_raw_get
   - gdpins_raw_put_file
   - gdpins_raw_put_object
   - gdpins_refresh_disconnect
+  - gdpins_raw_remove
 - title: Output layer
   desc: |
     Save figures and publish tabular output locally then to Drive.

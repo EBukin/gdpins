@@ -173,7 +173,7 @@ conn <- gdpins_raw_connect(
 # Store an R object (serialised to the appropriate format by extension)
 gdpins_raw_put_object(conn, api_response_tbl, "gdp_2024.parquet")
 
-# Upload a file verbatim (byte-faithful)
+# Upload a file verbatim (byte-faithful, any extension)
 gdpins_raw_put_file(conn, path = "downloads/kadaster_raw.geojson",
                     name = "kadaster_raw.geojson")
 
@@ -181,8 +181,18 @@ gdpins_raw_put_file(conn, path = "downloads/kadaster_raw.geojson",
 gdp_raw  <- gdpins_raw_get(conn, "gdp_2024.parquet")
 kad_raw  <- gdpins_raw_get(conn, "kadaster_raw.geojson")
 
-# List contents
-gdpins_raw_ls(conn, depth = 2)
+# List contents — 8-column tibble including local paths and Drive IDs
+listing <- gdpins_raw_ls(conn, depth = 2)
+# listing$local_path  — absolute path on this machine
+# listing$drive_id    — Drive file/folder ID (NA on fake adapter)
+# listing$drive_url   — clickable browser URL (NA on fake adapter)
+
+# Resolve a file to its local path, downloading from Drive if needed
+local_path <- gdpins_raw_path(conn, "gdp_2024.parquet")
+arrow::read_parquet(local_path)  # pass to any reader
+
+# Non-standard filenames (spaces, parentheses) work too
+gdpins_raw_path(conn, "quarterly report (Q1 2024).csv")
 
 # Remove one file (flat or nested path). Missing files are ignored.
 gdpins_raw_remove(conn, "kadaster_raw.geojson")
