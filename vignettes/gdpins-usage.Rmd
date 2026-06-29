@@ -154,6 +154,130 @@ parcels   <- gdpins_pin_read(bd_raw, "parcels")   # sf decoded with CRS intact
 gdpins_pin_remove(bd_raw, "gdp_panel")
 ```
 
+## Format selection
+
+`gdpins` auto-detects the storage format via `gdpins_detect_format()`. The
+rules, in order:
+
+| Object type | Chosen format | Storage |
+|-------------|--------------|---------|
+| Not a data frame (list, model, …) | `"rds"` | `saveRDS()` |
+| Data frame with list-columns (non-sf) | `"rds"` | `saveRDS()` |
+| Plain tibble / data frame | `"arrow"` | Parquet via `arrow` |
+| `sf` object (all list-cols are `sfc`) | `"arrow"` | Parquet (geometry WKT-encoded) |
+
+```{r format-auto}
+gdpins_detect_format(mtcars)         # "arrow"  — plain data frame
+gdpins_detect_format(my_sf)          # "arrow"  — sf, sfc cols are fine
+gdpins_detect_format(my_model)       # "rds"    — not a data frame
+gdpins_detect_format(nested_tibble)  # "rds"    — has non-sfc list-column
+```
+
+Override the format explicitly when you need to:
+
+```{r format-explicit}
+# Force RDS — useful for tibbles with custom attributes you want to preserve
+gdpins_pin_write(bd_raw, my_tibble, "gdp_panel", format = "rds")
+
+# Force Arrow/Parquet — rarely needed; auto-detect handles most cases
+gdpins_pin_write(bd_raw, my_tibble, "gdp_panel", format = "arrow")
+```
+
+> **Rule of thumb:** let auto-detection choose. Override to `"rds"` only if
+> the object has list-columns with non-spatial content (e.g. nested model
+> output) that you want to read back in R without re-building.
+
+## Spatial data (sf) round-trip
+
+`sf` objects are stored as **Parquet** with geometry converted to WKT text.
+CRS (EPSG code) is embedded in the column name using the suffix `__<epsg>__`:
+
+```
+geometry column "geometry" with EPSG 4326
+  → stored as column "geometry__4326__" (WKT text)
+  → restored as column "geometry" (sfc) with CRS 4326 on read
+```
+
+All of this happens automatically — no manual encoding/decoding needed:
+
+```{r sf-write-read}
+# Write sf — geometry and CRS encoded automatically
+gdpins_pin_write(bd_raw, parcels_sf, "parcels")
+
+# Read back — sf class and CRS fully restored
+parcels <- gdpins_pin_read(bd_raw, "parcels")
+sf::st_crs(parcels)$epsg  # original EPSG
+
+# Multiple geometry columns with different CRS are each encoded separately
+gdpins_pin_write(bd_raw, multi_geom_sf, "parcels_multi")
+```
+
+The helpers `gdpins_sf_to_parquet()` and `gdpins_parquet_to_sf()` are exposed
+if you need to encode/decode manually (e.g. to write to an external Parquet file):
+
+```{r sf-manual}
+encoded <- gdpins_sf_to_parquet(parcels_sf)   # tibble with geometry__4326__ col
+restored <- gdpins_parquet_to_sf(encoded)      # sf with CRS restored
+```
+
+> **Limitation:** geometry columns must have an EPSG integer CRS. Custom
+> proj-string-only CRS will error. Set a CRS first with `sf::st_set_crs()`.
+
+## Reading a specific version
+
+When `versioned = TRUE` (the default), each `gdpins_pin_write()` call creates
+a new version rather than overwriting. Versions are labelled by timestamp.
+
+```{r versions-list}
+# Inspect all versions of a pin
+info <- gdpins_pin_info(bd_raw, "gdp_panel")
+info$versions        # tibble: version label, created, size
+info$n_versions      # integer count
+```
+
+```{r versions-read}
+# Read the latest version (default)
+gdpins_pin_read(bd_raw, "gdp_panel")
+
+# Read a specific historical version by its label
+gdpins_pin_read(bd_raw, "gdp_panel", version = "20240615T120000Z-abc12")
+```
+
+```{r versions-prune}
+# Keep only the 3 most recent versions, dry-run first
+gdpins_prune_pin_versions(bd_raw, "gdp_panel", keep = 3, dry_run = TRUE)
+gdpins_prune_pin_versions(bd_raw, "gdp_panel", keep = 3, dry_run = FALSE)
+```
+
+> For a `versioned = FALSE` board, each write **overwrites** the previous
+> value. Use this for frequently-updated reference data where history is
+> unwanted.
+
+## Offline behaviour
+
+When Drive is unreachable (no internet, VPN down), `gdpins_init_board()` falls
+back automatically:
+
+| Config | Offline behaviour |
+|--------|------------------|
+| `local_only` | Fully offline — no change |
+| `drive_cache` | Falls back to cache directory as local-only board |
+| `drive_cache_local` | Falls back to standalone `local_dir` board |
+
+A warning is emitted; writes are blocked (Drive boards are write-protected
+offline); reads continue from the local copy.
+
+```{r offline}
+# Check connectivity explicitly before Drive operations
+gdpins_is_online()   # TRUE / FALSE
+
+# Board status shows sync state between Drive and local
+gdpins_board_status(bd_raw)
+
+# Reads work offline — served from cache or local_dir
+gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")  # no network needed
+```
+
 ## Raw-exogenous connection
 
 For data as received from APIs — plain files, no pins metadata.
