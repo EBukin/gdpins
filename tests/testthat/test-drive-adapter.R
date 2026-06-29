@@ -348,10 +348,53 @@ test_that("gdpins_drive_url returns NA for fake adapter with path", {
 })
 
 test_that("gdpins_real_drive is exported and creates adapter", {
+  local_mocked_bindings(
+    gdpins_ensure_drive_auth = function(email) invisible(NULL),
+    .package = "gdpins"
+  )
   adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
   expect_s3_class(adapter, "gdpins_drive_adapter")
   expect_equal(adapter$kind, "real")
   expect_equal(adapter$root_id, "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+})
+
+test_that("gdpins_real_drive() calls gdpins_ensure_drive_auth with GDRIVE_EMAIL by default", {
+  auth_email <- NULL
+  local_mocked_bindings(
+    gdpins_ensure_drive_auth = function(email) { auth_email <<- email; invisible(NULL) },
+    .package = "gdpins"
+  )
+  withr::with_envvar(c(GDRIVE_EMAIL = "env@example.com"), {
+    gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+  })
+  expect_equal(auth_email, "env@example.com")
+})
+
+test_that("gdpins_real_drive() explicit email overrides GDRIVE_EMAIL", {
+  auth_email <- NULL
+  local_mocked_bindings(
+    gdpins_ensure_drive_auth = function(email) { auth_email <<- email; invisible(NULL) },
+    .package = "gdpins"
+  )
+  withr::with_envvar(c(GDRIVE_EMAIL = "env@example.com"), {
+    gdpins_real_drive(
+      "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+      email = "explicit@example.com"
+    )
+  })
+  expect_equal(auth_email, "explicit@example.com")
+})
+
+test_that("gdpins_real_drive() passes empty string when no email anywhere", {
+  auth_email <- "sentinel"
+  local_mocked_bindings(
+    gdpins_ensure_drive_auth = function(email) { auth_email <<- email; invisible(NULL) },
+    .package = "gdpins"
+  )
+  withr::with_envvar(c(GDRIVE_EMAIL = ""), {
+    gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+  })
+  expect_equal(auth_email, "")
 })
 
 # ── Real adapter (skip unless live) ──────────────────────────────────────────

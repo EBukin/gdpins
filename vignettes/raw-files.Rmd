@@ -28,11 +28,14 @@ library(gdpins)
 ```
 
 ```{r adapter}
-# Authenticate once (picks up GDRIVE_EMAIL from .Renviron)
-gdpins_ensure_drive_auth()
+# Optional pre-flight auth:
+# gdpins_ensure_drive_auth()
 
 # Point the adapter at your project root folder on Drive
-adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+adapter <- gdpins_real_drive(
+  "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  email = Sys.getenv("GDRIVE_EMAIL")
+)
 ```
 
 ```{r connect}
@@ -353,11 +356,14 @@ library(gdpins)
 ```
 
 ```{r adapter}
-# Authenticate once (picks up GDRIVE_EMAIL from .Renviron)
-gdpins_ensure_drive_auth()
+# Optional pre-flight auth:
+# gdpins_ensure_drive_auth()
 
 # Point the adapter at your project root folder on Drive
-adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+adapter <- gdpins_real_drive(
+  "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  email = Sys.getenv("GDRIVE_EMAIL")
+)
 ```
 
 ```{r connect}

@@ -46,6 +46,30 @@ adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
 adapter <- gdpins_real_drive("My Drive/projects/myproject")
 ```
 
+### Authentication and the `email` parameter
+
+`gdpins_real_drive()` now calls `gdpins_ensure_drive_auth()` automatically.
+
+```{r, eval=FALSE}
+# 1) Uses GDRIVE_EMAIL from .Renviron (recommended)
+adapter <- gdpins_real_drive("folder-id")
+
+# 2) Explicit override
+adapter <- gdpins_real_drive("folder-id", email = "explicit@example.com")
+
+# 3) No email set -> gargle interactive CLI account picker
+adapter <- gdpins_real_drive("folder-id", email = "")
+```
+
+Set this once in `~/.Renviron`:
+
+```txt
+GDRIVE_EMAIL=you@example.com
+```
+
+An explicit pre-flight `gdpins_ensure_drive_auth()` call is still valid, but
+optional when creating adapters with `gdpins_real_drive()`.
+
 ## Verifying the folder location
 
 Use `gdpins_drive_url()` to get a clickable URL for any folder within the adapter root:

@@ -39,13 +39,6 @@ Drive operations use lazy, CLI-guided auth. Set your email once in
 GDRIVE_EMAIL=you@example.com
 ```
 
-Then auth is triggered automatically on the first Drive operation, or call it
-explicitly:
-
-```{r auth}
-gdpins_ensure_drive_auth()
-```
-
 Check connectivity:
 
 ```{r online}
@@ -62,11 +55,24 @@ https://drive.google.com/drive/folders/<your-folder-id-here>
 ```
 
 ```{r adapter}
-# Accepts a Drive folder ID:
+# Picks up GDRIVE_EMAIL by default:
 adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
 
 # Or a path string (resolved automatically via googledrive::drive_get):
 adapter <- gdpins_real_drive("My Drive/kazLandEconImpact-data")
+
+# Optional explicit override:
+adapter <- gdpins_real_drive(
+  "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  email = "you@example.com"
+)
+```
+
+Optional pre-flight auth call (usually unnecessary if you construct a real
+adapter right away):
+
+```{r auth}
+gdpins_ensure_drive_auth()
 ```
 
 ### Verify folder locations

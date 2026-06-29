@@ -785,7 +785,7 @@ test_that("on_discrepancy=prompt in interactive session -> informs", {
   )
 })
 
-test_that("create=NA + interactive + user says YES -> creates path", {
+test_that("gdpins_init_board create=NA uses .board_readline not utils::askYesNo", {
   fake_root  <- withr::local_tempdir()
   cache_dir  <- withr::local_tempdir()
   adapter    <- gdpins_fake_drive(root = fake_root)
@@ -798,9 +798,12 @@ test_that("create=NA + interactive + user says YES -> creates path", {
 
   withr::local_options(list(rlang_interactive = TRUE))
 
-  # Mock askYesNo to return TRUE
+  testthat::local_mocked_bindings(
+    .board_readline = function(prompt) "Yes",
+    .package = "gdpins"
+  )
   local_mocked_bindings(
-    askYesNo = function(...) TRUE,
+    askYesNo = function(...) stop("utils::askYesNo must not be called"),
     .package = "utils"
   )
 
@@ -828,9 +831,9 @@ test_that("create=NA + interactive + user says NO -> errors", {
 
   withr::local_options(list(rlang_interactive = TRUE))
 
-  local_mocked_bindings(
-    askYesNo = function(...) FALSE,
-    .package = "utils"
+  testthat::local_mocked_bindings(
+    .board_readline = function(prompt) "no",
+    .package = "gdpins"
   )
 
   expect_error(

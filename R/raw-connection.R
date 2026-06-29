@@ -204,7 +204,8 @@ NULL
 #' @param adapter A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
 #'
 #' @return A `gdpins_raw_conn` object.
-#' @seealso [gdpins_real_drive()] to create an adapter, [gdpins_raw_remove()].
+#' @seealso [gdpins_real_drive()] and [gdpins_ensure_drive_auth()] for auth and
+#'   adapter setup, [gdpins_raw_remove()].
 #' @examples
 #' # --- Fake adapter (no network) ---
 #' adapter <- gdpins_fake_drive()
