@@ -35,6 +35,7 @@ reference:
   - gdpins_pin_info
   - gdpins_list_pins
   - gdpins_detect_format
+  - gdpins_pin_remove
 - title: Versioning & pruning
   desc: |
     Manage historical versions stored on Drive and in the local cache.
@@ -65,4 +66,23 @@ reference:
   contents:
   - gdpins_sf_to_parquet
   - gdpins_parquet_to_sf
-
+- title: Package docs & methods
+  desc: |
+    Package-level topics, S3 methods, and conceptual helper pages.
+  contents:
+  - auth
+  - board
+  - discovery
+  - format.gdpins_board
+  - gdpins_drive_url
+  - gdpins_fake_drive
+  - gdpins_real_drive
+  - io-formats
+  - output
+  - print.gdpins_board
+  - print.gdpins_pin_info
+  - prune
+  - raw-connection
+  - summary.gdpins_board
+  - sync
+  - verbs
