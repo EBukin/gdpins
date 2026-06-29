@@ -15,6 +15,9 @@ NULL
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+#' @keywords internal
+.board_readline <- function(prompt) readline(prompt)
+
 #' Resolve the default on_discrepancy value
 #' @keywords internal
 .resolve_on_discrepancy <- function(on_discrepancy) {
@@ -133,7 +136,8 @@ NULL
 #' @param versioned Logical. Whether the board stores pin versions. Default
 #'   `TRUE`.
 #' @param create Logical or `NA`. `TRUE` = create Drive board if absent;
-#'   `FALSE` = error if absent; `NA` (default) = interactive prompt or error.
+#'   `FALSE` = error if absent; `NA` (default) = interactive CLI prompt or
+#'   error.
 #' @param on_discrepancy Character scalar or `NULL`. One of
 #'   `c("prompt","warn","sync_from_drive","sync_to_drive","ignore")`. `NULL`
 #'   resolves to `"prompt"` interactively or `"warn"` non-interactively.
@@ -365,14 +369,14 @@ gdpins_init_board <- function(
     } else {
       # create = NA: prompt if interactive, error if not
       if (rlang::is_interactive()) {
-        answer <- utils::askYesNo(
+        answer_raw <- .board_readline(
           paste0(
             "Drive path '", drive_path,
-            "' does not exist. Create it now?"
-          ),
-          default = FALSE
+            "' does not exist. Create it? [y/N] "
+          )
         )
-        if (isTRUE(answer)) {
+        answer <- tolower(trimws(answer_raw))
+        if (answer %in% c("y", "yes")) {
           gd_mkdir(adapter, drive_path)
         } else {
           cli::cli_abort(c(

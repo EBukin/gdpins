@@ -27,9 +27,20 @@ NULL
 #'
 #' @param root_id Character scalar. Drive folder ID of the project root folder,
 #'   or a Drive path string (for example `"My Drive/projects/myproject"`).
+#' @param email Character scalar. Google account email used for authentication.
+#'   Defaults to `Sys.getenv("GDRIVE_EMAIL")`. Set `GDRIVE_EMAIL` in your
+#'   `.Renviron` to avoid repeated prompts. Pass `""` to use gargle's
+#'   interactive account selector.
+#'
+#' @details
+#' Authentication is handled automatically: [gdpins_ensure_drive_auth()] is
+#' called when creating the adapter. If a valid token already exists it is
+#' reused. If `email` is non-empty, that account is requested; otherwise gargle
+#' shows interactive account selection.
 #'
 #' @return An object of class `gdpins_drive_adapter`.
-#' @seealso [gdpins_init_board()], [gdpins_raw_connect()]
+#' @seealso [gdpins_init_board()], [gdpins_raw_connect()],
+#'   [gdpins_ensure_drive_auth()]
 #' @export
 #' @examples
 #' \dontrun{
@@ -40,8 +51,12 @@ NULL
 #' adapter2 <- gdpins_real_drive("My Drive/projects/myproject")
 #' adapter2
 #' }
-gdpins_real_drive <- function(root_id) {
+gdpins_real_drive <- function(
+    root_id,
+    email = Sys.getenv("GDRIVE_EMAIL")
+) {
   stopifnot(is.character(root_id), length(root_id) == 1L)
+  gdpins_ensure_drive_auth(email)
 
   # nocov start
   if (grepl("/", root_id, fixed = TRUE) || grepl(" ", root_id, fixed = TRUE)) {
@@ -176,7 +191,8 @@ gdpins_real_drive <- function(root_id) {
       if (is.null(target)) {
         return(tibble::tibble(
           path  = character(), is_dir = logical(), size = double(),
-          md5   = character(), mtime  = as.POSIXct(character())
+          md5   = character(), mtime  = as.POSIXct(character()),
+          drive_id = character()
         ))
       }
       prefix <- if (nzchar(path)) paste0(path, "/") else ""
@@ -187,7 +203,8 @@ gdpins_real_drive <- function(root_id) {
         if (is.null(hits) || nrow(hits) == 0L) {
           return(tibble::tibble(
             path  = character(), is_dir = logical(), size = double(),
-            md5   = character(), mtime  = as.POSIXct(character())
+            md5   = character(), mtime  = as.POSIXct(character()),
+            drive_id = character()
           ))
         }
         .real_hits_to_tbl(hits, prefix)
@@ -249,6 +266,8 @@ gdpins_fake_drive <- function(root = tempfile("gdpins_fake_drive_")) {
     kind = "fake",
     root = root,
     state = state,  # exposed for test inspection
+
+    get_id = function(path) NA_character_,
 
     get_url = function(path) {
       cli::cli_inform("Fake Drive adapter has no real URL.")
@@ -321,11 +340,12 @@ gdpins_fake_drive <- function(root = tempfile("gdpins_fake_drive_")) {
       abs <- .abs(path)
       if (!file.exists(abs)) {
         return(tibble::tibble(
-          path  = character(),
+          path   = character(),
           is_dir = logical(),
-          size  = double(),
-          md5   = character(),
-          mtime = as.POSIXct(character())
+          size   = double(),
+          md5    = character(),
+          mtime  = as.POSIXct(character()),
+          drive_id = character()
         ))
       }
 
@@ -340,11 +360,12 @@ gdpins_fake_drive <- function(root = tempfile("gdpins_fake_drive_")) {
 
       if (length(all_paths) == 0L) {
         return(tibble::tibble(
-          path  = character(),
+          path   = character(),
           is_dir = logical(),
-          size  = double(),
-          md5   = character(),
-          mtime = as.POSIXct(character())
+          size   = double(),
+          md5    = character(),
+          mtime  = as.POSIXct(character()),
+          drive_id = character()
         ))
       }
 
@@ -364,11 +385,12 @@ gdpins_fake_drive <- function(root = tempfile("gdpins_fake_drive_")) {
 
       if (length(rel_paths) == 0L) { # nocov start
         return(tibble::tibble(
-          path  = character(),
+          path   = character(),
           is_dir = logical(),
-          size  = double(),
-          md5   = character(),
-          mtime = as.POSIXct(character())
+          size   = double(),
+          md5    = character(),
+          mtime  = as.POSIXct(character()),
+          drive_id = character()
         ))
       } # nocov end
 
@@ -382,11 +404,12 @@ gdpins_fake_drive <- function(root = tempfile("gdpins_fake_drive_")) {
       mtime <- file.mtime(abs_paths)
 
       tibble::tibble(
-        path  = rel_paths,
-        is_dir = is_dir,
-        size  = size,
-        md5   = md5,
-        mtime = mtime
+        path     = rel_paths,
+        is_dir   = is_dir,
+        size     = size,
+        md5      = md5,
+        mtime    = mtime,
+        drive_id = rep(NA_character_, length(rel_paths))
       )
     }
   )
@@ -488,8 +511,9 @@ gd_mtime <- function(adapter, path) {
 #' @param recursive Logical. Recurse into sub-directories? Default `FALSE`.
 #'
 #' @return A [tibble::tibble()] with columns `path` (chr, relative),
-#'   `is_dir` (lgl), `size` (dbl, bytes), `md5` (chr), `mtime` (POSIXct).
-#'   Trashed entries are excluded.
+#'   `is_dir` (lgl), `size` (dbl, bytes), `md5` (chr), `mtime` (POSIXct),
+#'   `drive_id` (chr; `NA_character_` for fake adapter, Drive file/folder ID
+#'   for real adapter). Trashed entries are excluded.
 #' @keywords internal
 gd_ls <- function(adapter, path = "", recursive = FALSE) {
   adapter$ls(path, recursive)
@@ -583,7 +607,10 @@ gdpins_drive_url <- function(adapter, path = "") {
       hits$drive_resource,
       function(r) { mt <- r$modifiedTime; if (is.null(mt)) NA_character_ else as.character(mt) },
       character(1L)
-    ), format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
+    ), format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
+    drive_id = vapply(hits$id, function(id) {
+      if (is.null(id) || is.na(id)) NA_character_ else as.character(id)
+    }, character(1L))
   )
   # nocov end
 }
@@ -596,7 +623,8 @@ gdpins_drive_url <- function(adapter, path = "") {
   if (is.null(hits) || nrow(hits) == 0L) {
     return(tibble::tibble(
       path  = character(), is_dir = logical(), size = double(),
-      md5   = character(), mtime  = as.POSIXct(character())
+      md5   = character(), mtime  = as.POSIXct(character()),
+      drive_id = character()
     ))
   }
   tbl <- .real_hits_to_tbl(hits, prefix)

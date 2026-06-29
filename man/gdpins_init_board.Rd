@@ -30,7 +30,8 @@ the adapter root), or \code{NULL} for \code{"local_only"}.}
 \code{TRUE}.}
 
 \item{create}{Logical or \code{NA}. \code{TRUE} = create Drive board if absent;
-\code{FALSE} = error if absent; \code{NA} (default) = interactive prompt or error.}
+\code{FALSE} = error if absent; \code{NA} (default) = interactive CLI prompt or
+error.}
 
 \item{on_discrepancy}{Character scalar or \code{NULL}. One of
 \code{c("prompt","warn","sync_from_drive","sync_to_drive","ignore")}. \code{NULL}

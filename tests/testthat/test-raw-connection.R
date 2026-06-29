@@ -318,7 +318,8 @@ test_that("raw_ls returns tibble with expected columns", {
   gdpins_raw_put_object(conn, tbl, "a/b.csv")
   result <- gdpins_raw_ls(conn)
   expect_s3_class(result, "tbl_df")
-  expect_true(all(c("name", "is_dir", "size", "mtime", "depth") %in% names(result)))
+  expect_true(all(c("name", "is_dir", "size", "mtime", "depth",
+                    "local_path", "drive_id", "drive_url") %in% names(result)))
 })
 
 test_that("raw_ls depth=1 shows only top-level entries", {
@@ -356,6 +357,229 @@ test_that("raw_ls works for local_only connections", {
   result <- gdpins_raw_ls(conn)
   expect_s3_class(result, "tbl_df")
   expect_true(any(grepl("local_file", result$name)))
+})
+
+# ── Phase 2: extended gdpins_raw_ls() ────────────────────────────────────────
+
+test_that("raw_ls drive_local: has all 8 columns with correct types", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "data.csv")
+  result <- gdpins_raw_ls(conn)
+
+  expect_named(result,
+    c("name", "is_dir", "size", "mtime", "depth", "local_path", "drive_id", "drive_url"),
+    ignore.order = FALSE
+  )
+  expect_type(result$local_path, "character")
+  expect_type(result$drive_id,   "character")
+  expect_type(result$drive_url,  "character")
+})
+
+test_that("raw_ls drive_local fake adapter: drive_id and drive_url are all NA", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "data.csv")
+  result <- gdpins_raw_ls(conn)
+
+  expect_true(all(is.na(result$drive_id)))
+  expect_true(all(is.na(result$drive_url)))
+})
+
+test_that("raw_ls drive_local: local_path is absolute and under conn$local_path", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "sub/file.csv")
+  result <- gdpins_raw_ls(conn)
+
+  file_row <- result[!result$is_dir & grepl("file.csv", result$name), ]
+  expect_equal(nrow(file_row), 1L)
+  expected <- normalizePath(file.path(conn$local_path, "sub", "file.csv"), mustWork = FALSE)
+  actual   <- normalizePath(file_row$local_path, mustWork = FALSE)
+  expect_equal(actual, expected)
+})
+
+test_that("raw_ls local_only: local_path present, drive_id/drive_url all NA", {
+  conn <- new_fake_raw_conn("local_only")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "local.csv")
+  result <- gdpins_raw_ls(conn)
+
+  expect_true("local_path" %in% names(result))
+  expect_true(all(is.na(result$drive_id)))
+  expect_true(all(is.na(result$drive_url)))
+})
+
+test_that("raw_ls empty connection returns 8-column zero-row tibble", {
+  conn   <- new_fake_raw_conn("drive_local")
+  result <- gdpins_raw_ls(conn)
+
+  expect_equal(nrow(result), 0L)
+  expect_named(result,
+    c("name", "is_dir", "size", "mtime", "depth", "local_path", "drive_id", "drive_url")
+  )
+  expect_type(result$local_path, "character")
+  expect_type(result$drive_id,   "character")
+  expect_type(result$drive_url,  "character")
+})
+
+test_that("raw_ls: non-standard filenames (spaces, parens, special chars) appear correctly", {
+  conn <- new_fake_raw_conn("drive_local")
+
+  # Upload via fake adapter directly to test non-standard names
+  local_tmp <- tempfile(fileext = ".csv")
+  writeLines("a,b\n1,2", local_tmp)
+  gd_upload(conn$adapter, local_tmp, paste0(conn$drive_path, "/my data (2024).csv"))
+  gd_upload(conn$adapter, local_tmp, paste0(conn$drive_path, "/report - final v2.csv"))
+
+  result <- gdpins_raw_ls(conn)
+  names_found <- result$name
+
+  expect_true(any(grepl("my data (2024)", names_found, fixed = TRUE)))
+  expect_true(any(grepl("report - final v2", names_found, fixed = TRUE)))
+  # local_path for non-standard names must still be non-empty strings
+  non_dir <- result[!result$is_dir, ]
+  expect_true(all(nzchar(non_dir$local_path)))
+})
+
+# ── gdpins_raw_path ───────────────────────────────────────────────────────────
+
+test_that("gdpins_raw_path: relative path returns absolute path when file exists locally", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "data.csv")
+
+  result <- gdpins_raw_path(conn, "data.csv")
+  expect_type(result, "character")
+  expect_length(result, 1L)
+  expect_true(file.exists(result))
+  expect_equal(
+    normalizePath(result, mustWork = TRUE),
+    normalizePath(file.path(conn$local_path, "data.csv"), mustWork = TRUE)
+  )
+})
+
+test_that("gdpins_raw_path: relative path downloads from Drive when not local", {
+  conn      <- new_fake_raw_conn("drive_local")
+  local_tmp <- tempfile(fileext = ".csv")
+  writeLines("a,b\n1,2", local_tmp)
+
+  # Upload only to fake Drive (not via gdpins_raw_put_object, so local mirror is empty)
+  gd_upload(conn$adapter, local_tmp, paste0(conn$drive_path, "/remote_only.csv"))
+  local_dest <- file.path(conn$local_path, "remote_only.csv")
+  expect_false(file.exists(local_dest))
+
+  result <- gdpins_raw_path(conn, "remote_only.csv")
+  expect_true(file.exists(result))
+  expect_equal(
+    normalizePath(result, mustWork = TRUE),
+    normalizePath(local_dest, mustWork = TRUE)
+  )
+})
+
+test_that("gdpins_raw_path: nested path downloads and creates parent dirs", {
+  conn      <- new_fake_raw_conn("drive_local")
+  local_tmp <- tempfile(fileext = ".csv")
+  writeLines("x,y\n3,4", local_tmp)
+
+  gd_mkdir(conn$adapter, paste0(conn$drive_path, "/sub"))
+  gd_upload(conn$adapter, local_tmp, paste0(conn$drive_path, "/sub/deep.csv"))
+  expect_false(file.exists(file.path(conn$local_path, "sub", "deep.csv")))
+
+  result <- gdpins_raw_path(conn, "sub/deep.csv")
+  expect_true(file.exists(result))
+  expect_true(dir.exists(dirname(result)))
+})
+
+test_that("gdpins_raw_path: does NOT re-download when file already local", {
+  conn <- new_fake_raw_conn("drive_local")
+
+  # Write known content locally
+  local_dest <- file.path(conn$local_path, "stable.csv")
+  writeLines("original", local_dest)
+  sentinel <- readLines(local_dest)
+
+  # Also put on Drive with different content
+  tmp2 <- tempfile(fileext = ".csv")
+  writeLines("modified on drive", tmp2)
+  gd_upload(conn$adapter, tmp2, paste0(conn$drive_path, "/stable.csv"))
+
+  result <- gdpins_raw_path(conn, "stable.csv")
+  expect_equal(readLines(result), sentinel)  # content unchanged
+})
+
+test_that("gdpins_raw_path: local_only missing file aborts with helpful message", {
+  conn <- new_fake_raw_conn("local_only")
+  expect_error(
+    gdpins_raw_path(conn, "missing.rds"),
+    regexp = "not found",
+    class  = "rlang_error"
+  )
+})
+
+test_that("gdpins_raw_path: relative path not on Drive aborts with message", {
+  conn <- new_fake_raw_conn("drive_local")
+  expect_error(
+    gdpins_raw_path(conn, "nonexistent.csv"),
+    regexp = "not found",
+    class  = "rlang_error"
+  )
+})
+
+test_that("gdpins_raw_path: Drive ID on local_only connection aborts", {
+  conn    <- new_fake_raw_conn("local_only")
+  fake_id <- strrep("A", 25L)  # 25-char alphanumeric = Drive ID by .is_drive_id()
+  expect_error(
+    gdpins_raw_path(conn, fake_id),
+    regexp = "local.only",
+    class  = "rlang_error"
+  )
+})
+
+test_that("gdpins_raw_path: Drive ID on fake adapter aborts", {
+  conn    <- new_fake_raw_conn("drive_local")
+  fake_id <- strrep("B", 25L)
+  expect_error(
+    gdpins_raw_path(conn, fake_id),
+    regexp = "fake",
+    class  = "rlang_error"
+  )
+})
+
+test_that("gdpins_raw_path: input validation - non-character aborts", {
+  conn <- new_fake_raw_conn("drive_local")
+  expect_error(gdpins_raw_path(conn, 123L))
+  expect_error(gdpins_raw_path(conn, NULL))
+})
+
+test_that("gdpins_raw_path: input validation - empty string aborts", {
+  conn <- new_fake_raw_conn("drive_local")
+  expect_error(gdpins_raw_path(conn, ""))
+})
+
+test_that("gdpins_raw_path: input validation - length > 1 aborts", {
+  conn <- new_fake_raw_conn("drive_local")
+  expect_error(gdpins_raw_path(conn, c("a.csv", "b.csv")))
+})
+
+test_that("gdpins_raw_path: input validation - wrong conn class aborts", {
+  expect_error(gdpins_raw_path(list(), "file.csv"), "gdpins_raw_conn")
+})
+
+test_that("gdpins_raw_path: non-standard filename with spaces and parens", {
+  conn      <- new_fake_raw_conn("drive_local")
+  local_tmp <- tempfile(fileext = ".csv")
+  writeLines("a,b\n1,2", local_tmp)
+  gd_upload(conn$adapter, local_tmp, paste0(conn$drive_path, "/my data (2024).csv"))
+
+  result <- gdpins_raw_path(conn, "my data (2024).csv")
+  expect_true(file.exists(result))
+  expect_true(grepl("my data (2024)", result, fixed = TRUE))
+})
+
+test_that("gdpins_raw_path: non-standard filename with hyphens and spaces", {
+  conn      <- new_fake_raw_conn("drive_local")
+  local_tmp <- tempfile(fileext = ".csv")
+  writeLines("x,y\n3,4", local_tmp)
+  gd_upload(conn$adapter, local_tmp, paste0(conn$drive_path, "/report - final v2.csv"))
+
+  result <- gdpins_raw_path(conn, "report - final v2.csv")
+  expect_true(file.exists(result))
 })
 
 # ── gdpins_raw_connect — create-confirm branches ─────────────────────────────
