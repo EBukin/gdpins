@@ -1,0 +1,351 @@
+# gdpins
+
+**Google Drive + pins data management for R projects.**
+
+`gdpins` layers three storage models over Google Drive for reproducible,
+offline-capable data pipelines. Drive is the source of truth; a local
+cache mirrors it. Reads are local-first; writes fan out to Drive and
+cache simultaneously; sync and delete are always explicit and guarded.
+
+## Storage layers
+
+| Layer | Interface | Use |
+|----|----|----|
+| **Pins boards** | `gdpins_pin_*` | Versioned R objects: tibbles, sf, nested lists |
+| **Raw-exogenous connection** | `gdpins_raw_*` | Plain files as received from APIs/sources |
+| **Output** | `gdpins_save_figure`, `gdpins_publish_output` | Local-first figures/tables, published to Drive deliberately |
+
+## Installation
+
+Install from GitHub:
+
+``` r
+
+# install.packages("pak")
+pak::pak("EBukin/gdpins")
+```
+
+Or load in-place from the project root:
+
+``` r
+
+pkgload::load_all(".")
+```
+
+## Authentication
+
+Set your Google account email in `.Renviron`:
+
+    GDRIVE_EMAIL=you@example.com
+
+Auth is lazy — triggered on the first Drive operation, or call
+explicitly:
+
+``` r
+
+gdpins_ensure_drive_auth()
+gdpins_is_online()   # check connectivity
+```
+
+Offline and local-only workflows need no auth.
+
+## Boards
+
+A board wraps one layer of the data pipeline. Three configurations:
+
+``` r
+
+# Local only — no Drive, works fully offline
+bd_local <- gdpins_init_board(
+  name      = "scratch",
+  local_dir = "path/to/local/folder"
+)
+
+# Drive + cache — standard production configuration
+bd_raw <- gdpins_init_board(
+  name           = "data_raw",
+  drive_path     = "my-project-data/data-raw",
+  cache_dir      = "path/to/data-raw-cache",
+  versioned      = TRUE,
+  create         = NA,        # prompt to create if Drive folder absent
+  on_discrepancy = "prompt"   # "warn" for non-interactive scripts
+)
+
+# Drive + cache + standalone local (super config)
+bd_clean <- gdpins_init_board(
+  name       = "data_clean",
+  drive_path = "my-project-data/data-clean",
+  cache_dir  = "path/to/data-clean-cache",
+  local_dir  = "path/to/data-clean-local",
+  versioned  = TRUE
+)
+```
+
+Pin names are **bare snake_case** — the board encodes the pipeline
+layer.
+
+``` r
+
+# Write any R object — tibble, sf, list, nested tibble
+gdpins_pin_write(bd_raw, gdp_tbl,  "gdp_panel")
+gdpins_pin_write(bd_raw, parcels,  "parcels")   # sf auto-encoded as parquet
+
+# Read back
+gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")
+parcels   <- gdpins_pin_read(bd_raw, "parcels")  # sf restored with CRS intact
+```
+
+## Raw-exogenous connection
+
+For data as received from external sources — plain files, no pins
+metadata.
+
+``` r
+
+conn <- gdpins_raw_connect(
+  drive_path = "my-project-data/raw-exogenous/worldbank-api",
+  local_path = "path/to/raw-exogenous/worldbank-api",
+  create     = TRUE
+)
+
+# Store an R object (serialised by extension: .parquet, .csv, .rds, .geojson)
+gdpins_raw_put_object(conn, api_tbl, "gdp_2024.parquet")
+
+# Upload a file verbatim (byte-faithful — no R round-trip)
+gdpins_raw_put_file(conn, path = "downloads/data.geojson", name = "data.geojson")
+
+# Retrieve (reads local mirror; hits Drive only if absent locally)
+result <- gdpins_raw_get(conn, "gdp_2024.parquet")
+
+# List contents
+gdpins_raw_ls(conn, depth = 2)
+```
+
+## Sync
+
+Sync is **always explicit** — never automatic.
+
+``` r
+
+# Auto: newer side wins, both directions
+gdpins_sync(bd_raw)
+
+# Explicit direction
+gdpins_sync(bd_raw, direction = "from_drive")   # pull Drive → local
+gdpins_sync(bd_raw, direction = "to_drive")     # push local → Drive
+
+# Check drift first
+gdpins_board_status(bd_raw)   # in_sync / local_ahead / drive_ahead / offline
+```
+
+For versioned boards, conflicts create new versions (zero data loss).
+For raw or unversioned boards, conflicts prompt interactively or stop
+with a report. Nothing is silently overwritten.
+
+## Discovery and output
+
+``` r
+
+gdpins_list_pins(bd_clean)          # tibble: name, type, n_versions, size
+gdpins_pin_info(bd_clean, "parcels")
+
+# Save a figure (PNG or SVG — ggplot object is not stored)
+gdpins_save_figure(plot = p, name = "gdp_trend", dir = "output/figures",
+                   width = 8, height = 5)
+
+# Publish local output to Drive (always deliberate — dry_run = TRUE first)
+gdpins_publish_output(
+  tables_board  = bd_output,
+  figures_dir   = "output/figures",
+  drive_tables  = "output-tables",
+  drive_figures = "output-figures",
+  dry_run       = TRUE
+)
+```
+
+## Pruning old versions
+
+``` r
+
+# Preview (dry_run = TRUE is the default)
+gdpins_prune_pin_versions(bd_raw, "gdp_panel", keep = 3, dry_run = TRUE)
+
+# Actually prune (trash on Drive, not hard delete)
+gdpins_prune_board_versions(bd_raw, keep = 2, dry_run = FALSE, force = TRUE)
+```
+
+## Data flow
+
+    API/source  ──►  raw-exogenous  ──►  data-raw  ──►  data-interm  ──►  data-clean
+      (gdpins_raw_*)                      (gdpins_pin_write / gdpins_pin_read)
+                                                                              │
+                                           output-tables board + output-figures folder
+                                                    (gdpins_publish_output)
+
+A concept (`parcels`, `gdp_panel`) keeps its name as it flows
+`raw → interm → clean`; the board encodes the layer.
+
+## Geospatial encoding
+
+`sf` objects are stored as parquet with geometry columns encoded as WKT
+and the CRS (EPSG code) embedded in the column name (`geom__4326__`).
+The round-trip is lossless — CRS and geometry are restored automatically
+on read.
+
+``` r
+
+gdpins_sf_to_parquet(sf_obj)   # df with WKT geometry columns
+gdpins_parquet_to_sf(df)       # sf with original CRS restored
+```
+
+## Testing
+
+Unit tests use a fake Drive adapter and run without authentication or
+network:
+
+``` r
+
+testthat::test_package("gdpins")
+```
+
+Live tests run against a real Google Drive folder and are skipped by
+default. To run them:
+
+``` powershell
+$env:GDRIVE_TEST_FOLDER = "<your-test-folder-id>"
+Rscript --no-init-file -e 'testthat::test_file("tests/testthat/test-live.R")'
+```
+
+## License
+
+MIT — see [LICENSE](https://ebukin.github.io/gdpins/LICENSE).
+
+# Package index
+
+## Board setup & auth
+
+Initialise a pins board backed by Google Drive and manage credentials.
+
+- [`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md)
+  : Initialise a gdpins board
+- [`gdpins_ensure_drive_auth()`](https://ebukin.github.io/gdpins/reference/gdpins_ensure_drive_auth.md)
+  : Ensure Google Drive is authenticated
+- [`gdpins_is_online()`](https://ebukin.github.io/gdpins/reference/gdpins_is_online.md)
+  : Check whether an internet connection is available
+- [`gdpins_board_status()`](https://ebukin.github.io/gdpins/reference/gdpins_board_status.md)
+  : Report sync status of a board or raw connection
+- [`gdpins_sync()`](https://ebukin.github.io/gdpins/reference/gdpins_sync.md)
+  : Synchronise a board or raw connection with Drive
+
+## Pin read / write
+
+Read and write versioned R objects (tibbles, sf, lists) to a board.
+
+- [`gdpins_pin_read()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_read.md)
+  : Read a pin from a gdpins board
+- [`gdpins_pin_write()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_write.md)
+  : Write a pin to a gdpins board
+- [`gdpins_pin_info()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_info.md)
+  : Retrieve detailed metadata for a single pin
+- [`gdpins_list_pins()`](https://ebukin.github.io/gdpins/reference/gdpins_list_pins.md)
+  : List all pins in a board
+- [`gdpins_detect_format()`](https://ebukin.github.io/gdpins/reference/gdpins_detect_format.md)
+  : Detect the appropriate storage format for an R object
+- [`gdpins_pin_remove()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_remove.md)
+  : Remove a pin from a gdpins board
+
+## Versioning & pruning
+
+Manage historical versions stored on Drive and in the local cache.
+
+- [`gdpins_prune_board_versions()`](https://ebukin.github.io/gdpins/reference/gdpins_prune_board_versions.md)
+  : Prune old versions of all pins in a board
+- [`gdpins_prune_pin_versions()`](https://ebukin.github.io/gdpins/reference/gdpins_prune_pin_versions.md)
+  : Prune old versions of a single pin
+
+## Raw-exogenous connection
+
+Plain-file interface for API/source data that should not be pinned.
+
+- [`gdpins_raw_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_connect.md)
+  : Connect to a raw-exogenous Drive folder
+- [`gdpins_raw_ls()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_ls.md)
+  : List contents of a raw connection
+- [`gdpins_raw_path()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_path.md)
+  : Resolve a raw file to its absolute local path
+- [`gdpins_raw_get()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_get.md)
+  : Read a file from a raw connection
+- [`gdpins_raw_put_file()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_put_file.md)
+  : Upload a file verbatim to a raw connection
+- [`gdpins_raw_put_object()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_put_object.md)
+  : Write an R object to a raw connection
+- [`gdpins_refresh_disconnect()`](https://ebukin.github.io/gdpins/reference/gdpins_refresh_disconnect.md)
+  : Force-refresh a raw connection and disconnect
+- [`gdpins_raw_remove()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_remove.md)
+  : Remove a file from a raw connection
+
+## Output layer
+
+Save figures and publish tabular output locally then to Drive.
+
+- [`gdpins_save_figure()`](https://ebukin.github.io/gdpins/reference/gdpins_save_figure.md)
+  : Save a ggplot figure to disk
+- [`gdpins_publish_output()`](https://ebukin.github.io/gdpins/reference/gdpins_publish_output.md)
+  : Publish local output to Google Drive
+
+## Spatial helpers
+
+Convert between sf objects and Parquet files.
+
+- [`gdpins_sf_to_parquet()`](https://ebukin.github.io/gdpins/reference/gdpins_sf_to_parquet.md)
+  : Convert an sf object to a plain tibble suitable for parquet storage
+- [`gdpins_parquet_to_sf()`](https://ebukin.github.io/gdpins/reference/gdpins_parquet_to_sf.md)
+  : Restore an sf object from a parquet-encoded tibble
+
+## Package docs & methods
+
+Package-level topics, S3 methods, and conceptual helper pages.
+
+- [`auth`](https://ebukin.github.io/gdpins/reference/auth.md) :
+  Authentication helpers for Google Drive
+- [`board`](https://ebukin.github.io/gdpins/reference/board.md) : Board
+  initialisation and S3 methods for gdpins_board
+- [`discovery`](https://ebukin.github.io/gdpins/reference/discovery.md)
+  : Pin discovery and metadata
+- [`format(`*`<gdpins_board>`*`)`](https://ebukin.github.io/gdpins/reference/format.gdpins_board.md)
+  : Format a gdpins_board as a compact one-line string (≤80 cols)
+- [`gdpins_drive_url()`](https://ebukin.github.io/gdpins/reference/gdpins_drive_url.md)
+  : Return the Google Drive URL for a folder
+- [`gdpins_fake_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_fake_drive.md)
+  : Create a fake (tempdir-backed) Drive adapter
+- [`gdpins_real_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_real_drive.md)
+  : Create a real Google Drive adapter
+- [`io-formats`](https://ebukin.github.io/gdpins/reference/io-formats.md)
+  : I/O format detection and geospatial encoding
+- [`output`](https://ebukin.github.io/gdpins/reference/output.md) :
+  Output rendering and Drive publishing
+- [`print(`*`<gdpins_board>`*`)`](https://ebukin.github.io/gdpins/reference/print.gdpins_board.md)
+  : Print a gdpins_board object (compact, ≤80 cols)
+- [`print(`*`<gdpins_pin_info>`*`)`](https://ebukin.github.io/gdpins/reference/print.gdpins_pin_info.md)
+  : Print method for gdpins_pin_info
+- [`prune`](https://ebukin.github.io/gdpins/reference/prune.md) :
+  Version pruning with delete guards
+- [`raw-connection`](https://ebukin.github.io/gdpins/reference/raw-connection.md)
+  : Raw-exogenous connection
+- [`summary(`*`<gdpins_board>`*`)`](https://ebukin.github.io/gdpins/reference/summary.gdpins_board.md)
+  : Summarise a gdpins_board object
+- [`sync`](https://ebukin.github.io/gdpins/reference/sync.md) :
+  Synchronisation engine
+- [`verbs`](https://ebukin.github.io/gdpins/reference/verbs.md) :
+  Read/write verbs for gdpins boards
+
+# Articles
+
+### All vignettes
+
+- [Getting Started with
+  gdpins](https://ebukin.github.io/gdpins/articles/gdpins-usage.md):
+- [Setting up the Google Drive
+  Adapter](https://ebukin.github.io/gdpins/articles/google-drive-adapter.md):
+- [Working with Raw Files: Writing, Reading, Listing, and Local
+  Downloads](https://ebukin.github.io/gdpins/articles/raw-files.md):

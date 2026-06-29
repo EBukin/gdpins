@@ -1,0 +1,359 @@
+# Working with Raw Files: Writing, Reading, Listing, and Local Downloads
+
+The raw-exogenous layer in `gdpins` manages files as received from
+external sources — APIs, vendor exports, survey downloads — without a
+pins metadata wrapper. This vignette covers the full lifecycle:
+**writing**, **reading**, **listing**, and **downloading** raw files,
+including files with non-standard names.
+
+## Setup
+
+``` r
+
+library(gdpins)
+```
+
+``` r
+
+# Optional pre-flight auth:
+# gdpins_ensure_drive_auth()
+
+# Point the adapter at your project root folder on Drive
+adapter <- gdpins_real_drive(
+  "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  email = Sys.getenv("GDRIVE_EMAIL")
+)
+```
+
+``` r
+
+conn <- gdpins_raw_connect(
+  drive_path = "worldbank-api",          # relative to adapter root
+  local_path = "data/raw/worldbank-api", # local mirror directory
+  adapter    = adapter,
+  create     = TRUE
+)
+conn
+```
+
+------------------------------------------------------------------------
+
+## Writing raw files
+
+There are two ways to store files: serialise an R object, or upload a
+file verbatim.
+
+### Write an R object — `gdpins_raw_put_object()`
+
+The extension in `name` controls the serialisation format. Supported
+formats:
+
+| Extension | Writer | Reader | Notes |
+|----|----|----|----|
+| `.parquet` | [`arrow::write_parquet()`](https://arrow.apache.org/docs/r/reference/write_parquet.html) | [`arrow::read_parquet()`](https://arrow.apache.org/docs/r/reference/read_parquet.html) | Columnar, fast, compact. Preferred for tibbles. |
+| `.csv` | [`readr::write_csv()`](https://readr.tidyverse.org/reference/write_delim.html) | [`readr::read_csv()`](https://readr.tidyverse.org/reference/read_delim.html) | Plain text, universally readable. |
+| `.rds` | [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) | [`readRDS()`](https://rdrr.io/r/base/readRDS.html) | Any R object, R-only format. |
+| `.geojson` | [`sf::st_write()`](https://r-spatial.github.io/sf/reference/st_write.html) | [`sf::st_read()`](https://r-spatial.github.io/sf/reference/st_read.html) | Spatial vector data. |
+
+``` r
+
+library(dplyr)
+
+# Tibble → Parquet (fast, columnar)
+gdpins_raw_put_object(conn, gdp_panel_tbl, "gdp_2024.parquet")
+
+# Tibble → CSV (plain text)
+gdpins_raw_put_object(conn, metadata_tbl, "metadata.csv")
+
+# Any R object (list, model, etc.) → RDS
+gdpins_raw_put_object(conn, my_model, "model.rds")
+
+# sf object → GeoJSON
+gdpins_raw_put_object(conn, parcels_sf, "parcels.geojson")
+
+# sf object → Parquet (geometry encoded as WKT, CRS preserved)
+gdpins_raw_put_object(conn, parcels_sf, "parcels.parquet")
+
+# Nested paths are created automatically
+gdpins_raw_put_object(conn, api_response, "worldbank/gdp_by_country_2023.parquet")
+```
+
+Files are written to both the **local mirror** and **Drive** in one
+step.
+
+### Upload a file verbatim — `gdpins_raw_put_file()`
+
+Use this when you already have a file on disk and want to upload it
+byte-faithful, without any R round-trip (e.g. a downloaded CSV, a
+shapefile ZIP, a JSON blob):
+
+``` r
+
+# Upload a file exactly as-is
+gdpins_raw_put_file(conn,
+  path = "downloads/kadaster_raw.geojson",
+  name = "kadaster_raw.geojson"
+)
+
+# Non-standard name — no escaping needed
+gdpins_raw_put_file(conn,
+  path = "downloads/quarterly report (Q1 2024).csv",
+  name = "quarterly report (Q1 2024).csv"
+)
+
+# Nested destination
+gdpins_raw_put_file(conn,
+  path = "exports/final/merged.parquet",
+  name = "exports/final/merged.parquet"
+)
+```
+
+------------------------------------------------------------------------
+
+## Reading raw files
+
+### Read and deserialise — `gdpins_raw_get()`
+
+[`gdpins_raw_get()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_get.md)
+reads from the **local mirror** and deserialises using the format
+matched by the file extension. Use `force_refresh = TRUE` to pull a
+fresh copy from Drive first.
+
+``` r
+
+# Read from local mirror (default — no network needed if already synced)
+gdp_tbl   <- gdpins_raw_get(conn, "gdp_2024.parquet")     # → tibble via arrow
+meta_tbl  <- gdpins_raw_get(conn, "metadata.csv")          # → tibble via readr
+my_model  <- gdpins_raw_get(conn, "model.rds")             # → R object via readRDS
+parcels   <- gdpins_raw_get(conn, "parcels.geojson")       # → sf via sf::st_read
+
+# sf stored as parquet: geometry and CRS are automatically restored
+parcels   <- gdpins_raw_get(conn, "parcels.parquet")       # → sf
+
+# Force a re-download from Drive before reading
+gdp_fresh <- gdpins_raw_get(conn, "gdp_2024.parquet", force_refresh = TRUE)
+
+# Non-standard filenames work identically
+q1_tbl <- gdpins_raw_get(conn, "quarterly report (Q1 2024).csv")
+```
+
+### Read via local path
+
+Sometimes you need the **file path** rather than the parsed R object —
+to pass to a specialised reader, an external tool, or when the format is
+not one of the four built-in ones. Use
+[`gdpins_raw_path()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_path.md):
+
+``` r
+
+# Get path (downloads from Drive if not yet local)
+path <- gdpins_raw_path(conn, "gdp_2024.parquet")
+
+# Use any reader directly
+arrow::read_parquet(path)
+data.table::fread(path)
+vroom::vroom(path)
+
+# Non-standard formats — gdpins_raw_get() doesn't parse these, use the path
+path_xlsx <- gdpins_raw_path(conn, "source data (raw).xlsx")
+readxl::read_excel(path_xlsx)
+```
+
+------------------------------------------------------------------------
+
+## Listing files with `gdpins_raw_ls()`
+
+[`gdpins_raw_ls()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_ls.md)
+returns an 8-column tibble describing everything inside the raw-root up
+to `depth` directory levels.
+
+``` r
+
+listing <- gdpins_raw_ls(conn, depth = 2)
+listing
+```
+
+The eight columns are:
+
+| Column       | Type    | Description                       |
+|--------------|---------|-----------------------------------|
+| `name`       | chr     | Relative path within the raw-root |
+| `is_dir`     | lgl     | `TRUE` for directories            |
+| `size`       | dbl     | File size in bytes                |
+| `mtime`      | POSIXct | Last-modified time                |
+| `depth`      | int     | Directory depth (1 = top-level)   |
+| `local_path` | chr     | **Absolute path on this machine** |
+| `drive_id`   | chr     | Google Drive file/folder ID       |
+| `drive_url`  | chr     | Clickable browser URL             |
+
+### Use the listing to read files directly
+
+``` r
+
+# Filter to a specific file and get its local path
+row <- listing[listing$name == "gdp_2024.parquet", ]
+local_path <- row$local_path
+
+# Pass the local path straight to any reader
+arrow::read_parquet(local_path)
+readr::read_csv(local_path)
+sf::st_read(local_path)
+```
+
+### Open files on Google Drive
+
+``` r
+
+# Inspect Drive IDs and URLs for every listed file
+listing[!listing$is_dir, c("name", "drive_id", "drive_url")]
+
+# Open a file directly in the browser (copy the URL)
+listing$drive_url[listing$name == "gdp_2024.parquet"]
+```
+
+------------------------------------------------------------------------
+
+## Downloading a file with `gdpins_raw_path()`
+
+`gdpins_raw_path(conn, name_or_id)` returns the **absolute local path**
+to a file, downloading it from Drive first if it is not already present
+locally. Files already in the local mirror are returned immediately — no
+re-download.
+
+``` r
+
+# File already in local mirror → instant return
+path <- gdpins_raw_path(conn, "gdp_2024.parquet")
+file.exists(path)  # TRUE
+
+# File not yet local → downloaded automatically, then path returned
+path2 <- gdpins_raw_path(conn, "api/gdp_2023.parquet")
+arrow::read_parquet(path2)
+```
+
+### Non-standard filenames
+
+Files with spaces, parentheses, hyphens, and other special characters
+work without any escaping:
+
+``` r
+
+# Spaces and parentheses in filename
+path <- gdpins_raw_path(conn, "quarterly report (Q1 2024).csv")
+readr::read_csv(path)
+
+# Hyphens and mixed case
+path <- gdpins_raw_path(conn, "World Bank - GDP Panel 2000-2023.parquet")
+arrow::read_parquet(path)
+
+# Deeply nested path with spaces
+path <- gdpins_raw_path(conn, "surveys/round 3/respondents - final.rds")
+readRDS(path)
+```
+
+### Fetch by Google Drive file ID
+
+If you have a Drive file ID (obtained from `gdpins_raw_ls()$drive_id` or
+from the Drive URL), you can fetch the file directly by ID. This is
+useful when you know the ID but not the exact relative path.
+
+``` r
+
+# Get IDs from the listing
+listing   <- gdpins_raw_ls(conn)
+file_id   <- listing$drive_id[listing$name == "gdp_2024.parquet"]
+
+# Fetch by ID — downloads to conn$local_path using original filename
+local_path <- gdpins_raw_path(conn, file_id)
+arrow::read_parquet(local_path)
+```
+
+> **Note:** Drive ID lookup requires a real adapter
+> ([`gdpins_real_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_real_drive.md)).
+> It is not supported on local-only connections or the fake adapter used
+> in tests.
+
+------------------------------------------------------------------------
+
+## Workflow: listing → path → read
+
+A complete pattern for reading all files of a given type from Drive:
+
+``` r
+
+listing <- gdpins_raw_ls(conn, depth = 3)
+
+# Filter to parquet files only
+parquet_files <- listing[!listing$is_dir & grepl("\\.parquet$", listing$name), ]
+
+# Download each (skips files already local) and read
+datasets <- lapply(parquet_files$name, function(name) {
+  path <- gdpins_raw_path(conn, name)
+  arrow::read_parquet(path)
+})
+names(datasets) <- parquet_files$name
+```
+
+## Workflow: force-refresh the local mirror
+
+To pull all Drive files to the local mirror in one shot (e.g. on a new
+machine or after a Drive update):
+
+``` r
+
+gdpins_refresh_disconnect(conn)
+# All Drive files are now present in conn$local_path
+# Re-connect afterwards if you need to keep using the connection
+conn <- gdpins_raw_connect(
+  drive_path = "worldbank-api",
+  local_path = "data/raw/worldbank-api",
+  adapter    = adapter
+)
+```
+
+------------------------------------------------------------------------
+
+## Testing without a network connection
+
+All the above works identically against the fake adapter used in tests
+and offline development — the only difference is that `drive_id` and
+`drive_url` will be `NA_character_` (the fake filesystem has no real
+Drive IDs).
+
+``` r
+
+library(gdpins)
+
+adapter <- gdpins_fake_drive()
+conn <- gdpins_raw_connect(
+  drive_path = "worldbank-api",
+  local_path = tempfile("raw_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+
+# Write files in various formats
+gdpins_raw_put_object(conn, mtcars,  "cars.parquet")
+gdpins_raw_put_object(conn, mtcars,  "cars.csv")
+gdpins_raw_put_object(conn, mtcars,  "cars.rds")
+gdpins_raw_put_object(conn, mtcars,  "quarterly report (Q1 2024).csv")
+
+# Read back by format
+gdpins_raw_get(conn, "cars.parquet")  # tibble via arrow
+gdpins_raw_get(conn, "cars.csv")      # tibble via readr
+gdpins_raw_get(conn, "cars.rds")      # data.frame via readRDS
+
+# Read non-standard filename
+gdpins_raw_get(conn, "quarterly report (Q1 2024).csv")
+
+# List — 8-column tibble
+tbl <- gdpins_raw_ls(conn)
+tbl[, intersect(c("name", "local_path", "drive_id"), names(tbl))]
+
+# Resolve to local path (already cached — instant)
+path <- gdpins_raw_path(conn, "cars.parquet")
+arrow::read_parquet(path) |> head(3)
+
+# Remove a file
+gdpins_raw_remove(conn, "cars.csv")
+```
