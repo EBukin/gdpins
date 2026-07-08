@@ -1,8 +1,8 @@
 # Detect the appropriate storage format for an R object
 
-Returns `"arrow"` for data frames, tibbles (including `sf` objects), and
-other tabular objects. Returns `"rds"` for lists, nested tibbles with
-list-columns, and any non-tabular object.
+Returns `"parquet"` for data frames, tibbles (including `sf` objects),
+and other tabular objects. Returns `"rds"` for lists, nested tibbles
+with list-columns, and any non-tabular object.
 
 ## Usage
 
@@ -18,7 +18,7 @@ gdpins_detect_format(x)
 
 ## Value
 
-Character scalar: `"arrow"` or `"rds"`.
+Character scalar: `"parquet"` or `"rds"`.
 
 ## Details
 
@@ -28,4 +28,4 @@ Decision rules (in order):
 
 2.  Data frame with any non-`sfc` list-column -\> `"rds"`.
 
-3.  Plain df/tibble or `sf` (all list-cols are `sfc`) -\> `"arrow"`.
+3.  Plain df/tibble or `sf` (all list-cols are `sfc`) -\> `"parquet"`.

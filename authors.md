@@ -7,13 +7,13 @@
 ## Citation
 
 Bukin E (2026). *gdpins: Google Drive + pins Data Management for R
-Projects*. R package version 0.0.0.9003,
+Projects*. R package version 0.0.0.9004,
 <https://ebukin.github.io/gdpins/>.
 
     @Manual{,
       title = {gdpins: Google Drive + pins Data Management for R Projects},
       author = {Eduard Bukin},
       year = {2026},
-      note = {R package version 0.0.0.9003},
+      note = {R package version 0.0.0.9004},
       url = {https://ebukin.github.io/gdpins/},
     }

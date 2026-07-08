@@ -64,7 +64,8 @@ is `FALSE`). An informative error is raised.
 
 [`gdpins_real_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_real_drive.md),
 [`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md),
-[`gdpins_raw_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_connect.md).
+[`gdpins_raw_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_connect.md),
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)/[`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md).
 
 ## Examples
 
@@ -78,7 +79,7 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! Board "data_raw": sync discrepancy detected between Drive and local. Run
+#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
 #>   `gdpins_sync()` to reconcile.
 gdpins_sync(board)
 #> ℹ Nothing to sync for board "data_raw".

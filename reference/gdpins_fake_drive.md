@@ -32,10 +32,25 @@ moves entries to an internal trash store (recoverable). It never calls
 [`gd_ls()`](https://ebukin.github.io/gdpins/reference/gd_ls.md) excludes
 trashed entries.
 
+This adapter is a **test seam**, not an offline-mode substitute: it
+starts from an empty tempdir with no relationship to any previously
+connected Drive folder, so swapping it in for
+[`gdpins_real_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_real_drive.md)
+on an already-connected board or raw connection will not preserve the
+existing Drive-side layout (create-confirm prompts/errors are the usual
+symptom). To temporarily disconnect an existing board or connection from
+Drive and work locally, use
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+/
+[`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+instead.
+
 ## See also
 
 [`gdpins_real_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_real_drive.md)
-for the live Google Drive adapter.
+for the live Google Drive adapter,
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+to temporarily work offline on a real board or connection.
 
 ## Examples
 

@@ -236,6 +236,9 @@ Initialise a pins board backed by Google Drive and manage credentials.
   : Report sync status of a board or raw connection
 - [`gdpins_sync()`](https://ebukin.github.io/gdpins/reference/gdpins_sync.md)
   : Synchronise a board or raw connection with Drive
+- [`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+  [`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+  : Temporarily disconnect from Drive, then reconnect and sync later
 
 ## Pin read / write
 

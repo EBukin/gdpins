@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -205,7 +205,7 @@ offline testing:</p>
 <span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span>
 <span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: <span style="color: #BBBB00;">!</span> Board <span style="color: #0000BB;">"test_board"</span>: sync discrepancy detected between Drive and local. Run</span></span>
+<span><span class="co">#&gt; Warning: <span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">"test_board"</span>: sync discrepancy detected between Drive and local. Run</span></span>
 <span><span class="co">#&gt;   `gdpins_sync()` to reconcile.</span></span>
 <span><span class="va">board</span></span>
 <span><span class="co">#&gt; &lt;gdpins_board&gt; [DC-] v+ cfg=drive_cache name=test_board path=project/data-raw</span></span>
@@ -213,9 +213,101 @@ offline testing:</p>
 <span><span class="co">#&gt; <span style="color: #00BB00;">name</span>: <span style="color: #0000BB;">"test_board"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">versioned</span>: <span style="color: #0000BB;">"TRUE"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">drive</span>: <span style="color: #0000BB;">"project/data-raw"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpEq24Xz/cache_24e278c496d4"</span></span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpELIILQ/cache_25923098802d"</span></span></span></code></pre></div>
 <p>The fake adapter mirrors Drive operations on the local filesystem —
 no credentials, no network, fully reproducible.</p>
+<p>Note that <code><a href="../reference/gdpins_fake_drive.html">gdpins_fake_drive()</a></code> is a <strong>test
+seam</strong>, not an offline-mode substitute: it starts from an empty
+tempdir, so swapping it in for <code><a href="../reference/gdpins_real_drive.html">gdpins_real_drive()</a></code> on a
+board or connection you have already been working with will not preserve
+the existing Drive-side layout, and typically surfaces as create-confirm
+errors. To temporarily disconnect a real board or connection from Drive,
+see “Deliberately going offline and back online” below instead.</p>
+</div>
+<div class="section level2">
+<h2 id="deliberately-going-offline-and-back-online">Deliberately going offline and back online<a class="anchor" aria-label="anchor" href="#deliberately-going-offline-and-back-online"></a>
+</h2>
+<p><code><a href="../reference/gdpins_init_board.html">gdpins_init_board()</a></code> and
+<code><a href="../reference/gdpins_raw_connect.html">gdpins_raw_connect()</a></code> fall back to local-only automatically
+when Drive is unreachable (see the “Offline behaviour” section of
+<code><a href="../articles/gdpins-usage.html">vignette("gdpins-usage")</a></code>). Sometimes you want the same
+effect on purpose — for example, Drive is flaky, you are working on a
+plane, or you just don’t want network calls slowing down every
+read/write for a while.</p>
+<p><code><a href="../reference/offline-mode.html">gdpins_go_offline()</a></code> detaches Drive from an
+already-connected board or raw connection, without touching any
+files:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">adapter</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_fake_drive.html">gdpins_fake_drive</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">board</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_init_board.html">gdpins_init_board</a></span><span class="op">(</span></span>
+<span>  name       <span class="op">=</span> <span class="st">"data_raw"</span>,</span>
+<span>  drive_path <span class="op">=</span> <span class="st">"project/data-raw"</span>,</span>
+<span>  cache_dir  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"cache_"</span><span class="op">)</span>,</span>
+<span>  local_dir  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"local_"</span><span class="op">)</span>,</span>
+<span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span>
+<span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; Warning: <span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">"data_raw"</span>: sync discrepancy detected between Drive and local. Run</span></span>
+<span><span class="co">#&gt;   `gdpins_sync()` to reconcile.</span></span>
+<span></span>
+<span><span class="va">board_offline</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/offline-mode.html">gdpins_go_offline</a></span><span class="op">(</span><span class="va">board</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Board <span style="color: #0000BB;">"data_raw"</span> switched to local-only (offline) mode.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Drive is untouched; call `gdpins_go_online()` to reconnect and sync.</span></span>
+<span><span class="va">board_offline</span><span class="op">$</span><span class="va">config</span>   <span class="co"># "local_only"</span></span>
+<span><span class="co">#&gt; [1] "local_only"</span></span>
+<span></span>
+<span><span class="co"># Reads and writes stay local -- no network calls, no blocked writes</span></span>
+<span><span class="fu"><a href="../reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Creating new version '20260708T105303Z-c0340'</span></span>
+<span><span class="co">#&gt; Writing to pin 'cars'</span></span>
+<span><span class="fu"><a href="../reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="st">"cars"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 32 × 11</span></span></span>
+<span><span class="co">#&gt;      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span></span>
+<span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span>  21       6  160    110  3.9   2.62  16.5     0     1     4     4</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span>  21       6  160    110  3.9   2.88  17.0     0     1     4     4</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span>  22.8     4  108     93  3.85  2.32  18.6     1     1     4     1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span>  21.4     6  258    110  3.08  3.22  19.4     1     0     3     1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span>  18.7     8  360    175  3.15  3.44  17.0     0     0     3     2</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span>  18.1     6  225    105  2.76  3.46  20.2     1     0     3     1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span>  14.3     8  360    245  3.21  3.57  15.8     0     0     3     4</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span>  24.4     4  147.    62  3.69  3.19  20       1     0     4     2</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span>  22.8     4  141.    95  3.92  3.15  22.9     1     0     4     2</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span>  19.2     6  168.   123  3.92  3.44  18.3     1     0     4     4</span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># ℹ 22 more rows</span></span></span></code></pre></div>
+<p>Under the hood, <code><a href="../reference/offline-mode.html">gdpins_go_offline()</a></code> reuses whichever
+local storage the board already had — the standalone
+<code>local_dir</code>/<code>local_board</code> for a
+<code>"drive_cache_local"</code> board, or the
+<code>cache_dir</code>/<code>cache_board</code> for a
+<code>"drive_cache"</code> board with no standalone local directory
+(mirroring the automatic offline fallback). Nothing is copied or
+deleted; the returned object just stops touching Drive. The original
+Drive configuration travels with the returned object, so
+<code><a href="../reference/offline-mode.html">gdpins_go_online()</a></code> can restore it later:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Later, once Drive is reachable again:</span></span>
+<span><span class="va">board_online</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/offline-mode.html">gdpins_go_online</a></span><span class="op">(</span></span>
+<span>  <span class="va">board_offline</span>,</span>
+<span>  on_discrepancy <span class="op">=</span> <span class="st">"sync_to_drive"</span>   <span class="co"># push what changed while offline</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">board_online</span><span class="op">$</span><span class="va">config</span>   <span class="co"># back to "drive_cache_local"</span></span></code></pre></div>
+<p><code><a href="../reference/offline-mode.html">gdpins_go_online()</a></code> requires
+<code><a href="../reference/gdpins_is_online.html">gdpins_is_online()</a></code> to be <code>TRUE</code> and errors if
+<code>x</code> was never produced by <code><a href="../reference/offline-mode.html">gdpins_go_offline()</a></code> —
+it restores a <em>specific</em> prior connection rather than guessing at
+one. <code>on_discrepancy</code> takes the same values as
+<code><a href="../reference/gdpins_init_board.html">gdpins_init_board()</a></code>/<code><a href="../reference/gdpins_raw_connect.html">gdpins_raw_connect()</a></code>
+(<code>"prompt"</code>, <code>"warn"</code>,
+<code>"sync_from_drive"</code>, <code>"sync_to_drive"</code>,
+<code>"ignore"</code>), so you control exactly how offline changes get
+reconciled with Drive. If your Drive credentials expired while offline,
+pass a freshly authenticated adapter:
+<code>gdpins_go_online(board_offline, adapter = gdpins_real_drive("folder-id"))</code>.</p>
+<p>The same two functions work on raw connections
+(<code><a href="../reference/gdpins_raw_connect.html">gdpins_raw_connect()</a></code>) the same way —
+<code>gdpins_go_offline(conn)</code> /
+<code>gdpins_go_online(conn)</code>.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

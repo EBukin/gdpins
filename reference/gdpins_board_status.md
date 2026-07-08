@@ -53,7 +53,10 @@ to create an adapter,
 [`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md)
 and
 [`gdpins_raw_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_connect.md)
-to create boards/connections.
+to create boards/connections,
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)/[`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+to temporarily detach a board or connection from Drive and reconcile it
+later.
 
 ## Examples
 
@@ -67,7 +70,7 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! Board "data_raw": sync discrepancy detected between Drive and local. Run
+#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
 #>   `gdpins_sync()` to reconcile.
 gdpins_board_status(board)
 #> # A tibble: 0 × 8

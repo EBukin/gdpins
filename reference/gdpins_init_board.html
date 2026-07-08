@@ -9,7 +9,7 @@ combination of arguments supplied:"></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -118,7 +118,8 @@ auto-created unless <code>create = TRUE</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="gdpins_real_drive.html">gdpins_real_drive()</a></code> to create an adapter.</p></div>
+    <div class="dont-index"><p><code><a href="gdpins_real_drive.html">gdpins_real_drive()</a></code> to create an adapter, <code><a href="offline-mode.html">gdpins_go_offline()</a></code>
+to temporarily detach an existing board from Drive and work locally.</p></div>
     </div>
 
     <div class="section level2">
@@ -132,7 +133,7 @@ auto-created unless <code>create = TRUE</code>.</p>
 <span class="r-in"><span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span></span>
 <span class="r-in"><span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span><span style="color: #BBBB00;">!</span> Board <span style="color: #0000BB;">"data_raw"</span>: sync discrepancy detected between Drive and local. Run</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span><span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">"data_raw"</span>: sync discrepancy detected between Drive and local. Run</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span>   `gdpins_sync()` to reconcile.</span>
 <span class="r-in"><span><span class="va">board</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> &lt;gdpins_board&gt; [DC-] v+ cfg=drive_cache name=data_raw path=my-project/data-raw</span>
@@ -140,7 +141,7 @@ auto-created unless <code>create = TRUE</code>.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">name</span>: <span style="color: #0000BB;">"data_raw"</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">versioned</span>: <span style="color: #0000BB;">"TRUE"</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">drive</span>: <span style="color: #0000BB;">"my-project/data-raw"</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpAB6nb6/cache_1f055881afa4"</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpsgdlPk/cache_1fb113e7fa11"</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># --- Real adapter (requires Google Drive auth) ---</span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>

@@ -11,7 +11,7 @@ the default test seam — never hits the network."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,10 +69,19 @@ a fresh <code><a href="https://rdrr.io/r/base/tempfile.html" class="external-lin
     <p><code><a href="gd_trash.html">gd_trash()</a></code> moves entries to an internal trash store (recoverable). It
 never calls <code><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink()</a></code>. <code><a href="gd_md5.html">gd_md5()</a></code> uses <code><a href="https://rdrr.io/r/tools/md5sum.html" class="external-link">tools::md5sum()</a></code>. <code><a href="gd_ls.html">gd_ls()</a></code>
 excludes trashed entries.</p>
+<p>This adapter is a <strong>test seam</strong>, not an offline-mode substitute: it starts
+from an empty tempdir with no relationship to any previously connected
+Drive folder, so swapping it in for <code><a href="gdpins_real_drive.html">gdpins_real_drive()</a></code> on an
+already-connected board or raw connection will not preserve the existing
+Drive-side layout (create-confirm prompts/errors are the usual symptom).
+To temporarily disconnect an existing board or connection from Drive and
+work locally, use <code><a href="offline-mode.html">gdpins_go_offline()</a></code> / <code><a href="offline-mode.html">gdpins_go_online()</a></code> instead.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="gdpins_real_drive.html">gdpins_real_drive()</a></code> for the live Google Drive adapter.</p></div>
+    <div class="dont-index"><p><code><a href="gdpins_real_drive.html">gdpins_real_drive()</a></code> for the live Google Drive adapter,
+<code><a href="offline-mode.html">gdpins_go_offline()</a></code> to temporarily work offline on a real board or
+connection.</p></div>
     </div>
 
     <div class="section level2">

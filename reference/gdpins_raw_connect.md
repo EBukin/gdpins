@@ -52,7 +52,10 @@ A `gdpins_raw_conn` object.
 and
 [`gdpins_ensure_drive_auth()`](https://ebukin.github.io/gdpins/reference/gdpins_ensure_drive_auth.md)
 for auth and adapter setup,
-[`gdpins_raw_remove()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_remove.md).
+[`gdpins_raw_remove()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_remove.md),
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+to temporarily detach an existing connection from Drive and work
+locally.
 
 ## Examples
 
@@ -67,7 +70,7 @@ conn <- gdpins_raw_connect(
 )
 conn
 #> <gdpins_raw_conn> [drive+local]
-#>   local: /tmp/RtmpAB6nb6/raw_1f0545a42744
+#>   local: /tmp/RtmpsgdlPk/raw_1fb1182fed02
 #>   drive: worldbank-api
 
 # --- Real adapter ---

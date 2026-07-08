@@ -59,7 +59,7 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! Board "data_raw": sync discrepancy detected between Drive and local. Run
+#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
 #>   `gdpins_sync()` to reconcile.
 gdpins_prune_board_versions(board, keep = 2L, dry_run = TRUE)
 #> ℹ No pins found in board "data_raw".

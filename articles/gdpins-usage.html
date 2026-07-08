@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -213,21 +213,21 @@ the layer.</p>
 </tr>
 <tr class="odd">
 <td>Plain tibble / data frame</td>
-<td><code>"arrow"</code></td>
-<td>Parquet via <code>arrow</code>
+<td><code>"parquet"</code></td>
+<td>Parquet via <code>nanoparquet</code>
 </td>
 </tr>
 <tr class="even">
 <td>
 <code>sf</code> object (all list-cols are <code>sfc</code>)</td>
-<td><code>"arrow"</code></td>
+<td><code>"parquet"</code></td>
 <td>Parquet (geometry WKT-encoded)</td>
 </tr>
 </tbody>
 </table>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/gdpins_detect_format.html">gdpins_detect_format</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">)</span>         <span class="co"># "arrow"  — plain data frame</span></span>
-<span><span class="fu"><a href="../reference/gdpins_detect_format.html">gdpins_detect_format</a></span><span class="op">(</span><span class="va">my_sf</span><span class="op">)</span>          <span class="co"># "arrow"  — sf, sfc cols are fine</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/gdpins_detect_format.html">gdpins_detect_format</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">)</span>         <span class="co"># "parquet"  — plain data frame</span></span>
+<span><span class="fu"><a href="../reference/gdpins_detect_format.html">gdpins_detect_format</a></span><span class="op">(</span><span class="va">my_sf</span><span class="op">)</span>          <span class="co"># "parquet"  — sf, sfc cols are fine</span></span>
 <span><span class="fu"><a href="../reference/gdpins_detect_format.html">gdpins_detect_format</a></span><span class="op">(</span><span class="va">my_model</span><span class="op">)</span>       <span class="co"># "rds"    — not a data frame</span></span>
 <span><span class="fu"><a href="../reference/gdpins_detect_format.html">gdpins_detect_format</a></span><span class="op">(</span><span class="va">nested_tibble</span><span class="op">)</span>  <span class="co"># "rds"    — has non-sfc list-column</span></span></code></pre></div>
 <p>Override the format explicitly when you need to:</p>
@@ -235,8 +235,8 @@ the layer.</p>
 <code class="sourceCode R"><span><span class="co"># Force RDS — useful for tibbles with custom attributes you want to preserve</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="va">my_tibble</span>, <span class="st">"gdp_panel"</span>, format <span class="op">=</span> <span class="st">"rds"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Force Arrow/Parquet — rarely needed; auto-detect handles most cases</span></span>
-<span><span class="fu"><a href="../reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="va">my_tibble</span>, <span class="st">"gdp_panel"</span>, format <span class="op">=</span> <span class="st">"arrow"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="co"># Force Parquet — rarely needed; auto-detect handles most cases</span></span>
+<span><span class="fu"><a href="../reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="va">my_tibble</span>, <span class="st">"gdp_panel"</span>, format <span class="op">=</span> <span class="st">"parquet"</span><span class="op">)</span></span></code></pre></div>
 <blockquote>
 <p><strong>Rule of thumb:</strong> let auto-detection choose. Override
 to <code>"rds"</code> only if the object has list-columns with
@@ -340,6 +340,14 @@ write-protected offline); reads continue from the local copy.</p>
 <span></span>
 <span><span class="co"># Reads work offline — served from cache or local_dir</span></span>
 <span><span class="va">gdp_panel</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span><span class="op">)</span>  <span class="co"># no network needed</span></span></code></pre></div>
+<p>The fallback above is automatic and happens only when Drive is
+unreachable at init time. To <em>deliberately</em> detach an
+already-connected board or raw connection from Drive — e.g. to avoid
+network calls for a while, or to keep working through a flaky connection
+— use <code><a href="../reference/offline-mode.html">gdpins_go_offline()</a></code> and
+<code><a href="../reference/offline-mode.html">gdpins_go_online()</a></code> instead. See “Deliberately going offline
+and back online” in <code><a href="../articles/google-drive-adapter.html">vignette("google-drive-adapter")</a></code> for
+details.</p>
 </div>
 <div class="section level2">
 <h2 id="raw-exogenous-connection">Raw-exogenous connection<a class="anchor" aria-label="anchor" href="#raw-exogenous-connection"></a>

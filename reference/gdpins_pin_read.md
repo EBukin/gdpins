@@ -52,12 +52,12 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! Board "data_raw": sync discrepancy detected between Drive and local. Run
+#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
 #>   `gdpins_sync()` to reconcile.
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260708T104939Z-283de'
+#> Creating new version '20260708T105251Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260708T104939Z-283de'
+#> Creating new version '20260708T105251Z-c0340'
 #> Writing to pin 'cars'
 gdpins_pin_read(board, "cars")
 #> # A tibble: 32 × 11

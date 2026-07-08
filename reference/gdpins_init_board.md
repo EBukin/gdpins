@@ -78,7 +78,9 @@ auto-created unless `create = TRUE`.
 ## See also
 
 [`gdpins_real_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_real_drive.md)
-to create an adapter.
+to create an adapter,
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+to temporarily detach an existing board from Drive and work locally.
 
 ## Examples
 
@@ -92,7 +94,7 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! Board "data_raw": sync discrepancy detected between Drive and local. Run
+#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
 #>   `gdpins_sync()` to reconcile.
 board
 #> <gdpins_board> [DC-] v+ cfg=drive_cache name=data_raw path=my-project/data-raw
@@ -100,7 +102,7 @@ board
 #> name: "data_raw"
 #> versioned: "TRUE"
 #> drive: "my-project/data-raw"
-#> cache: "/tmp/RtmpAB6nb6/cache_1f055881afa4"
+#> cache: "/tmp/RtmpsgdlPk/cache_1fb113e7fa11"
 
 # --- Real adapter (requires Google Drive auth) ---
 if (FALSE) { # \dontrun{

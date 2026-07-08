@@ -173,7 +173,7 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! Board "test_board": sync discrepancy detected between Drive and local. Run
+#> Warning: ! "test_board": sync discrepancy detected between Drive and local. Run
 #>   `gdpins_sync()` to reconcile.
 board
 #> <gdpins_board> [DC-] v+ cfg=drive_cache name=test_board path=project/data-raw
@@ -181,8 +181,115 @@ board
 #> name: "test_board"
 #> versioned: "TRUE"
 #> drive: "project/data-raw"
-#> cache: "/tmp/RtmpEq24Xz/cache_24e278c496d4"
+#> cache: "/tmp/RtmpELIILQ/cache_25923098802d"
 ```
 
 The fake adapter mirrors Drive operations on the local filesystem — no
 credentials, no network, fully reproducible.
+
+Note that
+[`gdpins_fake_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_fake_drive.md)
+is a **test seam**, not an offline-mode substitute: it starts from an
+empty tempdir, so swapping it in for
+[`gdpins_real_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_real_drive.md)
+on a board or connection you have already been working with will not
+preserve the existing Drive-side layout, and typically surfaces as
+create-confirm errors. To temporarily disconnect a real board or
+connection from Drive, see “Deliberately going offline and back online”
+below instead.
+
+## Deliberately going offline and back online
+
+[`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md)
+and
+[`gdpins_raw_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_connect.md)
+fall back to local-only automatically when Drive is unreachable (see the
+“Offline behaviour” section of
+[`vignette("gdpins-usage")`](https://ebukin.github.io/gdpins/articles/gdpins-usage.md)).
+Sometimes you want the same effect on purpose — for example, Drive is
+flaky, you are working on a plane, or you just don’t want network calls
+slowing down every read/write for a while.
+
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+detaches Drive from an already-connected board or raw connection,
+without touching any files:
+
+``` r
+
+adapter <- gdpins_fake_drive()
+board <- gdpins_init_board(
+  name       = "data_raw",
+  drive_path = "project/data-raw",
+  cache_dir  = tempfile("cache_"),
+  local_dir  = tempfile("local_"),
+  adapter    = adapter,
+  create     = TRUE
+)
+#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
+#>   `gdpins_sync()` to reconcile.
+
+board_offline <- gdpins_go_offline(board)
+#> ℹ Board "data_raw" switched to local-only (offline) mode.
+#> ℹ Drive is untouched; call `gdpins_go_online()` to reconnect and sync.
+board_offline$config   # "local_only"
+#> [1] "local_only"
+
+# Reads and writes stay local -- no network calls, no blocked writes
+gdpins_pin_write(board_offline, mtcars, "cars")
+#> Creating new version '20260708T105303Z-c0340'
+#> Writing to pin 'cars'
+gdpins_pin_read(board_offline, "cars")
+#> # A tibble: 32 × 11
+#>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
+#>    <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>
+#>  1  21       6  160    110  3.9   2.62  16.5     0     1     4     4
+#>  2  21       6  160    110  3.9   2.88  17.0     0     1     4     4
+#>  3  22.8     4  108     93  3.85  2.32  18.6     1     1     4     1
+#>  4  21.4     6  258    110  3.08  3.22  19.4     1     0     3     1
+#>  5  18.7     8  360    175  3.15  3.44  17.0     0     0     3     2
+#>  6  18.1     6  225    105  2.76  3.46  20.2     1     0     3     1
+#>  7  14.3     8  360    245  3.21  3.57  15.8     0     0     3     4
+#>  8  24.4     4  147.    62  3.69  3.19  20       1     0     4     2
+#>  9  22.8     4  141.    95  3.92  3.15  22.9     1     0     4     2
+#> 10  19.2     6  168.   123  3.92  3.44  18.3     1     0     4     4
+#> # ℹ 22 more rows
+```
+
+Under the hood,
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+reuses whichever local storage the board already had — the standalone
+`local_dir`/`local_board` for a `"drive_cache_local"` board, or the
+`cache_dir`/`cache_board` for a `"drive_cache"` board with no standalone
+local directory (mirroring the automatic offline fallback). Nothing is
+copied or deleted; the returned object just stops touching Drive. The
+original Drive configuration travels with the returned object, so
+[`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+can restore it later:
+
+``` r
+
+# Later, once Drive is reachable again:
+board_online <- gdpins_go_online(
+  board_offline,
+  on_discrepancy = "sync_to_drive"   # push what changed while offline
+)
+board_online$config   # back to "drive_cache_local"
+```
+
+[`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+requires
+[`gdpins_is_online()`](https://ebukin.github.io/gdpins/reference/gdpins_is_online.md)
+to be `TRUE` and errors if `x` was never produced by
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+— it restores a *specific* prior connection rather than guessing at one.
+`on_discrepancy` takes the same values as
+[`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md)/[`gdpins_raw_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_connect.md)
+(`"prompt"`, `"warn"`, `"sync_from_drive"`, `"sync_to_drive"`,
+`"ignore"`), so you control exactly how offline changes get reconciled
+with Drive. If your Drive credentials expired while offline, pass a
+freshly authenticated adapter:
+`gdpins_go_online(board_offline, adapter = gdpins_real_drive("folder-id"))`.
+
+The same two functions work on raw connections
+([`gdpins_raw_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_connect.md))
+the same way — `gdpins_go_offline(conn)` / `gdpins_go_online(conn)`.

@@ -11,7 +11,7 @@ gdpins_detect_format() unless format is supplied explicitly."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -73,7 +73,7 @@ board default.</p></dd>
 
 
 <dt id="arg-format">format<a class="anchor" aria-label="anchor" href="#arg-format"></a></dt>
-<dd><p>Character scalar or <code>NULL</code>. One of <code>"arrow"</code> or <code>"rds"</code>;
+<dd><p>Character scalar or <code>NULL</code>. One of <code>"parquet"</code> or <code>"rds"</code>;
 <code>NULL</code> auto-detects via <code><a href="gdpins_detect_format.html">gdpins_detect_format()</a></code>.</p></dd>
 
 </dl></div>
@@ -84,7 +84,7 @@ board default.</p></dd>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>If <code>x</code> is an <code>sf</code> object, it is encoded with <code><a href="gdpins_sf_to_parquet.html">gdpins_sf_to_parquet()</a></code>
-before writing (type <code>"arrow"</code>).</p>
+before writing (type <code>"parquet"</code>).</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -102,13 +102,13 @@ before writing (type <code>"arrow"</code>).</p>
 <span class="r-in"><span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span></span>
 <span class="r-in"><span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span><span style="color: #BBBB00;">!</span> Board <span style="color: #0000BB;">"data_raw"</span>: sync discrepancy detected between Drive and local. Run</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span><span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">"data_raw"</span>: sync discrepancy detected between Drive and local. Run</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span>   `gdpins_sync()` to reconcile.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu">gdpins_pin_write</span><span class="op">(</span><span class="va">board</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260708T104940Z-283de'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260708T105252Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260708T104940Z-283de'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260708T105252Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>

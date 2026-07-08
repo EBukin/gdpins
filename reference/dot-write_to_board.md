@@ -24,7 +24,7 @@ Write x to a single pins board with appropriate type
 
 - fmt:
 
-  Character scalar: `"arrow"` or `"rds"`.
+  Character scalar: `"parquet"` or `"rds"`.
 
 - versioned:
 

@@ -165,13 +165,13 @@ The rules, in order:
 |----|----|----|
 | Not a data frame (list, model, …) | `"rds"` | [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) |
 | Data frame with list-columns (non-sf) | `"rds"` | [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) |
-| Plain tibble / data frame | `"arrow"` | Parquet via `arrow` |
-| `sf` object (all list-cols are `sfc`) | `"arrow"` | Parquet (geometry WKT-encoded) |
+| Plain tibble / data frame | `"parquet"` | Parquet via `nanoparquet` |
+| `sf` object (all list-cols are `sfc`) | `"parquet"` | Parquet (geometry WKT-encoded) |
 
 ``` r
 
-gdpins_detect_format(mtcars)         # "arrow"  — plain data frame
-gdpins_detect_format(my_sf)          # "arrow"  — sf, sfc cols are fine
+gdpins_detect_format(mtcars)         # "parquet"  — plain data frame
+gdpins_detect_format(my_sf)          # "parquet"  — sf, sfc cols are fine
 gdpins_detect_format(my_model)       # "rds"    — not a data frame
 gdpins_detect_format(nested_tibble)  # "rds"    — has non-sfc list-column
 ```
@@ -183,8 +183,8 @@ Override the format explicitly when you need to:
 # Force RDS — useful for tibbles with custom attributes you want to preserve
 gdpins_pin_write(bd_raw, my_tibble, "gdp_panel", format = "rds")
 
-# Force Arrow/Parquet — rarely needed; auto-detect handles most cases
-gdpins_pin_write(bd_raw, my_tibble, "gdp_panel", format = "arrow")
+# Force Parquet — rarely needed; auto-detect handles most cases
+gdpins_pin_write(bd_raw, my_tibble, "gdp_panel", format = "parquet")
 ```
 
 > **Rule of thumb:** let auto-detection choose. Override to `"rds"` only
@@ -294,6 +294,17 @@ gdpins_board_status(bd_raw)
 # Reads work offline — served from cache or local_dir
 gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")  # no network needed
 ```
+
+The fallback above is automatic and happens only when Drive is
+unreachable at init time. To *deliberately* detach an already-connected
+board or raw connection from Drive — e.g. to avoid network calls for a
+while, or to keep working through a flaky connection — use
+[`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+and
+[`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+instead. See “Deliberately going offline and back online” in
+[`vignette("google-drive-adapter")`](https://ebukin.github.io/gdpins/articles/google-drive-adapter.md)
+for details.
 
 ## Raw-exogenous connection
 

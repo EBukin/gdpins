@@ -32,7 +32,7 @@ gdpins_pin_write(board, x, name, version = NULL, format = NULL)
 
 - format:
 
-  Character scalar or `NULL`. One of `"arrow"` or `"rds"`; `NULL`
+  Character scalar or `NULL`. One of `"parquet"` or `"rds"`; `NULL`
   auto-detects via
   [`gdpins_detect_format()`](https://ebukin.github.io/gdpins/reference/gdpins_detect_format.md).
 
@@ -44,7 +44,7 @@ Invisibly `NULL`. Called for its side effect.
 
 If `x` is an `sf` object, it is encoded with
 [`gdpins_sf_to_parquet()`](https://ebukin.github.io/gdpins/reference/gdpins_sf_to_parquet.md)
-before writing (type `"arrow"`).
+before writing (type `"parquet"`).
 
 ## See also
 
@@ -64,13 +64,13 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! Board "data_raw": sync discrepancy detected between Drive and local. Run
+#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
 #>   `gdpins_sync()` to reconcile.
 
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260708T104940Z-283de'
+#> Creating new version '20260708T105252Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260708T104940Z-283de'
+#> Creating new version '20260708T105252Z-c0340'
 #> Writing to pin 'cars'
 
 if (FALSE) { # \dontrun{
