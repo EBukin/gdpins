@@ -26,6 +26,7 @@ reference:
   - gdpins_is_online
   - gdpins_board_status
   - gdpins_sync
+  - offline-mode
 - title: Pin read / write
   desc: |
     Read and write versioned R objects (tibbles, sf, lists) to a board.

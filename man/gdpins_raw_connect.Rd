@@ -66,5 +66,6 @@ conn2 <- gdpins_raw_connect(
 }
 \seealso{
 \code{\link[=gdpins_real_drive]{gdpins_real_drive()}} and \code{\link[=gdpins_ensure_drive_auth]{gdpins_ensure_drive_auth()}} for auth and
-adapter setup, \code{\link[=gdpins_raw_remove]{gdpins_raw_remove()}}.
+adapter setup, \code{\link[=gdpins_raw_remove]{gdpins_raw_remove()}}, \code{\link[=gdpins_go_offline]{gdpins_go_offline()}} to
+temporarily detach an existing connection from Drive and work locally.
 }

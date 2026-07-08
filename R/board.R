@@ -28,19 +28,34 @@ NULL
   on_discrepancy
 }
 
-#' Handle init-time sync check
+#' Handle init-time (or reconnect-time) sync check
 #'
-#' Calls `gdpins_board_status()` on the board and acts per `on_discrepancy`.
-#' Errors from `gdpins_board_status` (e.g. WS5 stub) are caught and treated as
-#' offline/unavailable — a warning is emitted and the board is returned as-is.
+#' Calls `gdpins_board_status()` on `x` and acts per `on_discrepancy`. Errors
+#' from `gdpins_board_status` (e.g. WS5 stub) are caught and treated as
+#' offline/unavailable — a warning is emitted and `x` is returned as-is.
+#'
+#' Shared by [gdpins_init_board()]/[gdpins_raw_connect()] (init-time) and
+#' [gdpins_go_online()] (reconnect-time) — `x` may be a `gdpins_board` or a
+#' `gdpins_raw_conn`, since `gdpins_board_status()`/`gdpins_sync()` dispatch on
+#' both.
+#'
+#' @param x A `gdpins_board` or `gdpins_raw_conn` object.
+#' @param on_discrepancy Resolved on_discrepancy value (never `NULL`).
+#' @param label Character scalar used in messages. Defaults to `x$name` (set
+#'   on `gdpins_board`) or `"connection"` when unavailable (e.g. raw
+#'   connections, which have no `name` field).
 #'
 #' @keywords internal
-.handle_init_sync <- function(board, on_discrepancy) {
+.handle_init_sync <- function(x, on_discrepancy, label = NULL) {
+  if (is.null(label)) {
+    label <- if (!is.null(x$name)) x$name else "connection"
+  }
+
   status <- tryCatch(
-    gdpins_board_status(board),
+    gdpins_board_status(x),
     error = function(e) {
       cli::cli_warn(c(
-        "!" = "gdpins_board_status() failed during init-time sync check.",
+        "!" = "gdpins_board_status() failed during sync check.",
         "i" = "Sync status unavailable; proceeding without sync check.",
         "i" = "Detail: {conditionMessage(e)}"
       ))
@@ -49,7 +64,7 @@ NULL
   )
 
   if (is.null(status)) {
-    return(invisible(board))
+    return(invisible(x))
   }
 
   switch(on_discrepancy,
@@ -59,7 +74,7 @@ NULL
     warn = {
       cli::cli_warn(c(
         "!" = paste0(
-          "Board {.val {board$name}}: sync discrepancy detected between ",
+          "{.val {label}}: sync discrepancy detected between ",
           "Drive and local. Run {.fn gdpins_sync} to reconcile."
         )
       ))
@@ -68,14 +83,14 @@ NULL
       if (rlang::is_interactive()) {
         cli::cli_inform(c(
           "!" = paste0(
-            "Board {.val {board$name}}: sync discrepancy detected. ",
+            "{.val {label}}: sync discrepancy detected. ",
             "Run {.fn gdpins_sync} to reconcile."
           )
         ))
       } else {
         cli::cli_warn(c(
           "!" = paste0(
-            "Board {.val {board$name}}: sync discrepancy detected between ",
+            "{.val {label}}: sync discrepancy detected between ",
             "Drive and local."
           )
         ))
@@ -83,11 +98,11 @@ NULL
     },
     sync_from_drive = {
       cli::cli_inform(
-        "Syncing board {.val {board$name}} from Drive (on_discrepancy = \\
+        "Syncing {.val {label}} from Drive (on_discrepancy = \\
         {.val sync_from_drive})."
       )
       tryCatch(
-        gdpins_sync(board, direction = "from_drive"),
+        gdpins_sync(x, direction = "from_drive"),
         error = function(e) {
           cli::cli_warn("Sync from Drive failed: {conditionMessage(e)}")
         }
@@ -95,11 +110,11 @@ NULL
     },
     sync_to_drive = {
       cli::cli_inform(
-        "Syncing board {.val {board$name}} to Drive (on_discrepancy = \\
+        "Syncing {.val {label}} to Drive (on_discrepancy = \\
         {.val sync_to_drive})."
       )
       tryCatch(
-        gdpins_sync(board, direction = "to_drive"),
+        gdpins_sync(x, direction = "to_drive"),
         error = function(e) {
           cli::cli_warn("Sync to Drive failed: {conditionMessage(e)}")
         }
@@ -107,7 +122,7 @@ NULL
     }
   )
 
-  invisible(board)
+  invisible(x)
 }
 
 # ── Exported constructor ──────────────────────────────────────────────────────
@@ -144,7 +159,8 @@ NULL
 #' @param adapter A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
 #'
 #' @return A `gdpins_board` object.
-#' @seealso [gdpins_real_drive()] to create an adapter.
+#' @seealso [gdpins_real_drive()] to create an adapter, [gdpins_go_offline()]
+#'   to temporarily detach an existing board from Drive and work locally.
 #' @examples
 #' # --- Fake adapter (no network) ---
 #' adapter <- gdpins_fake_drive()

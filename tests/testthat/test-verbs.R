@@ -175,7 +175,7 @@ test_that("read from drive only when offline warns and returns NULL", {
 
 # ── 5. Format dispatch ────────────────────────────────────────────────────────
 
-test_that("plain tibble auto-detects as arrow and round-trips", {
+test_that("plain tibble auto-detects as parquet and round-trips", {
   board <- new_fake_board(config = "local_only")
   orig  <- fx_plain_tbl()
   gdpins_pin_write(board, orig, name = "plain")
@@ -191,11 +191,32 @@ test_that("explicit format='rds' is respected", {
   expect_equal(tibble::as_tibble(result), tibble::as_tibble(orig))
 })
 
-test_that("explicit format='arrow' is respected", {
+test_that("explicit format='parquet' is respected", {
   board <- new_fake_board(config = "local_only")
   orig  <- fx_plain_tbl()
-  gdpins_pin_write(board, orig, name = "forced_arrow", format = "arrow")
-  result <- gdpins_pin_read(board, "forced_arrow")
+  gdpins_pin_write(board, orig, name = "forced_parquet", format = "parquet")
+  result <- gdpins_pin_read(board, "forced_parquet")
+  expect_equal(result, orig)
+})
+
+test_that("format='arrow' is no longer a valid write format", {
+  board <- new_fake_board(config = "local_only")
+  orig  <- fx_plain_tbl()
+  expect_error(
+    gdpins_pin_write(board, orig, name = "should_not_write", format = "arrow")
+  )
+})
+
+test_that("pre-existing pins written in the legacy arrow format can still be read", {
+  board <- new_fake_board(config = "local_only")
+  orig  <- fx_plain_tbl()
+  # Simulate a pin written before the arrow -> parquet switch by writing
+  # directly to the underlying pins board with the legacy type.
+  pins::pin_write(board$local_board, orig, name = "legacy_arrow_pin", type = "arrow")
+
+  expect_equal(pins::pin_meta(board$local_board, "legacy_arrow_pin")$type, "arrow")
+
+  result <- gdpins_pin_read(board, "legacy_arrow_pin")
   expect_equal(result, orig)
 })
 
@@ -377,6 +398,10 @@ test_that("versioned board accumulates multiple versions", {
   v1 <- tibble::tibble(x = 1L)
   v2 <- tibble::tibble(x = 2L)
   gdpins_pin_write(board, v1, name = "versioned_pin")
+  # pins versions are timestamped to whole seconds; without a gap, writes
+  # inside the same second sort ambiguously and "latest" can resolve to
+  # either one (parquet writes are fast enough to hit this every time).
+  Sys.sleep(1.1)
   gdpins_pin_write(board, v2, name = "versioned_pin")
   # Latest version should be v2
   result <- gdpins_pin_read(board, "versioned_pin")

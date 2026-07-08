@@ -210,7 +210,8 @@ NULL
 #'
 #' @return A `gdpins_raw_conn` object.
 #' @seealso [gdpins_real_drive()] and [gdpins_ensure_drive_auth()] for auth and
-#'   adapter setup, [gdpins_raw_remove()].
+#'   adapter setup, [gdpins_raw_remove()], [gdpins_go_offline()] to
+#'   temporarily detach an existing connection from Drive and work locally.
 #' @examples
 #' # --- Fake adapter (no network) ---
 #' adapter <- gdpins_fake_drive()

@@ -4,7 +4,7 @@
       print(info)
     Message
       Pin: "sf_pin"
-      type: "arrow"
+      type: "parquet"
       versions: "1"
       size: "2.1 KB"
       modified: "<datetime>"
@@ -18,7 +18,7 @@
       print(info)
     Message
       Pin: "plain_pin"
-      type: "arrow"
+      type: "parquet"
       versions: "1"
       size: "1.2 KB"
       modified: "<datetime>"

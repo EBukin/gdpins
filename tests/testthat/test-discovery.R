@@ -12,12 +12,12 @@ make_seeded_board <- function() {
   b   <- new_fake_board("local_only")
   src <- b$local_board
 
-  pins::pin_write(src, fx_plain_tbl(), "plain_pin",  type = "arrow")
+  pins::pin_write(src, fx_plain_tbl(), "plain_pin",  type = "parquet")
   pins::pin_write(src, tibble::tibble(v = 1L), "versioned", type = "rds")
   pins::pin_write(src, tibble::tibble(v = 2L), "versioned", type = "rds")
 
   sf_tbl <- gdpins_sf_to_parquet(fx_sf_non4326())  # geometry__3857__
-  pins::pin_write(src, sf_tbl, "sf_pin", type = "arrow")
+  pins::pin_write(src, sf_tbl, "sf_pin", type = "parquet")
 
   b
 }
@@ -79,7 +79,7 @@ test_that("gdpins_list_pins reads from local_board in drive_cache config", {
   b   <- new_fake_board("drive_cache")
   src <- b$cache_board  # local-first for drive_cache is cache_board
 
-  pins::pin_write(src, fx_plain_tbl(), "cache_pin", type = "arrow")
+  pins::pin_write(src, fx_plain_tbl(), "cache_pin", type = "parquet")
 
   result <- gdpins_list_pins(b)
   expect_equal(result$name, "cache_pin")
@@ -89,7 +89,7 @@ test_that("gdpins_list_pins reads from local_board in drive_cache_local config",
   b   <- new_fake_board("drive_cache_local")
   src <- b$local_board  # local-first is local_board
 
-  pins::pin_write(src, fx_plain_tbl(), "local_pin", type = "arrow")
+  pins::pin_write(src, fx_plain_tbl(), "local_pin", type = "parquet")
   # Drive + cache are empty; should only see local_pin
   result <- gdpins_list_pins(b)
   expect_equal(result$name, "local_pin")
@@ -112,7 +112,7 @@ test_that("gdpins_list_pins falls back to drive_board when local and cache are N
     adapter     = adapter,
     versioned   = TRUE
   )
-  pins::pin_write(drive_board, fx_plain_tbl(), "drive_pin", type = "arrow")
+  pins::pin_write(drive_board, fx_plain_tbl(), "drive_pin", type = "parquet")
 
   result <- gdpins_list_pins(b)
   expect_equal(result$name, "drive_pin")
@@ -123,7 +123,7 @@ test_that("gdpins_list_pins falls back to drive_board when local and cache are N
 test_that("gdpins_pin_info returns gdpins_pin_info class", {
   b   <- new_fake_board("local_only")
   src <- b$local_board
-  pins::pin_write(src, fx_plain_tbl(), "p1", type = "arrow")
+  pins::pin_write(src, fx_plain_tbl(), "p1", type = "parquet")
 
   info <- gdpins_pin_info(b, "p1")
   expect_s3_class(info, "gdpins_pin_info")
@@ -132,10 +132,10 @@ test_that("gdpins_pin_info returns gdpins_pin_info class", {
 test_that("gdpins_pin_info reports correct type and n_versions for plain pin", {
   b   <- new_fake_board("local_only")
   src <- b$local_board
-  pins::pin_write(src, fx_plain_tbl(), "p1", type = "arrow")
+  pins::pin_write(src, fx_plain_tbl(), "p1", type = "parquet")
 
   info <- gdpins_pin_info(b, "p1")
-  expect_equal(info$type,       "arrow")
+  expect_equal(info$type,       "parquet")
   expect_equal(info$n_versions, 1L)
   expect_false(info$is_sf)
   expect_true(is.na(info$crs_epsg))
@@ -169,7 +169,7 @@ test_that("gdpins_pin_info detects sf CRS for geometry__3857__ pin", {
   b   <- new_fake_board("local_only")
   src <- b$local_board
   sf_tbl <- gdpins_sf_to_parquet(fx_sf_non4326())
-  pins::pin_write(src, sf_tbl, "sf_pin", type = "arrow")
+  pins::pin_write(src, sf_tbl, "sf_pin", type = "parquet")
 
   info <- gdpins_pin_info(b, "sf_pin")
   expect_true(info$is_sf)
@@ -179,7 +179,7 @@ test_that("gdpins_pin_info detects sf CRS for geometry__3857__ pin", {
 test_that("gdpins_pin_info lineage_name equals the bare pin name", {
   b   <- new_fake_board("local_only")
   src <- b$local_board
-  pins::pin_write(src, fx_plain_tbl(), "my_data_clean", type = "arrow")
+  pins::pin_write(src, fx_plain_tbl(), "my_data_clean", type = "parquet")
 
   info <- gdpins_pin_info(b, "my_data_clean")
   expect_equal(info$lineage_name, "my_data_clean")
@@ -214,7 +214,7 @@ test_that("print.gdpins_pin_info snapshot for sf pin", {
   b   <- new_fake_board("local_only")
   src <- b$local_board
   sf_tbl <- gdpins_sf_to_parquet(fx_sf_non4326())
-  pins::pin_write(src, sf_tbl, "sf_pin", type = "arrow")
+  pins::pin_write(src, sf_tbl, "sf_pin", type = "parquet")
   info <- gdpins_pin_info(b, "sf_pin")
 
   # Suppress colour codes and scrub the timestamp so snapshot is stable
@@ -229,7 +229,7 @@ test_that("print.gdpins_pin_info snapshot for sf pin", {
 test_that("print.gdpins_pin_info snapshot for plain pin", {
   b   <- new_fake_board("local_only")
   src <- b$local_board
-  pins::pin_write(src, fx_plain_tbl(), "plain_pin", type = "arrow")
+  pins::pin_write(src, fx_plain_tbl(), "plain_pin", type = "parquet")
   info <- gdpins_pin_info(b, "plain_pin")
 
   withr::with_options(list(cli.num_colors = 1L), {
@@ -244,7 +244,7 @@ test_that("print.gdpins_pin_info produces no line wider than 80 chars", {
   b   <- new_fake_board("local_only")
   src <- b$local_board
   sf_tbl <- gdpins_sf_to_parquet(fx_sf_non4326())
-  pins::pin_write(src, sf_tbl, "sf_pin_with_long_name_to_test", type = "arrow")
+  pins::pin_write(src, sf_tbl, "sf_pin_with_long_name_to_test", type = "parquet")
   info <- gdpins_pin_info(b, "sf_pin_with_long_name_to_test")
 
   # cli writes to the message stream

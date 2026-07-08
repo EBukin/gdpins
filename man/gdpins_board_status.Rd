@@ -66,5 +66,7 @@ gdpins_board_status(board)
 }
 \seealso{
 \code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter, \code{\link[=gdpins_init_board]{gdpins_init_board()}}
-and \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}} to create boards/connections.
+and \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}} to create boards/connections,
+\code{\link[=gdpins_go_offline]{gdpins_go_offline()}}/\code{\link[=gdpins_go_online]{gdpins_go_online()}} to temporarily detach a board
+or connection from Drive and reconcile it later.
 }

@@ -1,6 +1,6 @@
 Package: gdpins
 Title: Google Drive + pins Data Management for R Projects
-Version: 0.0.0.9003
+Version: 0.0.0.9004
 Authors@R:
     person("Eduard", "Bukin", email = "ebukin@worldbank.org",
            role = c("aut", "cre"))
@@ -19,6 +19,7 @@ Imports:
     pins,
     googledrive,
     arrow,
+    nanoparquet,
     sf,
     dplyr,
     readr,

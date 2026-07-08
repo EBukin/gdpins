@@ -14,14 +14,14 @@ NULL
 #' @param pins_board A pins board object.
 #' @param x The R object to write.
 #' @param name Pin name.
-#' @param fmt Character scalar: `"arrow"` or `"rds"`.
+#' @param fmt Character scalar: `"parquet"` or `"rds"`.
 #' @param versioned Logical. Whether this write creates a version.
 #'
 #' @keywords internal
 .write_to_board <- function(pins_board, x, name, fmt, versioned) {
   type <- switch(fmt,
-    arrow = "arrow",
-    rds   = "rds",
+    parquet = "parquet",
+    rds     = "rds",
     cli::cli_abort("Unknown format {.val {fmt}}.")
   )
   pins::pin_write(
@@ -58,14 +58,14 @@ NULL
 #' [gdpins_detect_format()] unless `format` is supplied explicitly.
 #'
 #' If `x` is an `sf` object, it is encoded with [gdpins_sf_to_parquet()]
-#' before writing (type `"arrow"`).
+#' before writing (type `"parquet"`).
 #'
 #' @param board A `gdpins_board` object.
 #' @param x An R object to pin.
 #' @param name Character scalar. Pin name (bare snake_case, e.g. `"parcels"`).
 #' @param version Character scalar or `NULL`. Version label; `NULL` uses the
 #'   board default.
-#' @param format Character scalar or `NULL`. One of `"arrow"` or `"rds"`;
+#' @param format Character scalar or `NULL`. One of `"parquet"` or `"rds"`;
 #'   `NULL` auto-detects via [gdpins_detect_format()].
 #'
 #' @return Invisibly `NULL`. Called for its side effect.
@@ -128,12 +128,12 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL) {
 
   # Detect format
   fmt <- if (!is.null(format)) {
-    match.arg(format, c("arrow", "rds"))
+    match.arg(format, c("parquet", "rds"))
   } else {
     gdpins_detect_format(x)
   }
 
-  # sf pre-processing: encode geometry before writing as arrow
+  # sf pre-processing: encode geometry before writing as parquet
   x_to_write <- if (inherits(x, "sf") || .is_sf_like(x)) {
     gdpins_sf_to_parquet(x)
   } else {
@@ -221,7 +221,8 @@ gdpins_pin_read <- function(board, name, version = NULL) {
     drive = board$drive_board
   )
 
-  result <- NULL
+  result      <- NULL
+  result_type <- NA_character_
   read_from_drive <- FALSE
 
   for (src_name in names(read_sources)) {
@@ -262,7 +263,13 @@ gdpins_pin_read <- function(board, name, version = NULL) {
       }
     )
 
-    if (!is.null(result)) break
+    if (!is.null(result)) {
+      result_type <- tryCatch(
+        pins::pin_meta(src, name, version = version)$type,
+        error = function(e) NA_character_
+      )
+      break
+    }
   }
 
   if (is.null(result)) {
@@ -272,8 +279,17 @@ gdpins_pin_read <- function(board, name, version = NULL) {
     ))
   }
 
-  # Auto-decode sf: if any column matches the __epsg__ pattern, restore sf
   if (is.data.frame(result)) {
+    # nanoparquet::read_parquet() (used by pins type "parquet") returns plain
+    # data frames rather than tibbles; normalise so parquet reads are still
+    # tibbles like before. Leave "rds" reads untouched so arbitrary
+    # data-frame subclasses (e.g. base data.frame with row names) round-trip
+    # byte-for-byte, as saveRDS()/readRDS() already guarantee.
+    if (identical(result_type, "parquet") && !inherits(result, "tbl_df")) {
+      result <- tibble::as_tibble(result)
+    }
+
+    # Auto-decode sf: if any column matches the __epsg__ pattern, restore sf
     has_geo_cols <- any(grepl("^.*__\\d{4,5}__$", names(result)))
     if (has_geo_cols) {
       result <- gdpins_parquet_to_sf(result)

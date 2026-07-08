@@ -22,6 +22,14 @@ the default test seam — \strong{never hits the network}.
 \code{gd_trash()} moves entries to an internal trash store (recoverable). It
 never calls \code{unlink()}. \code{gd_md5()} uses \code{tools::md5sum()}. \code{gd_ls()}
 excludes trashed entries.
+
+This adapter is a \strong{test seam}, not an offline-mode substitute: it starts
+from an empty tempdir with no relationship to any previously connected
+Drive folder, so swapping it in for \code{\link[=gdpins_real_drive]{gdpins_real_drive()}} on an
+already-connected board or raw connection will not preserve the existing
+Drive-side layout (create-confirm prompts/errors are the usual symptom).
+To temporarily disconnect an existing board or connection from Drive and
+work locally, use \code{\link[=gdpins_go_offline]{gdpins_go_offline()}} / \code{\link[=gdpins_go_online]{gdpins_go_online()}} instead.
 }
 \examples{
 adapter <- gdpins_fake_drive()
@@ -29,5 +37,7 @@ adapter$mkdir("project/data-raw")
 adapter$exists("project/data-raw")
 }
 \seealso{
-\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} for the live Google Drive adapter.
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} for the live Google Drive adapter,
+\code{\link[=gdpins_go_offline]{gdpins_go_offline()}} to temporarily work offline on a real board or
+connection.
 }

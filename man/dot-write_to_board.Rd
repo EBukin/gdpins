@@ -13,7 +13,7 @@
 
 \item{name}{Pin name.}
 
-\item{fmt}{Character scalar: \code{"arrow"} or \code{"rds"}.}
+\item{fmt}{Character scalar: \code{"parquet"} or \code{"rds"}.}
 
 \item{versioned}{Logical. Whether this write creates a version.}
 }

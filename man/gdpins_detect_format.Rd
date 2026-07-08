@@ -10,10 +10,10 @@ gdpins_detect_format(x)
 \item{x}{An R object.}
 }
 \value{
-Character scalar: \code{"arrow"} or \code{"rds"}.
+Character scalar: \code{"parquet"} or \code{"rds"}.
 }
 \description{
-Returns \code{"arrow"} for data frames, tibbles (including \code{sf} objects), and
+Returns \code{"parquet"} for data frames, tibbles (including \code{sf} objects), and
 other tabular objects. Returns \code{"rds"} for lists, nested tibbles with
 list-columns, and any non-tabular object.
 }
@@ -22,6 +22,6 @@ Decision rules (in order):
 \enumerate{
 \item Not a data frame -> \code{"rds"}.
 \item Data frame with any non-\code{sfc} list-column -> \code{"rds"}.
-\item Plain df/tibble or \code{sf} (all list-cols are \code{sfc}) -> \code{"arrow"}.
+\item Plain df/tibble or \code{sf} (all list-cols are \code{sfc}) -> \code{"parquet"}.
 }
 }
