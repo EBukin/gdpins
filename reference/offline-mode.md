@@ -115,7 +115,7 @@ board_offline <- gdpins_go_offline(board)
 board_offline$config   # "local_only"
 #> [1] "local_only"
 gdpins_pin_write(board_offline, mtcars, "cars")
-#> Creating new version '20260708T105256Z-c0340'
+#> Creating new version '20260708T105457Z-c0340'
 #> Writing to pin 'cars'
 
 # Reconnect and push local changes back up to Drive
