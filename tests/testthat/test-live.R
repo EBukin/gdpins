@@ -118,7 +118,7 @@ test_that("[LIVE] sync: local-ahead pin reaches Drive after gdpins_sync", {
 
   # Write directly to cache (simulate offline accumulation)
   suppressMessages(
-    pins::pin_write(board$cache_board, fx_plain_tbl(), "sync_pin", type = "arrow")
+    pins::pin_write(board$cache_board, fx_plain_tbl(), "sync_pin", type = "parquet")
   )
 
   suppressMessages(gdpins_sync(board, direction = "to_drive"))
@@ -242,7 +242,7 @@ test_that("[LIVE] sync: drive-ahead pin syncs to cache after from_drive", {
 
   # Seed Drive directly (bypassing fan-out write) — local cache stays empty
   suppressMessages(
-    pins::pin_write(board$drive_board, fx_plain_tbl(), "drive_pin", type = "arrow")
+    pins::pin_write(board$drive_board, fx_plain_tbl(), "drive_pin", type = "parquet")
   )
 
   # Status: drive_ahead
@@ -291,7 +291,7 @@ test_that("[LIVE] board status: in_sync after fan-out write, local_ahead after c
 
   # Cache-only write → local_ahead
   suppressMessages(
-    pins::pin_write(board$cache_board, fx_output_table(), "local_only_pin", type = "arrow")
+    pins::pin_write(board$cache_board, fx_output_table(), "local_only_pin", type = "parquet")
   )
   status_local <- gdpins_board_status(board)
   local_row    <- status_local[status_local$name == "local_only_pin", ]
@@ -325,10 +325,10 @@ test_that("[LIVE] sync: offline cache accumulation reconciles to Drive on sync",
   # Simulate offline accumulation: write to cache board directly
   # (gdpins_pin_write blocks when offline; here we bypass it)
   suppressMessages(
-    pins::pin_write(board$cache_board, fx_plain_tbl(), "offline_pin1", type = "arrow")
+    pins::pin_write(board$cache_board, fx_plain_tbl(), "offline_pin1", type = "parquet")
   )
   suppressMessages(
-    pins::pin_write(board$cache_board, fx_output_table(), "offline_pin2", type = "arrow")
+    pins::pin_write(board$cache_board, fx_output_table(), "offline_pin2", type = "parquet")
   )
 
   # "Come online" and sync to Drive

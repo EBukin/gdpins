@@ -19,6 +19,7 @@ Imports:
     pins,
     googledrive,
     arrow,
+    nanoparquet,
     sf,
     dplyr,
     readr,

@@ -45,7 +45,7 @@ test_that("sync from_drive moves drive-ahead pin to local", {
 
   # Seed Drive only (simulate remote write from another machine)
   suppressMessages(
-    pins::pin_write(board$drive_board, tbl, "analysis_table", type = "arrow")
+    pins::pin_write(board$drive_board, tbl, "analysis_table", type = "parquet")
   )
   expect_false(pins::pin_exists(board$cache_board, "analysis_table"))
 
@@ -64,7 +64,7 @@ test_that("sync to_drive pushes local-ahead pin to Drive", {
 
   # Seed cache only (simulate offline write)
   suppressMessages(
-    pins::pin_write(board$cache_board, tbl, "local_pin", type = "arrow")
+    pins::pin_write(board$cache_board, tbl, "local_pin", type = "parquet")
   )
   expect_false(pins::pin_exists(board$drive_board, "local_pin"))
 
@@ -82,11 +82,11 @@ test_that("auto sync reconciles both directions in one call", {
 
   suppressMessages(
     pins::pin_write(board$drive_board, fx_plain_tbl(), "from_drive_pin",
-                    type = "arrow")
+                    type = "parquet")
   )
   suppressMessages(
     pins::pin_write(board$cache_board, fx_plain_tbl(), "from_local_pin",
-                    type = "arrow")
+                    type = "parquet")
   )
 
   testthat::local_mocked_bindings(
@@ -107,7 +107,7 @@ test_that("multiple accumulated offline writes all reach Drive after sync", {
 
   for (nm in pin_names) {
     suppressMessages(
-      pins::pin_write(board$cache_board, fx_plain_tbl(), nm, type = "arrow")
+      pins::pin_write(board$cache_board, fx_plain_tbl(), nm, type = "parquet")
     )
   }
 
@@ -136,7 +136,7 @@ test_that("multiple offline writes produce readable pins after sync", {
 
   for (nm in pin_names) {
     suppressMessages(
-      pins::pin_write(board$cache_board, original, nm, type = "arrow")
+      pins::pin_write(board$cache_board, original, nm, type = "parquet")
     )
   }
 
@@ -146,10 +146,16 @@ test_that("multiple offline writes produce readable pins after sync", {
   )
   suppressMessages(gdpins_sync(board, direction = "to_drive"))
 
-  # Read from Drive directly to confirm data integrity
+  # Read from Drive directly to confirm data integrity. Compare via
+  # tibble::as_tibble(): nanoparquet::read_parquet() (pins type "parquet")
+  # returns a plain data frame rather than a tibble, so raw pins::pin_read()
+  # results differ in class from `original` even though the data matches.
   for (nm in pin_names) {
     result <- pins::pin_read(board$drive_board, nm)
-    expect_equal(result, original, label = paste("Data mismatch for:", nm))
+    expect_equal(
+      tibble::as_tibble(result), tibble::as_tibble(original),
+      label = paste("Data mismatch for:", nm)
+    )
   }
 })
 
@@ -158,13 +164,13 @@ test_that("versioned board offline writes create multiple versions, survive sync
 
   suppressMessages(
     pins::pin_write(board$cache_board, fx_plain_tbl(), "versioned_data",
-                    type = "arrow")
+                    type = "parquet")
   )
   suppressMessages(
     pins::pin_write(
       board$cache_board,
       dplyr::mutate(fx_plain_tbl(), value = value * 2),
-      "versioned_data", type = "arrow"
+      "versioned_data", type = "parquet"
     )
   )
 
@@ -185,13 +191,13 @@ test_that("versioned conflict resolved as new versions without data loss", {
 
   suppressMessages(
     pins::pin_write(board$drive_board, fx_plain_tbl(), "conflicted_pin",
-                    type = "arrow")
+                    type = "parquet")
   )
   suppressMessages(
     pins::pin_write(
       board$cache_board,
       dplyr::mutate(fx_plain_tbl(), value = value * 10),
-      "conflicted_pin", type = "arrow"
+      "conflicted_pin", type = "parquet"
     )
   )
 
@@ -221,11 +227,11 @@ test_that("new-computer sync: emits pulling/new-computer message", {
 
   suppressMessages(
     pins::pin_write(board$drive_board, fx_plain_tbl(), "existing_pin",
-                    type = "arrow")
+                    type = "parquet")
   )
   suppressMessages(
     pins::pin_write(board$drive_board, fx_plain_tbl(), "existing_sf",
-                    type = "arrow")
+                    type = "parquet")
   )
 
   expect_equal(length(pins::pin_list(board$cache_board)), 0L)
@@ -254,7 +260,7 @@ test_that("new-computer sync: all Drive pins available locally afterwards", {
 
   for (nm in drive_pins) {
     suppressMessages(
-      pins::pin_write(board$drive_board, fx_plain_tbl(), nm, type = "arrow")
+      pins::pin_write(board$drive_board, fx_plain_tbl(), nm, type = "parquet")
     )
   }
 
@@ -289,7 +295,7 @@ test_that("gdpins_init_board with on_discrepancy=sync_from_drive pulls Drive→l
   fs::dir_create(drive_board_dir)
   pre_board <- pins::board_folder(drive_board_dir, versioned = TRUE)
   suppressMessages(
-    pins::pin_write(pre_board, fx_plain_tbl(), "seeded_pin", type = "arrow")
+    pins::pin_write(pre_board, fx_plain_tbl(), "seeded_pin", type = "parquet")
   )
 
   testthat::local_mocked_bindings(
@@ -352,7 +358,7 @@ test_that("drive_cache: pin_read from cache succeeds offline", {
 
   suppressMessages(
     pins::pin_write(board$cache_board, fx_plain_tbl(), "cached_pin",
-                    type = "arrow")
+                    type = "parquet")
   )
 
   testthat::local_mocked_bindings(
@@ -381,7 +387,7 @@ test_that("gdpins_board_status returns offline rows when offline (if cache has p
 
   suppressMessages(
     pins::pin_write(board$cache_board, fx_plain_tbl(), "test_pin",
-                    type = "arrow")
+                    type = "parquet")
   )
 
   testthat::local_mocked_bindings(
@@ -407,7 +413,7 @@ test_that("drive_cache_local: offline read uses local_board", {
 
   suppressMessages(
     pins::pin_write(board$local_board, fx_plain_tbl(), "local_pin",
-                    type = "arrow")
+                    type = "parquet")
   )
 
   testthat::local_mocked_bindings(
@@ -424,7 +430,7 @@ test_that("online init + discrepancy=warn emits a warning", {
   # Seed Drive to create a discrepancy
   suppressMessages(
     pins::pin_write(board$drive_board, fx_plain_tbl(), "drive_pin",
-                    type = "arrow")
+                    type = "parquet")
   )
 
   # Build a new board over the same dirs to trigger init-sync check

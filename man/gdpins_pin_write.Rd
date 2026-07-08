@@ -16,7 +16,7 @@ gdpins_pin_write(board, x, name, version = NULL, format = NULL)
 \item{version}{Character scalar or \code{NULL}. Version label; \code{NULL} uses the
 board default.}
 
-\item{format}{Character scalar or \code{NULL}. One of \code{"arrow"} or \code{"rds"};
+\item{format}{Character scalar or \code{NULL}. One of \code{"parquet"} or \code{"rds"};
 \code{NULL} auto-detects via \code{\link[=gdpins_detect_format]{gdpins_detect_format()}}.}
 }
 \value{
@@ -29,7 +29,7 @@ Serialises \code{x} and writes it to every non-NULL component of \code{board}
 }
 \details{
 If \code{x} is an \code{sf} object, it is encoded with \code{\link[=gdpins_sf_to_parquet]{gdpins_sf_to_parquet()}}
-before writing (type \code{"arrow"}).
+before writing (type \code{"parquet"}).
 }
 \examples{
 adapter <- gdpins_fake_drive()

@@ -109,18 +109,18 @@ gdpins_parquet_to_sf <- function(x) {
 
 #' Detect the appropriate storage format for an R object
 #'
-#' Returns `"arrow"` for data frames, tibbles (including `sf` objects), and
+#' Returns `"parquet"` for data frames, tibbles (including `sf` objects), and
 #' other tabular objects. Returns `"rds"` for lists, nested tibbles with
 #' list-columns, and any non-tabular object.
 #'
 #' Decision rules (in order):
 #' 1. Not a data frame -> `"rds"`.
 #' 2. Data frame with any non-`sfc` list-column -> `"rds"`.
-#' 3. Plain df/tibble or `sf` (all list-cols are `sfc`) -> `"arrow"`.
+#' 3. Plain df/tibble or `sf` (all list-cols are `sfc`) -> `"parquet"`.
 #'
 #' @param x An R object.
 #'
-#' @return Character scalar: `"arrow"` or `"rds"`.
+#' @return Character scalar: `"parquet"` or `"rds"`.
 #' @export
 gdpins_detect_format <- function(x) {
   # Bare list (not data frame) -> rds
@@ -128,7 +128,7 @@ gdpins_detect_format <- function(x) {
     return("rds")
   }
 
-  # Data frame: check for non-sfc list-columns (sfc cols are fine for arrow)
+  # Data frame: check for non-sfc list-columns (sfc cols are fine for parquet)
   has_non_sfc_list_col <- any(vapply(
     x,
     function(col) is.list(col) && !inherits(col, "sfc"),
@@ -139,5 +139,5 @@ gdpins_detect_format <- function(x) {
     return("rds")
   }
 
-  "arrow"
+  "parquet"
 }

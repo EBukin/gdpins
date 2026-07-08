@@ -172,18 +172,18 @@ test_that("parquet_to_sf guard: mixed valid + invalid WKT cols — only valid on
 
 # ── gdpins_detect_format ──────────────────────────────────────────────────────
 
-test_that("detect_format returns 'arrow' for plain tibble", {
-  expect_equal(gdpins_detect_format(fx_plain_tbl()), "arrow")
+test_that("detect_format returns 'parquet' for plain tibble", {
+  expect_equal(gdpins_detect_format(fx_plain_tbl()), "parquet")
 })
 
-test_that("detect_format returns 'arrow' for plain data.frame", {
-  expect_equal(gdpins_detect_format(as.data.frame(fx_plain_tbl())), "arrow")
+test_that("detect_format returns 'parquet' for plain data.frame", {
+  expect_equal(gdpins_detect_format(as.data.frame(fx_plain_tbl())), "parquet")
 })
 
-test_that("detect_format returns 'arrow' for sf object (sfc cols are ok)", {
-  expect_equal(gdpins_detect_format(fx_sf_single()), "arrow")
-  expect_equal(gdpins_detect_format(fx_sf_multi_crs()), "arrow")
-  expect_equal(gdpins_detect_format(fx_sf_non4326()), "arrow")
+test_that("detect_format returns 'parquet' for sf object (sfc cols are ok)", {
+  expect_equal(gdpins_detect_format(fx_sf_single()), "parquet")
+  expect_equal(gdpins_detect_format(fx_sf_multi_crs()), "parquet")
+  expect_equal(gdpins_detect_format(fx_sf_non4326()), "parquet")
 })
 
 test_that("detect_format returns 'rds' for tibble with list-column", {
@@ -204,10 +204,10 @@ test_that("detect_format returns 'rds' for non-data-frame object", {
   expect_equal(gdpins_detect_format("a string"), "rds")
 })
 
-test_that("detect_format 'arrow' for tibble with ONLY sfc list-cols (sf is fine)", {
-  # sf data frame: list-cols are sfc, so arrow
+test_that("detect_format 'parquet' for tibble with ONLY sfc list-cols (sf is fine)", {
+  # sf data frame: list-cols are sfc, so parquet
   sf_obj <- fx_sf_single()
-  expect_equal(gdpins_detect_format(sf_obj), "arrow")
+  expect_equal(gdpins_detect_format(sf_obj), "parquet")
 })
 
 test_that("detect_format 'rds' for tibble with mixed sfc and non-sfc list-cols", {
