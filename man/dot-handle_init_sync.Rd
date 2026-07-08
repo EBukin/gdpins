@@ -2,13 +2,28 @@
 % Please edit documentation in R/board.R
 \name{.handle_init_sync}
 \alias{.handle_init_sync}
-\title{Handle init-time sync check}
+\title{Handle init-time (or reconnect-time) sync check}
 \usage{
-.handle_init_sync(board, on_discrepancy)
+.handle_init_sync(x, on_discrepancy, label = NULL)
+}
+\arguments{
+\item{x}{A \code{gdpins_board} or \code{gdpins_raw_conn} object.}
+
+\item{on_discrepancy}{Resolved on_discrepancy value (never \code{NULL}).}
+
+\item{label}{Character scalar used in messages. Defaults to \code{x$name} (set
+on \code{gdpins_board}) or \code{"connection"} when unavailable (e.g. raw
+connections, which have no \code{name} field).}
 }
 \description{
-Calls \code{gdpins_board_status()} on the board and acts per \code{on_discrepancy}.
-Errors from \code{gdpins_board_status} (e.g. WS5 stub) are caught and treated as
-offline/unavailable — a warning is emitted and the board is returned as-is.
+Calls \code{gdpins_board_status()} on \code{x} and acts per \code{on_discrepancy}. Errors
+from \code{gdpins_board_status} (e.g. WS5 stub) are caught and treated as
+offline/unavailable — a warning is emitted and \code{x} is returned as-is.
+}
+\details{
+Shared by \code{\link[=gdpins_init_board]{gdpins_init_board()}}/\code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}} (init-time) and
+\code{\link[=gdpins_go_online]{gdpins_go_online()}} (reconnect-time) — \code{x} may be a \code{gdpins_board} or a
+\code{gdpins_raw_conn}, since \code{gdpins_board_status()}/\code{gdpins_sync()} dispatch on
+both.
 }
 \keyword{internal}

@@ -39,7 +39,9 @@ NULL
 #' `local_mtime`.
 #'
 #' @seealso [gdpins_real_drive()] to create an adapter, [gdpins_init_board()]
-#'   and [gdpins_raw_connect()] to create boards/connections.
+#'   and [gdpins_raw_connect()] to create boards/connections,
+#'   [gdpins_go_offline()]/[gdpins_go_online()] to temporarily detach a board
+#'   or connection from Drive and reconcile it later.
 #' @examples
 #' # --- Fake adapter board ---
 #' adapter <- gdpins_fake_drive()
@@ -118,7 +120,8 @@ gdpins_board_status.default <- function(x) {
 #'   "stop")`. Default `"version"`.
 #'
 #' @return Invisibly `x`. Called for its side effect.
-#' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_raw_connect()].
+#' @seealso [gdpins_real_drive()], [gdpins_init_board()],
+#'   [gdpins_raw_connect()], [gdpins_go_offline()]/[gdpins_go_online()].
 #' @examples
 #' # --- Fake adapter board ---
 #' adapter <- gdpins_fake_drive()

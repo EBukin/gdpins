@@ -284,6 +284,13 @@ gdpins_board_status(bd_raw)
 gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")  # no network needed
 ```
 
+The fallback above is automatic and happens only when Drive is unreachable at
+init time. To *deliberately* detach an already-connected board or raw
+connection from Drive — e.g. to avoid network calls for a while, or to keep
+working through a flaky connection — use `gdpins_go_offline()` and
+`gdpins_go_online()` instead. See "Deliberately going offline and back
+online" in `vignette("google-drive-adapter")` for details.
+
 ## Raw-exogenous connection
 
 For data as received from APIs — plain files, no pins metadata.

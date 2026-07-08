@@ -93,5 +93,6 @@ board2 <- gdpins_init_board(
 }
 }
 \seealso{
-\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter.
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter, \code{\link[=gdpins_go_offline]{gdpins_go_offline()}}
+to temporarily detach an existing board from Drive and work locally.
 }

@@ -226,11 +226,21 @@ gdpins_real_drive <- function(
 #' never calls `unlink()`. `gd_md5()` uses `tools::md5sum()`. `gd_ls()`
 #' excludes trashed entries.
 #'
+#' This adapter is a **test seam**, not an offline-mode substitute: it starts
+#' from an empty tempdir with no relationship to any previously connected
+#' Drive folder, so swapping it in for [gdpins_real_drive()] on an
+#' already-connected board or raw connection will not preserve the existing
+#' Drive-side layout (create-confirm prompts/errors are the usual symptom).
+#' To temporarily disconnect an existing board or connection from Drive and
+#' work locally, use [gdpins_go_offline()] / [gdpins_go_online()] instead.
+#'
 #' @param root Character scalar. Root directory for the fake drive. Defaults to
 #'   a fresh `tempfile()` path (created on first use).
 #'
 #' @return An object of class `gdpins_drive_adapter`.
-#' @seealso [gdpins_real_drive()] for the live Google Drive adapter.
+#' @seealso [gdpins_real_drive()] for the live Google Drive adapter,
+#'   [gdpins_go_offline()] to temporarily work offline on a real board or
+#'   connection.
 #' @export
 #' @examples
 #' adapter <- gdpins_fake_drive()

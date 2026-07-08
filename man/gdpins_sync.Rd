@@ -71,5 +71,6 @@ gdpins_sync(board, direction = "from_drive")
 }
 }
 \seealso{
-\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}}.
+\code{\link[=gdpins_real_drive]{gdpins_real_drive()}}, \code{\link[=gdpins_init_board]{gdpins_init_board()}},
+\code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}}, \code{\link[=gdpins_go_offline]{gdpins_go_offline()}}/\code{\link[=gdpins_go_online]{gdpins_go_online()}}.
 }
