@@ -67,7 +67,7 @@ conn <- gdpins_raw_connect(
 )
 conn
 #> <gdpins_raw_conn> [drive+local]
-#>   local: /tmp/Rtmpgw0Tfn/raw_639d31655229
+#>   local: /tmp/RtmpAB6nb6/raw_1f0545a42744
 #>   drive: worldbank-api
 
 # --- Real adapter ---

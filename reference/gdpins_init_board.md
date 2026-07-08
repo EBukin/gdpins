@@ -100,7 +100,7 @@ board
 #> name: "data_raw"
 #> versioned: "TRUE"
 #> drive: "my-project/data-raw"
-#> cache: "/tmp/Rtmpgw0Tfn/cache_639d48732449"
+#> cache: "/tmp/RtmpAB6nb6/cache_1f055881afa4"
 
 # --- Real adapter (requires Google Drive auth) ---
 if (FALSE) { # \dontrun{

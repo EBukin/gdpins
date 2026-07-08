@@ -68,9 +68,9 @@ board <- gdpins_init_board(
 #>   `gdpins_sync()` to reconcile.
 
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260629T171414Z-283de'
+#> Creating new version '20260708T104940Z-283de'
 #> Writing to pin 'cars'
-#> Creating new version '20260629T171414Z-283de'
+#> Creating new version '20260708T104940Z-283de'
 #> Writing to pin 'cars'
 
 if (FALSE) { # \dontrun{

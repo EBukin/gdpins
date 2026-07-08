@@ -181,7 +181,7 @@ board
 #> name: "test_board"
 #> versioned: "TRUE"
 #> drive: "project/data-raw"
-#> cache: "/tmp/RtmpyX0LXk/cache_697732931e35"
+#> cache: "/tmp/RtmpEq24Xz/cache_24e278c496d4"
 ```
 
 The fake adapter mirrors Drive operations on the local filesystem — no
