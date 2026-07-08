@@ -98,7 +98,12 @@ NULL
     ext,
     ".rds"     = readRDS(local_file),
     ".parquet" = {
-      tbl <- arrow::read_parquet(local_file)
+      # mmap = FALSE: memory-mapping local files crashes the R session with an
+      # access violation when the file lives on a cloud-sync mount (OneDrive/
+      # SharePoint Files On-Demand) that can invalidate or rewrite the backing
+      # pages while Arrow still holds the mapping. A buffered read is slightly
+      # slower but never segfaults.
+      tbl <- arrow::read_parquet(local_file, mmap = FALSE)
       # Route through gdpins_parquet_to_sf if encoded geometry columns present
       gdpins_parquet_to_sf(tbl)
     },

@@ -22,6 +22,30 @@ test_that("put_object/get round-trips .parquet (plain tibble)", {
   expect_equal(nrow(result), nrow(tbl))
 })
 
+test_that("get reads .parquet with mmap disabled (avoids cloud-sync access violations)", {
+  # arrow::read_parquet() memory-maps local files by default. On a cloud-sync
+  # mount (OneDrive/SharePoint Files On-Demand) the backing pages can be
+  # invalidated or rewritten out from under an active mapping, which segfaults
+  # the whole R session (uncatchable, bypasses tryCatch). Reads must opt out
+  # of mmap.
+  conn <- new_fake_raw_conn()
+  tbl  <- fx_plain_tbl()
+  gdpins_raw_put_object(conn, tbl, "test.parquet")
+
+  captured_mmap <- "not called"
+  real_read_parquet <- arrow::read_parquet
+  testthat::local_mocked_bindings(
+    read_parquet = function(file, ..., mmap = TRUE) {
+      captured_mmap <<- mmap
+      real_read_parquet(file, ..., mmap = mmap)
+    },
+    .package = "arrow"
+  )
+
+  gdpins_raw_get(conn, "test.parquet")
+  expect_false(captured_mmap)
+})
+
 test_that("put_object/get round-trips .csv", {
   conn   <- new_fake_raw_conn()
   tbl    <- fx_plain_tbl()
