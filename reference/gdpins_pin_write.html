@@ -11,7 +11,7 @@ gdpins_detect_format() unless format is supplied explicitly."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -26,6 +26,7 @@ gdpins_detect_format() unless format is supplied explicitly."></head><body>
     <li><a class="dropdown-item" href="../articles/google-drive-adapter.html">Setting up the Google Drive Adapter</a></li>
     <li><a class="dropdown-item" href="../articles/raw-files.html">Working with Raw Files: Writing, Reading, Listing, and Local Downloads</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://github.com/EBukin/gdpins" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
@@ -48,7 +49,14 @@ gdpins_detect_format() unless format is supplied explicitly."></head><body>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">gdpins_pin_write</span><span class="op">(</span><span class="va">board</span>, <span class="va">x</span>, <span class="va">name</span>, version <span class="op">=</span> <span class="cn">NULL</span>, format <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">gdpins_pin_write</span><span class="op">(</span></span>
+<span>  <span class="va">board</span>,</span>
+<span>  <span class="va">x</span>,</span>
+<span>  <span class="va">name</span>,</span>
+<span>  version <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  format <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  wkt_engine <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -75,6 +83,12 @@ board default.</p></dd>
 <dt id="arg-format">format<a class="anchor" aria-label="anchor" href="#arg-format"></a></dt>
 <dd><p>Character scalar or <code>NULL</code>. One of <code>"parquet"</code> or <code>"rds"</code>;
 <code>NULL</code> auto-detects via <code><a href="gdpins_detect_format.html">gdpins_detect_format()</a></code>.</p></dd>
+
+
+<dt id="arg-wkt-engine">wkt_engine<a class="anchor" aria-label="anchor" href="#arg-wkt-engine"></a></dt>
+<dd><p>Character scalar or <code>NULL</code>. WKT engine used to encode <code>sf</code>
+geometry: <code>"wk"</code> (default, fast, full precision) or <code>"sf"</code> (fallback).
+<code>NULL</code> uses the <code>gdpins.wkt_engine</code> option. See <code><a href="gdpins_sf_to_parquet.html">gdpins_sf_to_parquet()</a></code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -106,9 +120,9 @@ before writing (type <code>"parquet"</code>).</p>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span>   `gdpins_sync()` to reconcile.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu">gdpins_pin_write</span><span class="op">(</span><span class="va">board</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260708T105453Z-c0340'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260715T125502Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260708T105453Z-c0340'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260715T125502Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>

@@ -198,6 +198,39 @@ gdpins_sf_to_parquet(sf_obj)   # df with WKT geometry columns
 gdpins_parquet_to_sf(df)       # sf with original CRS restored
 ```
 
+### WKT engine
+
+The geometry ↔︎ WKT conversion uses one of two interchangeable engines,
+chosen with the `wkt_engine` / `engine` argument or the
+`gdpins.wkt_engine` option:
+
+- `"wk"` (**default**) — uses the
+  [wk](https://paleolimbot.github.io/wk/) package. ~20× faster to write
+  than `sf` and always full-precision.
+- `"sf"` — uses
+  [`sf::st_as_text()`](https://r-spatial.github.io/sf/reference/st_as_text.html)
+  (pinned to `digits = 15`, so also full-precision). A dependency-light
+  fallback.
+
+Both are read-compatible: WKT written by one engine reads back correctly
+with the other, so you can switch at any time without re-encoding stored
+data.
+
+``` r
+
+gdpins_pin_write(board, sf_obj, "parcels")                    # default "wk"
+gdpins_pin_write(board, sf_obj, "parcels", wkt_engine = "sf") # force sf
+options(gdpins.wkt_engine = "sf")                             # switch globally
+```
+
+> Note: a bare
+> [`sf::st_as_text()`](https://r-spatial.github.io/sf/reference/st_as_text.html)
+> defaults to 7 significant digits, silently rounding projected
+> coordinates (e.g. UTM metres) by up to ~0.5 m. gdpins avoids this on
+> both engines. A benchmark harness lives in
+> `tests/testthat/test-benchmark-wkt.R` (skipped unless
+> `GDPINS_BENCH_WKT=true`).
+
 ## Testing
 
 Unit tests use a fake Drive adapter and run without authentication or

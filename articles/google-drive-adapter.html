@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,7 @@
     <li><a class="dropdown-item" href="../articles/raw-files.html">Working with Raw Files: Writing, Reading, Listing, and Local Downloads</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/EBukin/gdpins" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -213,7 +214,7 @@ offline testing:</p>
 <span><span class="co">#&gt; <span style="color: #00BB00;">name</span>: <span style="color: #0000BB;">"test_board"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">versioned</span>: <span style="color: #0000BB;">"TRUE"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">drive</span>: <span style="color: #0000BB;">"project/data-raw"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/Rtmph1C0gh/cache_23e23e9de8d5"</span></span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpLFZGtB/cache_2aeb61da65b2"</span></span></span></code></pre></div>
 <p>The fake adapter mirrors Drive operations on the local filesystem —
 no credentials, no network, fully reproducible.</p>
 <p>Note that <code><a href="../reference/gdpins_fake_drive.html">gdpins_fake_drive()</a></code> is a <strong>test
@@ -258,7 +259,7 @@ files:</p>
 <span></span>
 <span><span class="co"># Reads and writes stay local -- no network calls, no blocked writes</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Creating new version '20260708T105504Z-c0340'</span></span>
+<span><span class="co">#&gt; Creating new version '20260715T125513Z-c0340'</span></span>
 <span><span class="co">#&gt; Writing to pin 'cars'</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="st">"cars"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 32 × 11</span></span></span>

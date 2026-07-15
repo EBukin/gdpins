@@ -9,7 +9,7 @@ of depth."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,6 +24,7 @@ of depth."></head><body>
     <li><a class="dropdown-item" href="../articles/google-drive-adapter.html">Setting up the Google Drive Adapter</a></li>
     <li><a class="dropdown-item" href="../articles/raw-files.html">Working with Raw Files: Writing, Reading, Listing, and Local Downloads</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://github.com/EBukin/gdpins" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
@@ -105,7 +106,7 @@ for local-only connections and the fake adapter.</p></dd>
 <span class="r-in"><span><span class="fu"><a href="gdpins_raw_put_object.html">gdpins_raw_put_object</a></span><span class="op">(</span><span class="va">conn</span>, <span class="va">mtcars</span>, <span class="st">"cars.csv"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">tbl</span> <span class="op">&lt;-</span> <span class="fu">gdpins_raw_ls</span><span class="op">(</span><span class="va">conn</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">tbl</span><span class="op">$</span><span class="va">local_path</span>   <span class="co"># absolute local path</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "/tmp/RtmpQ8TPRT/raw_1dfc3a59a220/cars.csv"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "/tmp/Rtmp7u8b8x/raw_24f96fdfc54d/cars.csv"</span>
 <span class="r-in"><span><span class="va">tbl</span><span class="op">$</span><span class="va">drive_id</span>     <span class="co"># NA for fake adapter; real Drive ID with real adapter</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
 </code></pre></div>

@@ -7,7 +7,7 @@ locally.
 ## Usage
 
 ``` r
-gdpins_pin_read(board, name, version = NULL)
+gdpins_pin_read(board, name, version = NULL, wkt_engine = NULL)
 ```
 
 ## Arguments
@@ -23,6 +23,13 @@ gdpins_pin_read(board, name, version = NULL)
 - version:
 
   Character scalar or `NULL`. Pin version; `NULL` = latest.
+
+- wkt_engine:
+
+  Character scalar or `NULL`. WKT engine used to decode `sf` geometry:
+  `"wk"` (default) or `"sf"`. `NULL` uses the `gdpins.wkt_engine`
+  option. Reads are engine-agnostic; this only affects parse speed. See
+  [`gdpins_parquet_to_sf()`](https://ebukin.github.io/gdpins/reference/gdpins_parquet_to_sf.md).
 
 ## Value
 
@@ -55,9 +62,9 @@ board <- gdpins_init_board(
 #> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
 #>   `gdpins_sync()` to reconcile.
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260708T105452Z-c0340'
+#> Creating new version '20260715T125501Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260708T105452Z-c0340'
+#> Creating new version '20260715T125501Z-c0340'
 #> Writing to pin 'cars'
 gdpins_pin_read(board, "cars")
 #> # A tibble: 32 × 11

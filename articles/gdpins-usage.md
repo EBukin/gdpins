@@ -233,6 +233,51 @@ restored <- gdpins_parquet_to_sf(encoded)      # sf with CRS restored
 > proj-string-only CRS will error. Set a CRS first with
 > [`sf::st_set_crs()`](https://r-spatial.github.io/sf/reference/st_crs.html).
 
+### Choosing the WKT engine
+
+The geometry ↔︎ WKT conversion is done by one of two interchangeable
+engines:
+
+- `"wk"` (**default**) — the [wk](https://paleolimbot.github.io/wk/)
+  package. About 20× faster to write than `sf`, and full-precision.
+- `"sf"` —
+  [`sf::st_as_text()`](https://r-spatial.github.io/sf/reference/st_as_text.html),
+  pinned to `digits = 15` so it is also full-precision. A
+  dependency-light fallback.
+
+Select per call with `wkt_engine` (on
+[`gdpins_pin_write()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_write.md)
+/
+[`gdpins_pin_read()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_read.md)
+/
+[`gdpins_raw_put_object()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_put_object.md)
+/
+[`gdpins_raw_get()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_get.md))
+or `engine` (on the two helpers), or set the default for the whole
+session:
+
+``` r
+
+# Per-call override
+gdpins_pin_write(bd_raw, parcels_sf, "parcels", wkt_engine = "sf")
+
+# Session-wide default
+options(gdpins.wkt_engine = "sf")
+
+encoded_sf <- gdpins_sf_to_parquet(parcels_sf, engine = "sf")
+```
+
+Both engines are **read-compatible**: WKT written by one reads back
+correctly with the other, so switching engines never requires
+re-encoding stored data.
+
+> **Precision note:** a bare
+> [`sf::st_as_text()`](https://r-spatial.github.io/sf/reference/st_as_text.html)
+> uses `getOption("digits")` (7 significant figures), which silently
+> rounds projected coordinates (e.g. UTM metres) by up to ~0.5 m. gdpins
+> avoids this on **both** engines — the `"wk"` engine is exact by
+> construction, and the `"sf"` engine is called with `digits = 15`.
+
 ## Reading a specific version
 
 When `versioned = TRUE` (the default), each

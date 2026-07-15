@@ -8,7 +8,14 @@ unless `format` is supplied explicitly.
 ## Usage
 
 ``` r
-gdpins_pin_write(board, x, name, version = NULL, format = NULL)
+gdpins_pin_write(
+  board,
+  x,
+  name,
+  version = NULL,
+  format = NULL,
+  wkt_engine = NULL
+)
 ```
 
 ## Arguments
@@ -35,6 +42,13 @@ gdpins_pin_write(board, x, name, version = NULL, format = NULL)
   Character scalar or `NULL`. One of `"parquet"` or `"rds"`; `NULL`
   auto-detects via
   [`gdpins_detect_format()`](https://ebukin.github.io/gdpins/reference/gdpins_detect_format.md).
+
+- wkt_engine:
+
+  Character scalar or `NULL`. WKT engine used to encode `sf` geometry:
+  `"wk"` (default, fast, full precision) or `"sf"` (fallback). `NULL`
+  uses the `gdpins.wkt_engine` option. See
+  [`gdpins_sf_to_parquet()`](https://ebukin.github.io/gdpins/reference/gdpins_sf_to_parquet.md).
 
 ## Value
 
@@ -68,9 +82,9 @@ board <- gdpins_init_board(
 #>   `gdpins_sync()` to reconcile.
 
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260708T105453Z-c0340'
+#> Creating new version '20260715T125502Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260708T105453Z-c0340'
+#> Creating new version '20260715T125502Z-c0340'
 #> Writing to pin 'cars'
 
 if (FALSE) { # \dontrun{

@@ -9,7 +9,7 @@ handling for sf geospatial objects using a WKT + column-name CRS encoding."></he
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,6 +24,7 @@ handling for sf geospatial objects using a WKT + column-name CRS encoding."></he
     <li><a class="dropdown-item" href="../articles/google-drive-adapter.html">Setting up the Google Drive Adapter</a></li>
     <li><a class="dropdown-item" href="../articles/raw-files.html">Working with Raw Files: Writing, Reading, Listing, and Local Downloads</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://github.com/EBukin/gdpins" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
@@ -44,6 +45,26 @@ handling for <code>sf</code> geospatial objects using a WKT + column-name CRS en
     </div>
 
 
+    <div class="section level2">
+    <h2 id="wkt-engine">WKT engine<a class="anchor" aria-label="anchor" href="#wkt-engine"></a></h2>
+
+
+<p>The geometry &lt;-&gt; WKT text conversion can be performed by one of two engines,
+selected with the <code>engine</code> argument (or, package-wide, the
+<code>gdpins.wkt_engine</code> option):</p><ul><li><p><code>"wk"</code> (default) — uses <code><a href="https://paleolimbot.github.io/wk/reference/wkt.html" class="external-link">wk::as_wkt()</a></code> to write and routes reads through
+<code><a href="https://paleolimbot.github.io/wk/reference/wkt.html" class="external-link">wk::wkt()</a></code> into <code><a href="https://r-spatial.github.io/sf/reference/st_as_sfc.html" class="external-link">sf::st_as_sfc()</a></code>. About 20x faster to write than <code>"sf"</code>
+and always full-precision.</p></li>
+<li><p><code>"sf"</code> — uses <code><a href="https://r-spatial.github.io/sf/reference/st_as_text.html" class="external-link">sf::st_as_text()</a></code> (with <code>digits = 15</code>, so it is
+full-precision) to write and <code><a href="https://r-spatial.github.io/sf/reference/st_as_sfc.html" class="external-link">sf::st_as_sfc()</a></code> to read. Kept as a fallback
+so encoding never depends on a single engine.</p></li>
+</ul><p>Both engines are read-compatible: WKT written by one reads back correctly with
+the other. The default can be changed globally with
+<code>options(gdpins.wkt_engine = "sf")</code>.</p>
+<p>Note: <code><a href="https://r-spatial.github.io/sf/reference/st_as_text.html" class="external-link">sf::st_as_text()</a></code> defaults to <code>getOption("digits")</code> (7 significant
+figures), which silently rounds projected coordinates (e.g. UTM metres) by up
+to ~0.5 m. gdpins always pins <code>digits = 15</code> for the <code>"sf"</code> engine to avoid
+this; the <code>"wk"</code> engine is full-precision by construction.</p>
+    </div>
 
   </main></div>
 

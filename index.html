@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -40,6 +40,7 @@
     <li><a class="dropdown-item" href="articles/raw-files.html">Working with Raw Files: Writing, Reading, Listing, and Local Downloads</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/EBukin/gdpins" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -237,16 +238,35 @@
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/gdpins_sf_to_parquet.html">gdpins_sf_to_parquet</a></span><span class="op">(</span><span class="va">sf_obj</span><span class="op">)</span>   <span class="co"># df with WKT geometry columns</span></span>
 <span><span class="fu"><a href="reference/gdpins_parquet_to_sf.html">gdpins_parquet_to_sf</a></span><span class="op">(</span><span class="va">df</span><span class="op">)</span>       <span class="co"># sf with original CRS restored</span></span></code></pre></div>
+<div class="section level3">
+<h3 id="wkt-engine">WKT engine<a class="anchor" aria-label="anchor" href="#wkt-engine"></a>
+</h3>
+<p>The geometry ↔︎ WKT conversion uses one of two interchangeable engines, chosen with the <code>wkt_engine</code> / <code>engine</code> argument or the <code>gdpins.wkt_engine</code> option:</p>
+<ul>
+<li>
+<code>"wk"</code> (<strong>default</strong>) — uses the <a href="https://paleolimbot.github.io/wk/" class="external-link">wk</a> package. ~20× faster to write than <code>sf</code> and always full-precision.</li>
+<li>
+<code>"sf"</code> — uses <code><a href="https://r-spatial.github.io/sf/reference/st_as_text.html" class="external-link">sf::st_as_text()</a></code> (pinned to <code>digits = 15</code>, so also full-precision). A dependency-light fallback.</li>
+</ul>
+<p>Both are read-compatible: WKT written by one engine reads back correctly with the other, so you can switch at any time without re-encoding stored data.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board</span>, <span class="va">sf_obj</span>, <span class="st">"parcels"</span><span class="op">)</span>                    <span class="co"># default "wk"</span></span>
+<span><span class="fu"><a href="reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board</span>, <span class="va">sf_obj</span>, <span class="st">"parcels"</span>, wkt_engine <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span> <span class="co"># force sf</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>gdpins.wkt_engine <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span>                             <span class="co"># switch globally</span></span></code></pre></div>
+<blockquote>
+<p>Note: a bare <code><a href="https://r-spatial.github.io/sf/reference/st_as_text.html" class="external-link">sf::st_as_text()</a></code> defaults to 7 significant digits, silently rounding projected coordinates (e.g. UTM metres) by up to ~0.5 m. gdpins avoids this on both engines. A benchmark harness lives in <code>tests/testthat/test-benchmark-wkt.R</code> (skipped unless <code>GDPINS_BENCH_WKT=true</code>).</p>
+</blockquote>
+</div>
 </div>
 <div class="section level2">
 <h2 id="testing">Testing<a class="anchor" aria-label="anchor" href="#testing"></a>
 </h2>
 <p>Unit tests use a fake Drive adapter and run without authentication or network:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">testthat</span><span class="fu">::</span><span class="fu"><a href="https://testthat.r-lib.org/reference/test_package.html" class="external-link">test_package</a></span><span class="op">(</span><span class="st">"gdpins"</span><span class="op">)</span></span></code></pre></div>
 <p>Live tests run against a real Google Drive folder and are skipped by default. To run them:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="va">$env</span><span class="op">:</span><span class="va">GDRIVE_TEST_FOLDER</span> <span class="op">=</span> <span class="st">"&lt;your-test-folder-id&gt;"</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>Rscript <span class="op">--</span>no-init-file <span class="op">-</span>e <span class="st">'testthat::test_file("tests/testthat/test-live.R")'</span></span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="va">$env</span><span class="op">:</span><span class="va">GDRIVE_TEST_FOLDER</span> <span class="op">=</span> <span class="st">"&lt;your-test-folder-id&gt;"</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>Rscript <span class="op">--</span>no-init-file <span class="op">-</span>e <span class="st">'testthat::test_file("tests/testthat/test-live.R")'</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>

@@ -9,7 +9,7 @@ else Drive board. Hits the network only if the pin is absent locally."></head><b
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,6 +24,7 @@ else Drive board. Hits the network only if the pin is absent locally."></head><b
     <li><a class="dropdown-item" href="../articles/google-drive-adapter.html">Setting up the Google Drive Adapter</a></li>
     <li><a class="dropdown-item" href="../articles/raw-files.html">Working with Raw Files: Writing, Reading, Listing, and Local Downloads</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://github.com/EBukin/gdpins" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
@@ -45,7 +46,7 @@ else Drive board. Hits the network only if the pin is absent locally.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">gdpins_pin_read</span><span class="op">(</span><span class="va">board</span>, <span class="va">name</span>, version <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">gdpins_pin_read</span><span class="op">(</span><span class="va">board</span>, <span class="va">name</span>, version <span class="op">=</span> <span class="cn">NULL</span>, wkt_engine <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -62,6 +63,13 @@ else Drive board. Hits the network only if the pin is absent locally.</p>
 
 <dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>
 <dd><p>Character scalar or <code>NULL</code>. Pin version; <code>NULL</code> = latest.</p></dd>
+
+
+<dt id="arg-wkt-engine">wkt_engine<a class="anchor" aria-label="anchor" href="#arg-wkt-engine"></a></dt>
+<dd><p>Character scalar or <code>NULL</code>. WKT engine used to decode <code>sf</code>
+geometry: <code>"wk"</code> (default) or <code>"sf"</code>. <code>NULL</code> uses the <code>gdpins.wkt_engine</code>
+option. Reads are engine-agnostic; this only affects parse speed. See
+<code><a href="gdpins_parquet_to_sf.html">gdpins_parquet_to_sf()</a></code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -92,9 +100,9 @@ encoding), the geometry is automatically restored via <code><a href="gdpins_parq
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span><span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">"data_raw"</span>: sync discrepancy detected between Drive and local. Run</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span>   `gdpins_sync()` to reconcile.</span>
 <span class="r-in"><span><span class="fu"><a href="gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260708T105452Z-c0340'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260715T125501Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260708T105452Z-c0340'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260715T125501Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
 <span class="r-in"><span><span class="fu">gdpins_pin_read</span><span class="op">(</span><span class="va">board</span>, <span class="st">"cars"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 32 × 11</span></span>

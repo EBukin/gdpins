@@ -6,7 +6,7 @@ Reads a file from the local mirror by default. Set
 ## Usage
 
 ``` r
-gdpins_raw_get(conn, name, force_refresh = FALSE)
+gdpins_raw_get(conn, name, force_refresh = FALSE, wkt_engine = NULL)
 ```
 
 ## Arguments
@@ -22,6 +22,13 @@ gdpins_raw_get(conn, name, force_refresh = FALSE)
 - force_refresh:
 
   Logical. `TRUE` re-pulls from Drive before reading. Default `FALSE`.
+
+- wkt_engine:
+
+  Character scalar or `NULL`. WKT engine used to decode `sf` geometry
+  when reading `.parquet`: `"wk"` (default) or `"sf"`. `NULL` uses the
+  `gdpins.wkt_engine` option. Reads are engine-agnostic. See
+  [`gdpins_parquet_to_sf()`](https://ebukin.github.io/gdpins/reference/gdpins_parquet_to_sf.md).
 
 ## Value
 

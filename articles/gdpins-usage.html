@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,7 @@
     <li><a class="dropdown-item" href="../articles/raw-files.html">Working with Raw Files: Writing, Reading, Listing, and Local Downloads</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/EBukin/gdpins" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -276,6 +277,45 @@ encode/decode manually (e.g. to write to an external Parquet file):</p>
 integer CRS. Custom proj-string-only CRS will error. Set a CRS first
 with <code><a href="https://r-spatial.github.io/sf/reference/st_crs.html" class="external-link">sf::st_set_crs()</a></code>.</p>
 </blockquote>
+<div class="section level3">
+<h3 id="choosing-the-wkt-engine">Choosing the WKT engine<a class="anchor" aria-label="anchor" href="#choosing-the-wkt-engine"></a>
+</h3>
+<p>The geometry ↔︎ WKT conversion is done by one of two interchangeable
+engines:</p>
+<ul>
+<li>
+<code>"wk"</code> (<strong>default</strong>) — the <a href="https://paleolimbot.github.io/wk/" class="external-link">wk</a> package. About 20×
+faster to write than <code>sf</code>, and full-precision.</li>
+<li>
+<code>"sf"</code> — <code><a href="https://r-spatial.github.io/sf/reference/st_as_text.html" class="external-link">sf::st_as_text()</a></code>, pinned to
+<code>digits = 15</code> so it is also full-precision. A
+dependency-light fallback.</li>
+</ul>
+<p>Select per call with <code>wkt_engine</code> (on
+<code><a href="../reference/gdpins_pin_write.html">gdpins_pin_write()</a></code> / <code><a href="../reference/gdpins_pin_read.html">gdpins_pin_read()</a></code> /
+<code><a href="../reference/gdpins_raw_put_object.html">gdpins_raw_put_object()</a></code> / <code><a href="../reference/gdpins_raw_get.html">gdpins_raw_get()</a></code>) or
+<code>engine</code> (on the two helpers), or set the default for the
+whole session:</p>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Per-call override</span></span>
+<span><span class="fu"><a href="../reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="va">parcels_sf</span>, <span class="st">"parcels"</span>, wkt_engine <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Session-wide default</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>gdpins.wkt_engine <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">encoded_sf</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_sf_to_parquet.html">gdpins_sf_to_parquet</a></span><span class="op">(</span><span class="va">parcels_sf</span>, engine <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span></span></code></pre></div>
+<p>Both engines are <strong>read-compatible</strong>: WKT written by one
+reads back correctly with the other, so switching engines never requires
+re-encoding stored data.</p>
+<blockquote>
+<p><strong>Precision note:</strong> a bare <code><a href="https://r-spatial.github.io/sf/reference/st_as_text.html" class="external-link">sf::st_as_text()</a></code>
+uses <code>getOption("digits")</code> (7 significant figures), which
+silently rounds projected coordinates (e.g. UTM metres) by up to ~0.5 m.
+gdpins avoids this on <strong>both</strong> engines — the
+<code>"wk"</code> engine is exact by construction, and the
+<code>"sf"</code> engine is called with <code>digits = 15</code>.</p>
+</blockquote>
+</div>
 </div>
 <div class="section level2">
 <h2 id="reading-a-specific-version">Reading a specific version<a class="anchor" aria-label="anchor" href="#reading-a-specific-version"></a>
@@ -283,18 +323,18 @@ with <code><a href="https://r-spatial.github.io/sf/reference/st_crs.html" class=
 <p>When <code>versioned = TRUE</code> (the default), each
 <code><a href="../reference/gdpins_pin_write.html">gdpins_pin_write()</a></code> call creates a new version rather than
 overwriting. Versions are labelled by timestamp.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Inspect all versions of a pin</span></span>
 <span><span class="va">info</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_pin_info.html">gdpins_pin_info</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span><span class="op">)</span></span>
 <span><span class="va">info</span><span class="op">$</span><span class="va">versions</span>        <span class="co"># tibble: version label, created, size</span></span>
 <span><span class="va">info</span><span class="op">$</span><span class="va">n_versions</span>      <span class="co"># integer count</span></span></code></pre></div>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Read the latest version (default)</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Read a specific historical version by its label</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span>, version <span class="op">=</span> <span class="st">"20240615T120000Z-abc12"</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Keep only the 3 most recent versions, dry-run first</span></span>
 <span><span class="fu"><a href="../reference/gdpins_prune_pin_versions.html">gdpins_prune_pin_versions</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span>, keep <span class="op">=</span> <span class="fl">3</span>, dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/gdpins_prune_pin_versions.html">gdpins_prune_pin_versions</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span>, keep <span class="op">=</span> <span class="fl">3</span>, dry_run <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
@@ -331,7 +371,7 @@ frequently-updated reference data where history is unwanted.</p>
 </table>
 <p>A warning is emitted; writes are blocked (Drive boards are
 write-protected offline); reads continue from the local copy.</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Check connectivity explicitly before Drive operations</span></span>
 <span><span class="fu"><a href="../reference/gdpins_is_online.html">gdpins_is_online</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># TRUE / FALSE</span></span>
 <span></span>
@@ -353,7 +393,7 @@ details.</p>
 <h2 id="raw-exogenous-connection">Raw-exogenous connection<a class="anchor" aria-label="anchor" href="#raw-exogenous-connection"></a>
 </h2>
 <p>For data as received from APIs — plain files, no pins metadata.</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">conn</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_raw_connect.html">gdpins_raw_connect</a></span><span class="op">(</span></span>
 <span>  drive_path <span class="op">=</span> <span class="st">"kazLandEconImpact-data/raw-exogenous/worldbank-api"</span>,</span>
 <span>  local_path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"OD_PRIV_ROOT"</span><span class="op">)</span>,</span>
@@ -362,7 +402,7 @@ details.</p>
 <span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span>
 <span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Store an R object (serialised to the appropriate format by extension)</span></span>
 <span><span class="fu"><a href="../reference/gdpins_raw_put_object.html">gdpins_raw_put_object</a></span><span class="op">(</span><span class="va">conn</span>, <span class="va">api_response_tbl</span>, <span class="st">"gdp_2024.parquet"</span><span class="op">)</span></span>
 <span></span>
@@ -394,7 +434,7 @@ details.</p>
 <h2 id="sync">Sync<a class="anchor" aria-label="anchor" href="#sync"></a>
 </h2>
 <p>Sync is <strong>always explicit</strong> — never automatic.</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Auto: newer side wins, both directions</span></span>
 <span><span class="fu"><a href="../reference/gdpins_sync.html">gdpins_sync</a></span><span class="op">(</span><span class="va">bd_raw</span><span class="op">)</span></span>
 <span></span>
@@ -412,7 +452,7 @@ versions (zero data loss). For raw/unversioned boards:
 <div class="section level2">
 <h2 id="discovery">Discovery<a class="anchor" aria-label="anchor" href="#discovery"></a>
 </h2>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># List all pins</span></span>
 <span><span class="fu"><a href="../reference/gdpins_list_pins.html">gdpins_list_pins</a></span><span class="op">(</span><span class="va">bd_clean</span><span class="op">)</span></span>
 <span></span>
@@ -422,7 +462,7 @@ versions (zero data loss). For raw/unversioned boards:
 <div class="section level2">
 <h2 id="output">Output<a class="anchor" aria-label="anchor" href="#output"></a>
 </h2>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Save a figure (PNG or SVG — ggplot object is NOT stored)</span></span>
@@ -459,7 +499,7 @@ versions (zero data loss). For raw/unversioned boards:
 <div class="section level2">
 <h2 id="pruning-old-versions">Pruning old versions<a class="anchor" aria-label="anchor" href="#pruning-old-versions"></a>
 </h2>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Preview what would be removed (dry_run = TRUE by default)</span></span>
 <span><span class="fu"><a href="../reference/gdpins_prune_pin_versions.html">gdpins_prune_pin_versions</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span>, keep <span class="op">=</span> <span class="fl">3</span>, dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
@@ -470,7 +510,7 @@ versions (zero data loss). For raw/unversioned boards:
 <h2 id="console-output">Console output<a class="anchor" aria-label="anchor" href="#console-output"></a>
 </h2>
 <p><code>gdpins</code> objects print compactly (≤80 cols):</p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">bd_raw</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">bd_raw</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/gdpins_list_pins.html">gdpins_list_pins</a></span><span class="op">(</span><span class="va">bd_raw</span><span class="op">)</span></span>

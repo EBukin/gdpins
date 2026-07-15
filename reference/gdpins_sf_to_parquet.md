@@ -8,7 +8,7 @@ plain tibble with no `sf` class.
 ## Usage
 
 ``` r
-gdpins_sf_to_parquet(x)
+gdpins_sf_to_parquet(x, engine = NULL)
 ```
 
 ## Arguments
@@ -16,6 +16,13 @@ gdpins_sf_to_parquet(x)
 - x:
 
   An `sf` data frame with one or more geometry columns.
+
+- engine:
+
+  Character scalar, the WKT engine: `"wk"` (default) or `"sf"`. `NULL`
+  uses the `gdpins.wkt_engine` option (default `"wk"`). See the
+  [io-formats](https://ebukin.github.io/gdpins/reference/io-formats.md)
+  "WKT engine" section.
 
 ## Value
 
@@ -26,7 +33,29 @@ with geometry columns replaced by WKT character columns named
 
 ## Details
 
-No coordinate transformation is performed. Each geometry is converted
-via
-[`sf::st_as_text()`](https://r-spatial.github.io/sf/reference/st_as_text.html)
-(WKT, never WKB). Per-column CRS is supported.
+No coordinate transformation is performed. Each geometry is converted to
+WKT text (never WKB) by the selected `engine` (see
+[io-formats](https://ebukin.github.io/gdpins/reference/io-formats.md)).
+Per-column CRS is supported.
+
+## Examples
+
+``` r
+library(sf)
+pts <- st_sf(
+  id = 1:2,
+  geometry = st_sfc(st_point(c(71, 51)), st_point(c(76, 43)), crs = 4326)
+)
+gdpins_sf_to_parquet(pts)                 # default "wk" engine
+#> # A tibble: 2 × 2
+#>      id geometry__4326__
+#>   <int> <chr>           
+#> 1     1 POINT (71 51)   
+#> 2     2 POINT (76 43)   
+gdpins_sf_to_parquet(pts, engine = "sf")  # sf fallback (full precision)
+#> # A tibble: 2 × 2
+#>      id geometry__4326__
+#>   <int> <chr>           
+#> 1     1 POINT (71 51)   
+#> 2     2 POINT (76 43)   
+```
