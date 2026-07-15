@@ -67,7 +67,7 @@ NULL
 }
 
 # Serialise x to a temp file using the writer for ext; return temp path
-.raw_write_tmp <- function(x, name) {
+.raw_write_tmp <- function(x, name, wkt_engine = NULL) {
   ext  <- .check_ext(name)
   tmp  <- tempfile(fileext = ext)
 
@@ -76,7 +76,7 @@ NULL
     ".rds"     = saveRDS(x, tmp),
     ".parquet" = {
       if (inherits(x, "sf")) {
-        encoded <- gdpins_sf_to_parquet(x)
+        encoded <- gdpins_sf_to_parquet(x, engine = wkt_engine)
         arrow::write_parquet(encoded, tmp)
       } else {
         arrow::write_parquet(x, tmp)
@@ -90,7 +90,7 @@ NULL
 }
 
 # Read from a local file path using the reader for the extension
-.raw_read_local <- function(local_file) {
+.raw_read_local <- function(local_file, wkt_engine = NULL) {
   ext <- .raw_ext(local_file)
   .check_ext(local_file)  # errors on unknown
 
@@ -105,7 +105,7 @@ NULL
       # slower but never segfaults.
       tbl <- arrow::read_parquet(local_file, mmap = FALSE)
       # Route through gdpins_parquet_to_sf if encoded geometry columns present
-      gdpins_parquet_to_sf(tbl)
+      gdpins_parquet_to_sf(tbl, engine = wkt_engine)
     },
     ".geojson" = sf::st_read(local_file, quiet = TRUE),
     ".csv"     = readr::read_csv(local_file, show_col_types = FALSE)
@@ -428,13 +428,16 @@ gdpins_raw_connect <- function(
 #' @param x An R object.
 #' @param name Character scalar. Relative path within the raw-root, including
 #'   extension (e.g. `"worldbank-api/gdp_2024.parquet"`).
+#' @param wkt_engine Character scalar or `NULL`. WKT engine used to encode `sf`
+#'   geometry when writing `.parquet`: `"wk"` (default) or `"sf"`. `NULL` uses
+#'   the `gdpins.wkt_engine` option. See [gdpins_sf_to_parquet()].
 #'
 #' @return Invisibly `NULL`.
 #' @export
-gdpins_raw_put_object <- function(conn, x, name) {
+gdpins_raw_put_object <- function(conn, x, name, wkt_engine = NULL) {
   .check_ext(name)
 
-  tmp        <- .raw_write_tmp(x, name)
+  tmp        <- .raw_write_tmp(x, name, wkt_engine = wkt_engine)
   on.exit(unlink(tmp), add = TRUE)
 
   local_dest <- .local_full_path(conn, name)
@@ -685,10 +688,14 @@ gdpins_raw_path <- function(conn, name_or_id) {
 #' @param name Character scalar. Relative path within the raw-root.
 #' @param force_refresh Logical. `TRUE` re-pulls from Drive before reading.
 #'   Default `FALSE`.
+#' @param wkt_engine Character scalar or `NULL`. WKT engine used to decode `sf`
+#'   geometry when reading `.parquet`: `"wk"` (default) or `"sf"`. `NULL` uses
+#'   the `gdpins.wkt_engine` option. Reads are engine-agnostic. See
+#'   [gdpins_parquet_to_sf()].
 #'
 #' @return The deserialised R object.
 #' @export
-gdpins_raw_get <- function(conn, name, force_refresh = FALSE) {
+gdpins_raw_get <- function(conn, name, force_refresh = FALSE, wkt_engine = NULL) {
   local_file <- .local_full_path(conn, name)
 
   if (isTRUE(force_refresh) && !is.null(conn$adapter)) {
@@ -704,7 +711,7 @@ gdpins_raw_get <- function(conn, name, force_refresh = FALSE) {
     ))
   }
 
-  .raw_read_local(local_file)
+  .raw_read_local(local_file, wkt_engine = wkt_engine)
 }
 
 # ── gdpins_raw_ls ─────────────────────────────────────────────────────────────

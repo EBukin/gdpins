@@ -4,7 +4,7 @@
 \alias{gdpins_raw_get}
 \title{Read a file from a raw connection}
 \usage{
-gdpins_raw_get(conn, name, force_refresh = FALSE)
+gdpins_raw_get(conn, name, force_refresh = FALSE, wkt_engine = NULL)
 }
 \arguments{
 \item{conn}{A \code{gdpins_raw_conn} object.}
@@ -13,6 +13,11 @@ gdpins_raw_get(conn, name, force_refresh = FALSE)
 
 \item{force_refresh}{Logical. \code{TRUE} re-pulls from Drive before reading.
 Default \code{FALSE}.}
+
+\item{wkt_engine}{Character scalar or \code{NULL}. WKT engine used to decode \code{sf}
+geometry when reading \code{.parquet}: \code{"wk"} (default) or \code{"sf"}. \code{NULL} uses
+the \code{gdpins.wkt_engine} option. Reads are engine-agnostic. See
+\code{\link[=gdpins_parquet_to_sf]{gdpins_parquet_to_sf()}}.}
 }
 \value{
 The deserialised R object.

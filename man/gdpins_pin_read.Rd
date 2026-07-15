@@ -4,7 +4,7 @@
 \alias{gdpins_pin_read}
 \title{Read a pin from a gdpins board}
 \usage{
-gdpins_pin_read(board, name, version = NULL)
+gdpins_pin_read(board, name, version = NULL, wkt_engine = NULL)
 }
 \arguments{
 \item{board}{A \code{gdpins_board} object.}
@@ -12,6 +12,11 @@ gdpins_pin_read(board, name, version = NULL)
 \item{name}{Character scalar. Pin name.}
 
 \item{version}{Character scalar or \code{NULL}. Pin version; \code{NULL} = latest.}
+
+\item{wkt_engine}{Character scalar or \code{NULL}. WKT engine used to decode \code{sf}
+geometry: \code{"wk"} (default) or \code{"sf"}. \code{NULL} uses the \code{gdpins.wkt_engine}
+option. Reads are engine-agnostic; this only affects parse speed. See
+\code{\link[=gdpins_parquet_to_sf]{gdpins_parquet_to_sf()}}.}
 }
 \value{
 The pinned R object.

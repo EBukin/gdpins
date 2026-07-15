@@ -7,3 +7,27 @@
 Functions for converting between R objects and storage formats, with special
 handling for \code{sf} geospatial objects using a WKT + column-name CRS encoding.
 }
+\section{WKT engine}{
+
+The geometry <-> WKT text conversion can be performed by one of two engines,
+selected with the \code{engine} argument (or, package-wide, the
+\code{gdpins.wkt_engine} option):
+\itemize{
+\item \code{"wk"} (default) — uses \code{\link[wk:wkt]{wk::as_wkt()}} to write and routes reads through
+\code{\link[wk:wkt]{wk::wkt()}} into \code{\link[sf:st_as_sfc]{sf::st_as_sfc()}}. About 20x faster to write than \code{"sf"}
+and always full-precision.
+\item \code{"sf"} — uses \code{\link[sf:st_as_text]{sf::st_as_text()}} (with \code{digits = 15}, so it is
+full-precision) to write and \code{\link[sf:st_as_sfc]{sf::st_as_sfc()}} to read. Kept as a fallback
+so encoding never depends on a single engine.
+}
+
+Both engines are read-compatible: WKT written by one reads back correctly with
+the other. The default can be changed globally with
+\code{options(gdpins.wkt_engine = "sf")}.
+
+Note: \code{sf::st_as_text()} defaults to \code{getOption("digits")} (7 significant
+figures), which silently rounds projected coordinates (e.g. UTM metres) by up
+to ~0.5 m. gdpins always pins \code{digits = 15} for the \code{"sf"} engine to avoid
+this; the \code{"wk"} engine is full-precision by construction.
+}
+

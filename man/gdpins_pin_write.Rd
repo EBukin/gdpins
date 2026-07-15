@@ -4,7 +4,14 @@
 \alias{gdpins_pin_write}
 \title{Write a pin to a gdpins board}
 \usage{
-gdpins_pin_write(board, x, name, version = NULL, format = NULL)
+gdpins_pin_write(
+  board,
+  x,
+  name,
+  version = NULL,
+  format = NULL,
+  wkt_engine = NULL
+)
 }
 \arguments{
 \item{board}{A \code{gdpins_board} object.}
@@ -18,6 +25,10 @@ board default.}
 
 \item{format}{Character scalar or \code{NULL}. One of \code{"parquet"} or \code{"rds"};
 \code{NULL} auto-detects via \code{\link[=gdpins_detect_format]{gdpins_detect_format()}}.}
+
+\item{wkt_engine}{Character scalar or \code{NULL}. WKT engine used to encode \code{sf}
+geometry: \code{"wk"} (default, fast, full precision) or \code{"sf"} (fallback).
+\code{NULL} uses the \code{gdpins.wkt_engine} option. See \code{\link[=gdpins_sf_to_parquet]{gdpins_sf_to_parquet()}}.}
 }
 \value{
 Invisibly \code{NULL}. Called for its side effect.

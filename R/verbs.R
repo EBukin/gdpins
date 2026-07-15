@@ -67,6 +67,9 @@ NULL
 #'   board default.
 #' @param format Character scalar or `NULL`. One of `"parquet"` or `"rds"`;
 #'   `NULL` auto-detects via [gdpins_detect_format()].
+#' @param wkt_engine Character scalar or `NULL`. WKT engine used to encode `sf`
+#'   geometry: `"wk"` (default, fast, full precision) or `"sf"` (fallback).
+#'   `NULL` uses the `gdpins.wkt_engine` option. See [gdpins_sf_to_parquet()].
 #'
 #' @return Invisibly `NULL`. Called for its side effect.
 #' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_read()],
@@ -95,7 +98,8 @@ NULL
 #' gdpins_pin_write(board, mtcars, "cars")
 #' }
 #' @export
-gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL) {
+gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
+                             wkt_engine = NULL) {
   if (!inherits(board, "gdpins_board")) {
     cli::cli_abort(c(
       "{.arg board} must be a {.cls gdpins_board}.",
@@ -135,7 +139,7 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL) {
 
   # sf pre-processing: encode geometry before writing as parquet
   x_to_write <- if (inherits(x, "sf") || .is_sf_like(x)) {
-    gdpins_sf_to_parquet(x)
+    gdpins_sf_to_parquet(x, engine = wkt_engine)
   } else {
     x
   }
@@ -175,6 +179,10 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL) {
 #' @param board A `gdpins_board` object.
 #' @param name Character scalar. Pin name.
 #' @param version Character scalar or `NULL`. Pin version; `NULL` = latest.
+#' @param wkt_engine Character scalar or `NULL`. WKT engine used to decode `sf`
+#'   geometry: `"wk"` (default) or `"sf"`. `NULL` uses the `gdpins.wkt_engine`
+#'   option. Reads are engine-agnostic; this only affects parse speed. See
+#'   [gdpins_parquet_to_sf()].
 #'
 #' @return The pinned R object.
 #' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_write()],
@@ -203,7 +211,7 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL) {
 #' gdpins_pin_read(board, "cars")
 #' }
 #' @export
-gdpins_pin_read <- function(board, name, version = NULL) {
+gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
   if (!inherits(board, "gdpins_board")) {
     cli::cli_abort(c(
       "{.arg board} must be a {.cls gdpins_board}.",
@@ -292,7 +300,7 @@ gdpins_pin_read <- function(board, name, version = NULL) {
     # Auto-decode sf: if any column matches the __epsg__ pattern, restore sf
     has_geo_cols <- any(grepl("^.*__\\d{4,5}__$", names(result)))
     if (has_geo_cols) {
-      result <- gdpins_parquet_to_sf(result)
+      result <- gdpins_parquet_to_sf(result, engine = wkt_engine)
     }
   }
 

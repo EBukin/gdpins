@@ -86,6 +86,58 @@ fx_sf_non4326 <- function() {
   )
 }
 
+#' Projected-CRS polygon sf fixture (EPSG:32643, UTM 43N, metres)
+#'
+#' Coordinates carry sub-metre fractional parts on purpose: sf::st_as_text()
+#' at its default 7 significant digits rounds these away, so this fixture
+#' exercises the WKT-engine precision path.
+#' @keywords internal
+fx_sf_poly_utm <- function() {
+  ring1 <- cbind(
+    c(200000.123456, 200500.987654, 200500.111111, 200000.123456),
+    c(1000000.654321, 1000000.222222, 1000500.999999, 1000000.654321)
+  )
+  ring2 <- cbind(
+    c(300000.500001, 300500.250002, 300250.750003, 300000.500001),
+    c(1200000.100004, 1200000.900005, 1200500.500006, 1200000.100004)
+  )
+  sf::st_sf(
+    id       = 1:2,
+    label    = c("parcel_a", "parcel_b"),
+    geometry = sf::st_sfc(
+      sf::st_polygon(list(ring1)),
+      sf::st_polygon(list(ring2)),
+      crs = 32643
+    )
+  )
+}
+
+#' Projected-CRS multipolygon sf fixture (EPSG:32643)
+#' @keywords internal
+fx_sf_multipoly_utm <- function() {
+  p1a <- cbind(
+    c(210000.123, 210300.456, 210300.789, 210000.123),
+    c(1010000.321, 1010000.654, 1010300.987, 1010000.321)
+  )
+  p1b <- cbind(
+    c(212000.111, 212300.222, 212300.333, 212000.111),
+    c(1010000.444, 1010000.555, 1010300.666, 1010000.444)
+  )
+  p2a <- cbind(
+    c(310000.777, 310300.888, 310300.999, 310000.777),
+    c(1210000.101, 1210000.202, 1210300.303, 1210000.101)
+  )
+  sf::st_sf(
+    id       = 1:2,
+    label    = c("estate_a", "estate_b"),
+    geometry = sf::st_sfc(
+      sf::st_multipolygon(list(list(p1a), list(p1b))),
+      sf::st_multipolygon(list(list(p2a))),
+      crs = 32643
+    )
+  )
+}
+
 #' GeoJSON file fixture — writes to tempfile, returns path
 #' @keywords internal
 fx_geojson_path <- function() {
