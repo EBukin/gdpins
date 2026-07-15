@@ -188,6 +188,16 @@ gdpins_sf_to_parquet(sf_obj)   # df with WKT geometry columns
 gdpins_parquet_to_sf(df)       # sf with original CRS restored
 ```
 
+To keep geometry as raw WKT text on read (no `sf` restoration), pass
+`wkt_engine = "none"`. `gdpins_as_sf()` converts such a data frame back to `sf`,
+autodetecting the geometry column and inferring the CRS from its name:
+
+```r
+txt <- gdpins_pin_read(board, "parcels", wkt_engine = "none")  # WKT text cols
+gdpins_as_sf(txt)                    # autodetect column + EPSG -> sf
+gdpins_as_sf(df, column = "geom", epsg = 4326)  # be explicit when unsure
+```
+
 ### WKT engine
 
 The geometry ↔ WKT conversion uses one of two interchangeable engines, chosen

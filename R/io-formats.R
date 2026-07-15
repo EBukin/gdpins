@@ -81,6 +81,33 @@ NULL
   }
 }
 
+# Detect candidate WKT geometry columns by name + type. A candidate is a
+# character column whose name looks geometric: the standard __<epsg>__ suffix,
+# or containing "geom"/"wkt" (case-insensitive). The character-type filter keeps
+# non-geometry columns like an integer `geom_id` out of the running.
+.gdpins_wkt_columns <- function(x) {
+  nm     <- names(x)
+  is_chr <- vapply(x, is.character, logical(1))
+  looks  <- grepl("__\\d{4,5}__$|geom|wkt", nm, ignore.case = TRUE)
+  nm[is_chr & looks]
+}
+
+# Infer an EPSG code from a column name. Returns list(epsg, source) where
+# source is "standard" (the __<epsg>__ pattern, trust it silently),
+# "nonstandard" (some digit run present, e.g. geom_1111 — usable but worth a
+# heads-up), or "default" (no digits — fall back to default_epsg).
+.gdpins_epsg_from_name <- function(col, default_epsg) {
+  std <- regmatches(col, regexpr("(?<=__)\\d{4,5}(?=__$)", col, perl = TRUE))
+  if (length(std) == 1L && nzchar(std)) {
+    return(list(epsg = as.integer(std), source = "standard"))
+  }
+  digits <- regmatches(col, regexpr("\\d+", col))
+  if (length(digits) == 1L && nzchar(digits)) {
+    return(list(epsg = as.integer(digits), source = "nonstandard"))
+  }
+  list(epsg = as.integer(default_epsg), source = "default")
+}
+
 #' Convert an sf object to a plain tibble suitable for parquet storage
 #'
 #' Converts all `sfc` geometry columns to WKT text and encodes the per-column
@@ -155,6 +182,8 @@ gdpins_sf_to_parquet <- function(x, engine = NULL) {
 #'
 #' @return An `sf` object. Column names are restored to their original form
 #'   (suffix stripped). CRS is set from the EPSG code embedded in the name.
+#' @seealso [gdpins_as_sf()] for a single-column decoder that autodetects the
+#'   geometry column and infers the CRS from messier column names.
 #' @examples
 #' library(sf)
 #' pts <- st_sf(
@@ -208,6 +237,169 @@ gdpins_parquet_to_sf <- function(x, engine = NULL) {
   }
 
   # Promote to sf using first restored sfc column as active geometry
+  sf::st_sf(result)
+}
+
+#' Convert a data frame with a WKT text column to an sf object (autodetecting)
+#'
+#' A friendly, single-column decoder for data whose geometry lives in a WKT
+#' character column. Unlike [gdpins_parquet_to_sf()] — which strictly decodes
+#' every `"<name>__<epsg>__"` column and reads the CRS from the name — this
+#' function autodetects the geometry column and infers the CRS, so it also
+#' handles hand-made or externally-produced columns (`geom`, `geom_1111`, ...)
+#' whose name does not carry a clean EPSG code.
+#'
+#' **Column detection.** When `column` is `NULL`, character columns whose name
+#' matches the standard `__<epsg>__` suffix or contains `"geom"`/`"wkt"` are
+#' candidates. Exactly one candidate is used automatically. If none is found,
+#' `x` is returned unchanged with a warning (so plain, non-spatial data passes
+#' through safely). If several match, an error asks you to pass `column`. An
+#' explicitly supplied `column` that is absent is always an error.
+#'
+#' **CRS inference.** When `epsg` is `NULL`, the EPSG code is taken from the
+#' column name: the standard `__<epsg>__` pattern is trusted silently; a
+#' non-standard digit run (e.g. `geom_1111`) is used but emits a message; a name
+#' with no digits falls back to `default_epsg` with a warning. In the latter two
+#' cases you are firmly encouraged to pass `epsg` explicitly. An explicit `epsg`
+#' argument always wins and silences inference.
+#'
+#' No coordinate transformation is performed; the EPSG code only labels the CRS.
+#'
+#' @param x A data frame with a WKT geometry column.
+#' @param column Character scalar or `NULL`. Name of the WKT column. `NULL`
+#'   autodetects (see Details).
+#' @param epsg Integer scalar or `NULL`. EPSG code for the geometry CRS. `NULL`
+#'   infers it from `column`'s name (see Details).
+#' @param engine Character scalar, the WKT engine: `"wk"` (default) or `"sf"`.
+#'   `NULL` uses the `gdpins.wkt_engine` option. See the [io-formats] "WKT
+#'   engine" section.
+#' @param default_epsg Integer scalar. CRS assumed when `epsg` is `NULL` and the
+#'   column name carries no digits. Default `4326` (WGS 84).
+#'
+#' @return An `sf` object, or — when autodetection finds no geometry column —
+#'   the input `x` unchanged (with a warning). A standard `__<epsg>__` suffix is
+#'   stripped from the converted column name; other names are kept as-is.
+#' @seealso [gdpins_parquet_to_sf()] for strict multi-geometry decoding,
+#'   [gdpins_sf_to_parquet()] for the inverse, and [gdpins_pin_read()] whose
+#'   `wkt_engine = "none"` returns WKT text ready for this function.
+#' @examples
+#' library(sf)
+#' pts <- st_sf(
+#'   id = 1:2,
+#'   geometry = st_sfc(st_point(c(71, 51)), st_point(c(76, 43)), crs = 4326)
+#' )
+#' encoded <- gdpins_sf_to_parquet(pts)   # a "geometry__4326__" WKT column
+#' gdpins_as_sf(encoded)                  # autodetect column + EPSG, silent
+#'
+#' # Non-standard name: EPSG inferred from the digits (with a message)
+#' df <- data.frame(geom_3857 = "POINT (0 0)")
+#' gdpins_as_sf(df)
+#'
+#' # No CRS in the name: pass epsg explicitly to avoid the default + warning
+#' df2 <- data.frame(geom = "POINT (0 0)")
+#' gdpins_as_sf(df2, epsg = 4326)
+#' @export
+gdpins_as_sf <- function(x,
+                         column       = NULL,
+                         epsg         = NULL,
+                         engine       = NULL,
+                         default_epsg = 4326L) {
+  if (!is.data.frame(x)) {
+    cli::cli_abort("{.arg x} must be a data frame.")
+  }
+  engine <- .gdpins_wkt_engine(engine)
+
+  # 1. Resolve the geometry column
+  if (is.null(column)) {
+    candidates <- .gdpins_wkt_columns(x)
+    if (length(candidates) == 0L) {
+      # Nothing to convert: don't break — the caller asked for a conversion, so
+      # warn, but hand the data back untouched (plain, non-spatial data passes
+      # through). An explicitly named `column` that is absent is still an error.
+      cli::cli_warn(c(
+        "!" = "No WKT geometry column detected in {.arg x}; returning it unchanged.",
+        "i" = "Expected a character column named like {.val geom__4326__}, {.val geom}, or {.val wkt}.",
+        "i" = "Pass {.arg column} to name the geometry column explicitly."
+      ))
+      return(x)
+    }
+    if (length(candidates) > 1L) {
+      cli::cli_abort(c(
+        "Multiple candidate geometry columns detected: {.val {candidates}}.",
+        i = "Pass {.arg column} to choose which one to convert."
+      ))
+    }
+    column <- candidates
+  } else {
+    if (!is.character(column) || length(column) != 1L || !nzchar(column)) {
+      cli::cli_abort("{.arg column} must be a non-empty character scalar.")
+    }
+    if (!column %in% names(x)) {
+      cli::cli_abort(c(
+        "Column {.val {column}} not found in {.arg x}.",
+        i = "Available columns: {.val {names(x)}}."
+      ))
+    }
+  }
+
+  # Already an sfc column: nothing to parse, just promote.
+  if (inherits(x[[column]], "sfc")) {
+    return(sf::st_sf(x))
+  }
+  if (!is.character(x[[column]])) {
+    cli::cli_abort(c(
+      "Geometry column {.val {column}} must be character WKT.",
+      x = "Got {.cls {class(x[[column]])}}."
+    ))
+  }
+
+  # 2. Resolve the EPSG code
+  if (is.null(epsg)) {
+    det  <- .gdpins_epsg_from_name(column, default_epsg)
+    epsg <- det$epsg
+    if (identical(det$source, "nonstandard")) {
+      cli::cli_inform(c(
+        "i" = "Inferred EPSG {.val {epsg}} from non-standard column name {.val {column}}.",
+        "i" = "Pass {.arg epsg} explicitly if this is not the intended CRS."
+      ))
+    } else if (identical(det$source, "default")) {
+      cli::cli_warn(c(
+        "!" = "Could not infer a CRS from column name {.val {column}}; assuming EPSG {.val {epsg}}.",
+        "i" = "Pass {.arg epsg} explicitly to set the correct CRS."
+      ))
+    }
+  } else {
+    epsg_int <- suppressWarnings(as.integer(epsg))
+    if (length(epsg) != 1L || is.na(epsg_int)) {
+      cli::cli_abort("{.arg epsg} must be a single EPSG integer.")
+    }
+    epsg <- epsg_int
+  }
+
+  # 3. Parse WKT -> sfc (guard: a non-WKT column is a hard error here)
+  sfc <- tryCatch(
+    .gdpins_wkt_to_sfc(x[[column]], epsg, engine),
+    error = function(e) {
+      cli::cli_abort(c(
+        "Column {.val {column}} does not contain valid WKT.",
+        x = conditionMessage(e)
+      ))
+    },
+    warning = function(w) {
+      cli::cli_abort(c(
+        "Column {.val {column}} does not contain valid WKT.",
+        x = conditionMessage(w)
+      ))
+    }
+  )
+
+  # 4. Replace column, strip a standard suffix, promote to sf
+  result           <- x
+  result[[column]] <- sfc
+  base_name        <- sub("__\\d{4,5}__$", "", column)
+  if (!identical(base_name, column)) {
+    names(result)[names(result) == column] <- base_name
+  }
   sf::st_sf(result)
 }
 

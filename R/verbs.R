@@ -179,10 +179,13 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
 #' @param board A `gdpins_board` object.
 #' @param name Character scalar. Pin name.
 #' @param version Character scalar or `NULL`. Pin version; `NULL` = latest.
-#' @param wkt_engine Character scalar or `NULL`. WKT engine used to decode `sf`
-#'   geometry: `"wk"` (default) or `"sf"`. `NULL` uses the `gdpins.wkt_engine`
-#'   option. Reads are engine-agnostic; this only affects parse speed. See
-#'   [gdpins_parquet_to_sf()].
+#' @param wkt_engine Character scalar or `NULL`. Controls how WKT-encoded `sf`
+#'   geometry is restored: `"wk"` (default) or `"sf"` decode to an `sf` object
+#'   (reads are engine-agnostic; the choice only affects parse speed), while
+#'   `"none"` skips restoration and returns the geometry columns as raw WKT text
+#'   (names keep their `__<epsg>__` suffix, so the result can be fed to
+#'   [gdpins_as_sf()] later). `NULL` uses the `gdpins.wkt_engine` option (never
+#'   `"none"`). See [gdpins_parquet_to_sf()].
 #'
 #' @return The pinned R object.
 #' @seealso [gdpins_real_drive()], [gdpins_init_board()], [gdpins_pin_write()],
@@ -220,6 +223,14 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
   }
   if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
     cli::cli_abort("{.arg name} must be a non-empty character scalar.")
+  }
+  if (!is.null(wkt_engine) &&
+      !(is.character(wkt_engine) && length(wkt_engine) == 1L &&
+        wkt_engine %in% c("wk", "sf", "none"))) {
+    cli::cli_abort(c(
+      "Invalid {.arg wkt_engine}: {.val {wkt_engine}}.",
+      i = "Must be one of {.val wk}, {.val sf}, {.val none}, or {.code NULL}."
+    ))
   }
 
   # Local-first read order: local → cache → drive
@@ -297,9 +308,10 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
       result <- tibble::as_tibble(result)
     }
 
-    # Auto-decode sf: if any column matches the __epsg__ pattern, restore sf
+    # Auto-decode sf: if any column matches the __epsg__ pattern, restore sf.
+    # wkt_engine = "none" opts out: geometry stays as raw WKT text columns.
     has_geo_cols <- any(grepl("^.*__\\d{4,5}__$", names(result)))
-    if (has_geo_cols) {
+    if (has_geo_cols && !identical(wkt_engine, "none")) {
       result <- gdpins_parquet_to_sf(result, engine = wkt_engine)
     }
   }

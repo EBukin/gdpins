@@ -34,3 +34,7 @@ encoded <- gdpins_sf_to_parquet(pts)
 gdpins_parquet_to_sf(encoded)                 # default "wk" engine
 gdpins_parquet_to_sf(encoded, engine = "sf")  # sf fallback
 }
+\seealso{
+\code{\link[=gdpins_as_sf]{gdpins_as_sf()}} for a single-column decoder that autodetects the
+geometry column and infers the CRS from messier column names.
+}

@@ -5,3 +5,5 @@
 ^docs$
 ^\.github$
 ^pkgdown$
+^AGENTS\.md$
+^CLAUDE\.md$
