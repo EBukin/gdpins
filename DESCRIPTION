@@ -1,6 +1,6 @@
 Package: gdpins
 Title: Google Drive + pins Data Management for R Projects
-Version: 0.0.0.9005
+Version: 0.0.1.0
 Authors@R:
     person("Eduard", "Bukin", email = "ebukin@worldbank.org",
            role = c("aut", "cre"))
@@ -21,6 +21,7 @@ Imports:
     arrow,
     nanoparquet,
     sf,
+    wk,
     dplyr,
     readr,
     tibble,
@@ -36,7 +37,9 @@ Suggests:
     ggplot2,
     withr,
     knitr,
-    rmarkdown
+    rmarkdown,
+    lwgeom,
+    microbenchmark
 VignetteBuilder: knitr
 Config/roxygen2/version: 8.0.0
 RoxygenNote: 7.3.3

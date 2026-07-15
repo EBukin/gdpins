@@ -4,7 +4,7 @@
 \alias{gdpins_raw_put_object}
 \title{Write an R object to a raw connection}
 \usage{
-gdpins_raw_put_object(conn, x, name)
+gdpins_raw_put_object(conn, x, name, wkt_engine = NULL)
 }
 \arguments{
 \item{conn}{A \code{gdpins_raw_conn} object.}
@@ -13,6 +13,10 @@ gdpins_raw_put_object(conn, x, name)
 
 \item{name}{Character scalar. Relative path within the raw-root, including
 extension (e.g. \code{"worldbank-api/gdp_2024.parquet"}).}
+
+\item{wkt_engine}{Character scalar or \code{NULL}. WKT engine used to encode \code{sf}
+geometry when writing \code{.parquet}: \code{"wk"} (default) or \code{"sf"}. \code{NULL} uses
+the \code{gdpins.wkt_engine} option. See \code{\link[=gdpins_sf_to_parquet]{gdpins_sf_to_parquet()}}.}
 }
 \value{
 Invisibly \code{NULL}.

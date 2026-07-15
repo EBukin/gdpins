@@ -4,10 +4,15 @@
 \alias{gdpins_parquet_to_sf}
 \title{Restore an sf object from a parquet-encoded tibble}
 \usage{
-gdpins_parquet_to_sf(x)
+gdpins_parquet_to_sf(x, engine = NULL)
 }
 \arguments{
 \item{x}{A \code{\link[tibble:tibble]{tibble::tibble()}} previously produced by \code{\link[=gdpins_sf_to_parquet]{gdpins_sf_to_parquet()}}.}
+
+\item{engine}{Character scalar, the WKT engine: \code{"wk"} (default) or \code{"sf"}.
+\code{NULL} uses the \code{gdpins.wkt_engine} option (default \code{"wk"}). Reads are
+engine-agnostic — WKT written by either engine parses with either — so this
+only affects parsing speed. See the \link{io-formats} "WKT engine" section.}
 }
 \value{
 An \code{sf} object. Column names are restored to their original form
@@ -18,4 +23,14 @@ Inverse of \code{\link[=gdpins_sf_to_parquet]{gdpins_sf_to_parquet()}}. Detects 
 pattern \verb{^.*__\\\\d\{4,5\}__$} and attempts to parse them as WKT geometry. Only
 columns where the WKT actually parses are converted; others are left as plain
 strings (column name is NOT changed).
+}
+\examples{
+library(sf)
+pts <- st_sf(
+  id = 1:2,
+  geometry = st_sfc(st_point(c(71, 51)), st_point(c(76, 43)), crs = 4326)
+)
+encoded <- gdpins_sf_to_parquet(pts)
+gdpins_parquet_to_sf(encoded)                 # default "wk" engine
+gdpins_parquet_to_sf(encoded, engine = "sf")  # sf fallback
 }

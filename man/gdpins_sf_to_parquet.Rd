@@ -4,10 +4,14 @@
 \alias{gdpins_sf_to_parquet}
 \title{Convert an sf object to a plain tibble suitable for parquet storage}
 \usage{
-gdpins_sf_to_parquet(x)
+gdpins_sf_to_parquet(x, engine = NULL)
 }
 \arguments{
 \item{x}{An \code{sf} data frame with one or more geometry columns.}
+
+\item{engine}{Character scalar, the WKT engine: \code{"wk"} (default) or \code{"sf"}.
+\code{NULL} uses the \code{gdpins.wkt_engine} option (default \code{"wk"}). See the
+\link{io-formats} "WKT engine" section.}
 }
 \value{
 A \code{\link[tibble:tibble]{tibble::tibble()}} with geometry columns replaced by WKT character
@@ -20,6 +24,16 @@ CRS (EPSG integer) into the column name using the pattern
 tibble with no \code{sf} class.
 }
 \details{
-No coordinate transformation is performed. Each geometry is converted via
-\code{\link[sf:st_as_text]{sf::st_as_text()}} (WKT, never WKB). Per-column CRS is supported.
+No coordinate transformation is performed. Each geometry is converted to WKT
+text (never WKB) by the selected \code{engine} (see \link{io-formats}). Per-column CRS
+is supported.
+}
+\examples{
+library(sf)
+pts <- st_sf(
+  id = 1:2,
+  geometry = st_sfc(st_point(c(71, 51)), st_point(c(76, 43)), crs = 4326)
+)
+gdpins_sf_to_parquet(pts)                 # default "wk" engine
+gdpins_sf_to_parquet(pts, engine = "sf")  # sf fallback (full precision)
 }
