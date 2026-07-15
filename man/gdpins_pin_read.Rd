@@ -13,10 +13,13 @@ gdpins_pin_read(board, name, version = NULL, wkt_engine = NULL)
 
 \item{version}{Character scalar or \code{NULL}. Pin version; \code{NULL} = latest.}
 
-\item{wkt_engine}{Character scalar or \code{NULL}. WKT engine used to decode \code{sf}
-geometry: \code{"wk"} (default) or \code{"sf"}. \code{NULL} uses the \code{gdpins.wkt_engine}
-option. Reads are engine-agnostic; this only affects parse speed. See
-\code{\link[=gdpins_parquet_to_sf]{gdpins_parquet_to_sf()}}.}
+\item{wkt_engine}{Character scalar or \code{NULL}. Controls how WKT-encoded \code{sf}
+geometry is restored: \code{"wk"} (default) or \code{"sf"} decode to an \code{sf} object
+(reads are engine-agnostic; the choice only affects parse speed), while
+\code{"none"} skips restoration and returns the geometry columns as raw WKT text
+(names keep their \verb{__<epsg>__} suffix, so the result can be fed to
+\code{\link[=gdpins_as_sf]{gdpins_as_sf()}} later). \code{NULL} uses the \code{gdpins.wkt_engine} option (never
+\code{"none"}). See \code{\link[=gdpins_parquet_to_sf]{gdpins_parquet_to_sf()}}.}
 }
 \value{
 The pinned R object.

@@ -229,6 +229,32 @@ restored <- gdpins_parquet_to_sf(encoded)      # sf with CRS restored
 > **Limitation:** geometry columns must have an EPSG integer CRS. Custom
 > proj-string-only CRS will error. Set a CRS first with `sf::st_set_crs()`.
 
+### Keeping geometry as WKT text (`wkt_engine = "none"`)
+
+Sometimes you want the geometry back as raw WKT text — to inspect it, hand it to
+another tool, or skip the cost of building an `sf` object. Pass
+`wkt_engine = "none"` to `gdpins_pin_read()`: the geometry columns come back as
+character vectors, their names still carrying the `__<epsg>__` suffix.
+
+`gdpins_as_sf()` converts such a data frame back to `sf`. It autodetects the
+geometry column (a character column named like `geom__4326__`, `geom`, or
+`wkt`) and infers the CRS from the name — trusting the standard `__<epsg>__`
+pattern silently, using a non-standard digit run (`geom_1111`) with a message,
+and falling back to `default_epsg` with a warning when the name has no digits.
+Pass `epsg` (and `column`, if several candidates match) to be explicit.
+
+```{r sf-none}
+txt <- gdpins_pin_read(bd_raw, "parcels", wkt_engine = "none")
+class(txt)                # a plain tibble; geometry is WKT text
+
+parcels_again <- gdpins_as_sf(txt)           # autodetect column + EPSG
+sf::st_crs(parcels_again)$epsg
+
+# Firmly set the CRS when the column name does not encode it
+df <- data.frame(geom = "POINT (0 0)")
+gdpins_as_sf(df, epsg = 4326)
+```
+
 ### Choosing the WKT engine
 
 The geometry ↔ WKT conversion is done by one of two interchangeable engines:

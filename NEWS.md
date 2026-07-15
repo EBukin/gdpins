@@ -1,3 +1,24 @@
+# gdpins 0.0.1.9010
+
+## New features
+
+* **Keep geometry as raw WKT text on read.** `gdpins_pin_read()` now accepts
+  `wkt_engine = "none"`, which skips `sf` restoration and returns the geometry
+  columns as WKT character vectors (names keep their `__<epsg>__` suffix). The
+  `"none"` value is read-only — it is not a valid `gdpins.wkt_engine` option and
+  never applies to writes.
+* **`gdpins_as_sf()`** — a user-facing, autodetecting WKT → `sf` converter.
+  - Autodetects the geometry column (character column named like `geom__4326__`,
+    `geom`, or `wkt`). Returns the input unchanged with a warning when none is
+    found (plain, non-spatial data passes through); errors asking for `column`
+    only when several candidates match.
+  - Infers the CRS from the column name: the standard `__<epsg>__` pattern is
+    trusted silently, a non-standard digit run (e.g. `geom_1111`) is used with a
+    message, and a name with no digits falls back to `default_epsg` (4326) with a
+    warning. Pass `epsg` explicitly to silence inference.
+  - Uses the same swappable WKT engine (`"wk"` default / `"sf"`) as the rest of
+    the package. Pairs with `gdpins_pin_read(wkt_engine = "none")`.
+
 # gdpins 0.0.1.0
 
 ## New features

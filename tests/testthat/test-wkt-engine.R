@@ -183,3 +183,40 @@ test_that("raw put_object/get round-trip sf parquet via wkt_engine", {
     expect_lt(we_max_dev(got, x), 1e-6)
   }
 })
+
+# ── wkt_engine = "none": pin_read returns raw WKT text, no sf restoration ──────
+
+test_that("pin_read(wkt_engine = 'none') returns WKT text, not sf", {
+  x     <- fx_sf_poly_utm()
+  board <- new_fake_board("local_only")
+  gdpins_pin_write(board, x, "parcels")
+
+  got <- gdpins_pin_read(board, "parcels", wkt_engine = "none")
+  expect_false(inherits(got, "sf"))
+  expect_s3_class(got, "data.frame")
+
+  geo_col <- grep("__\\d{4,5}__$", names(got), value = TRUE)
+  expect_length(geo_col, 1L)                # name keeps its __epsg__ suffix
+  expect_type(got[[geo_col]], "character")  # geometry left as WKT text
+})
+
+test_that("pin_read(none) output feeds gdpins_as_sf() back to sf", {
+  x     <- fx_sf_poly_utm()
+  board <- new_fake_board("local_only")
+  gdpins_pin_write(board, x, "parcels")
+
+  txt <- gdpins_pin_read(board, "parcels", wkt_engine = "none")
+  got <- gdpins_as_sf(txt)                  # standard suffix -> silent
+  expect_s3_class(got, "sf")
+  expect_lt(we_max_dev(got, x), 1e-6)
+  expect_equal(sf::st_crs(got), sf::st_crs(x))
+})
+
+test_that("pin_read rejects an invalid wkt_engine", {
+  board <- new_fake_board("local_only")
+  gdpins_pin_write(board, fx_plain_tbl(), "plain")
+  expect_error(
+    gdpins_pin_read(board, "plain", wkt_engine = "bogus"),
+    "Invalid.*wkt_engine|wkt_engine"
+  )
+})
