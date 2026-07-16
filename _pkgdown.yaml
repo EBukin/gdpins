@@ -22,6 +22,8 @@ reference:
     Initialise a pins board backed by Google Drive and manage credentials.
   contents:
   - gdpins_init_board
+  - gdpins_board_connect
+  - gdpins_board_is_connected
   - gdpins_ensure_drive_auth
   - gdpins_is_online
   - gdpins_board_status
@@ -68,18 +70,21 @@ reference:
   contents:
   - gdpins_sf_to_parquet
   - gdpins_parquet_to_sf
+  - gdpins_as_sf
 - title: Package docs & methods
   desc: |
     Package-level topics, S3 methods, and conceptual helper pages.
   contents:
   - auth
   - board
+  - board-extract
   - discovery
   - format.gdpins_board
   - gdpins_drive_url
   - gdpins_fake_drive
   - gdpins_real_drive
   - io-formats
+  - lazy-boards
   - output
   - print.gdpins_board
   - print.gdpins_pin_info

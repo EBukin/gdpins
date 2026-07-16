@@ -7,3 +7,5 @@
 ^pkgdown$
 ^AGENTS\.md$
 ^CLAUDE\.md$
+^tools$
+^\.githooks$
