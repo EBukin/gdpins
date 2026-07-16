@@ -1,3 +1,16 @@
+# gdpins 0.0.1.9022
+
+## Bug fixes
+
+* **Fixed pin type drift when copying pins between boards.** `gdpins_sync()`
+  and `on_discrepancy = "sync_from_drive"`/`"sync_to_drive"` copy pins via an
+  internal helper that used to write with `pins`' default type (`"rds"`)
+  regardless of how the source pin was stored. A parquet pin synced between
+  boards silently became an rds pin — on either side, including Drive itself
+  for `to_drive` syncs — and lost the tibble-normalisation that
+  `gdpins_pin_read()` applies to parquet reads. The copy now preserves the
+  source pin's `pins::pin_meta()` type.
+
 # gdpins 0.0.1.9021
 
 ## New features

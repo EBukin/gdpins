@@ -8,25 +8,6 @@
 # that this same work still happens on connect, is test-lazy.R's job.
 withr::local_options(gdpins.lazy_boards = FALSE)
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-# Mock gdpins_board_status to return a "no discrepancy" status silently
-mock_status_ok <- function() {
-  tibble::tibble(
-    name = character(0),
-    status = character(0),
-    detail = character(0)
-  )
-}
-
-mock_status_discrepancy <- function() {
-  tibble::tibble(
-    name = "some_pin",
-    status = "local_ahead",
-    detail = "local has newer version"
-  )
-}
-
 # ── 1. Config: local_only ─────────────────────────────────────────────────────
 
 test_that("local_only board builds with correct components", {

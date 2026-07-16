@@ -250,6 +250,10 @@ test_that("gdpins_board_connect is a no-op on an eager board", {
 })
 
 test_that("the init on_discrepancy runs at connect time", {
+  testthat::local_mocked_bindings(
+    gdpins_board_status = function(x) mock_status_discrepancy(),
+    .package = "gdpins"
+  )
   fx <- new_lazy_board(name = "warner", on_discrepancy = "warn")
   expect_warning(gdpins_board_connect(fx$board), "sync discrepancy")
 })

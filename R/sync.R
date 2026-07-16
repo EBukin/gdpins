@@ -699,7 +699,12 @@ gdpins_sync.default <- function(
     }
   )
   if (!is.null(obj)) {
-    suppressMessages(pins::pin_write(dst_board, obj, pin_name))
+    pin_type <- tryCatch(
+      pins::pin_meta(src_board, pin_name)$type,
+      error = function(e) NULL
+    )
+    if (is.null(pin_type) || is.na(pin_type)) pin_type <- NULL
+    suppressMessages(pins::pin_write(dst_board, obj, pin_name, type = pin_type))
   }
   invisible(NULL)
 }

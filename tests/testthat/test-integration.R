@@ -328,14 +328,9 @@ test_that("gdpins_init_board with on_discrepancy=sync_from_drive pulls Drive→l
 
   # The message is not the point — the pull is. The seeded Drive pin must be
   # readable from the board now that it has connected.
-  #
-  # Compared as data.frames: .copy_pin_to_board() re-writes with pins' default
-  # type, so a parquet pin lands in the cache as rds and reads back a bare tbl
-  # rather than a tbl_df. That type drift is a separate bug from lazy init;
-  # tighten this to expect_equal() once it is fixed.
   expect_equal(
-    as.data.frame(gdpins_pin_read(board, "seeded_pin")),
-    as.data.frame(fx_plain_tbl())
+    gdpins_pin_read(board, "seeded_pin"),
+    fx_plain_tbl()
   )
 })
 
