@@ -570,6 +570,7 @@ gdpins_sync.default <- function(
   }
 
   conflicts <- character()
+  n_actions <- 0L
 
   for (i in seq_len(nrow(status))) {
     row      <- status[i, ]
@@ -585,8 +586,12 @@ gdpins_sync.default <- function(
         # Versioned boards: both writes become versions -- no loss
         .copy_pin_to_board(drive_board, local_board, pin_name)
         .copy_pin_to_board(local_board, drive_board, pin_name)
+        n_actions <- n_actions + 1L
         cli::cli_inform(c(
-          "i" = "Pin {.val {pin_name}}: conflict resolved as new versions (versioned board)."
+          "i" = paste0(
+            "Board {.val {x$name}}: pin {.val {pin_name}} conflict resolved ",
+            "as new versions (versioned board)."
+          )
         ))
       } else if (on_conflict == "stop") {
         conflicts <- c(conflicts, pin_name)
@@ -595,13 +600,28 @@ gdpins_sync.default <- function(
         choice <- .prompt_conflict(pin_name, row)
         if (choice == "local") {
           .copy_pin_to_board(local_board, drive_board, pin_name)
+          n_actions <- n_actions + 1L
+          cli::cli_inform(c(
+            "v" = "Board {.val {x$name}}: synced {.val {pin_name}} local -> Drive."
+          ))
         } else if (choice == "drive") {
           .copy_pin_to_board(drive_board, local_board, pin_name)
+          n_actions <- n_actions + 1L
+          cli::cli_inform(c(
+            "v" = "Board {.val {x$name}}: synced {.val {pin_name}} Drive -> local."
+          ))
         }
       } else {
         # on_conflict == "version" on unversioned -- copy both directions
         .copy_pin_to_board(drive_board, local_board, pin_name)
         .copy_pin_to_board(local_board, drive_board, pin_name)
+        n_actions <- n_actions + 1L
+        cli::cli_inform(c(
+          "i" = paste0(
+            "Board {.val {x$name}}: pin {.val {pin_name}} conflict -- copied ",
+            "both directions."
+          )
+        ))
       }
       next
     }
@@ -609,11 +629,27 @@ gdpins_sync.default <- function(
     # Non-conflict directional copy
     if (effective_dir == "to_drive") {
       .copy_pin_to_board(local_board, drive_board, pin_name)
-      cli::cli_inform(c("v" = "Synced {.val {pin_name}}: local -> Drive."))
+      n_actions <- n_actions + 1L
+      cli::cli_inform(c(
+        "v" = "Board {.val {x$name}}: synced {.val {pin_name}} local -> Drive."
+      ))
     } else if (effective_dir == "from_drive") {
       .copy_pin_to_board(drive_board, local_board, pin_name)
-      cli::cli_inform(c("v" = "Synced {.val {pin_name}}: Drive -> local."))
+      n_actions <- n_actions + 1L
+      cli::cli_inform(c(
+        "v" = "Board {.val {x$name}}: synced {.val {pin_name}} Drive -> local."
+      ))
     }
+  }
+
+  # Nothing moved and nothing blocked -- say so, rather than exiting silently.
+  if (n_actions == 0L && length(conflicts) == 0L) {
+    cli::cli_inform(c(
+      "v" = paste0(
+        "Board {.val {x$name}}: everything in sync, nothing to reconcile ",
+        "({nrow(status)} pin{?s} checked)."
+      )
+    ))
   }
 
   # Report conflicts that were stopped -- abort after processing all items
@@ -720,6 +756,7 @@ gdpins_sync.default <- function(
   }
 
   conflicts <- character()
+  n_actions <- 0L
 
   for (i in seq_len(nrow(status))) {
     row   <- status[i, ]
@@ -738,12 +775,15 @@ gdpins_sync.default <- function(
         choice <- .prompt_raw_conflict(fname, row)
         if (choice == "local") {
           .raw_copy_to_drive(x, fname)
+          n_actions <- n_actions + 1L
         } else if (choice == "drive") {
           .raw_copy_to_local(x, fname)
+          n_actions <- n_actions + 1L
         }
       } else {
         # on_conflict == "version" on raw -- drive wins as safest default
         .raw_copy_to_local(x, fname)
+        n_actions <- n_actions + 1L
         cli::cli_inform(c(
           "i" = "File {.val {fname}}: conflict -- Drive version kept (raw connection)."
         ))
@@ -753,11 +793,23 @@ gdpins_sync.default <- function(
 
     if (effective_dir == "to_drive") {
       .raw_copy_to_drive(x, fname)
+      n_actions <- n_actions + 1L
       cli::cli_inform(c("v" = "Synced {.val {fname}}: local -> Drive."))
     } else if (effective_dir == "from_drive") {
       .raw_copy_to_local(x, fname)
+      n_actions <- n_actions + 1L
       cli::cli_inform(c("v" = "Synced {.val {fname}}: Drive -> local."))
     }
+  }
+
+  # Nothing moved and nothing blocked -- say so, rather than exiting silently.
+  if (n_actions == 0L && length(conflicts) == 0L) {
+    cli::cli_inform(c(
+      "v" = paste0(
+        "Raw connection: everything in sync, nothing to reconcile ",
+        "({nrow(status)} file{?s} checked)."
+      )
+    ))
   }
 
   if (length(conflicts) > 0L) {
