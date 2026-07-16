@@ -125,3 +125,60 @@ new_fake_raw_conn <- function(
     adapter    = adapter
   )
 }
+
+# ── gdpins_board_status() mocks ───────────────────────────────────────────────
+# Single source of truth for fake status tibbles, shared by test-board.R and
+# test-offline.R. Each test file gets its own environment, so a mock defined in
+# a test file is invisible to the others -- copies drift.
+#
+# The schema is taken from the package's own .empty_board_status_tbl() instead
+# of being hand-written, and mock_status_row() asserts against it. It drifted
+# once: the mocks carried a `status` column where the real schema says `state`.
+# Because .handle_init_sync() acted on any non-NULL status, nothing ever read
+# the mock, and every "warns on drift" test passed for the wrong reason. If the
+# real schema moves again, these fixtures fail loudly rather than silently.
+
+mock_status_ok <- function() .empty_board_status_tbl()
+
+mock_status_row <- function(name          = "some_pin",
+                            state         = "in_sync",
+                            drive_version = "20260101T120000Z-aaa",
+                            local_version = "20260101T120000Z-aaa",
+                            drive_hash    = "aaaa",
+                            local_hash    = "aaaa") {
+  row <- tibble::tibble(
+    name          = name,
+    state         = state,
+    drive_version = drive_version,
+    local_version = local_version,
+    drive_created = list(as.POSIXct("2026-01-01 12:00:00", tz = "UTC")),
+    local_created = list(as.POSIXct("2026-01-02 12:00:00", tz = "UTC")),
+    drive_hash    = drive_hash,
+    local_hash    = local_hash
+  )
+  stopifnot(identical(names(row), names(.empty_board_status_tbl())))
+  row
+}
+
+# Local side has a newer version -- a real, actionable discrepancy.
+mock_status_discrepancy <- function() {
+  mock_status_row(
+    state         = "local_ahead",
+    local_version = "20260102T120000Z-bbb",
+    local_hash    = "bbbb"
+  )
+}
+
+# Status call succeeded, but nothing needs reconciling.
+mock_status_in_sync <- function() mock_status_row(state = "in_sync")
+
+# Could not be compared at all -- not a discrepancy.
+mock_status_offline <- function() {
+  mock_status_row(
+    state         = "offline",
+    drive_version = NA_character_,
+    local_version = NA_character_,
+    drive_hash    = NA_character_,
+    local_hash    = NA_character_
+  )
+}

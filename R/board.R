@@ -28,6 +28,19 @@ NULL
   on_discrepancy
 }
 
+#' Does a status tibble describe an actual discrepancy?
+#'
+#' `TRUE` only when at least one row needs reconciling. An empty status (nothing
+#' on either side) and rows marked `"offline"` are both "no discrepancy": the
+#' former has nothing to compare, the latter could not be compared at all.
+#'
+#' @param status A tibble from [gdpins_board_status()].
+#' @keywords internal
+.has_discrepancy <- function(status) {
+  if (is.null(status) || nrow(status) == 0L) return(FALSE)
+  any(!status$state %in% c("in_sync", "offline"))
+}
+
 #' Handle init-time (or reconnect-time) sync check
 #'
 #' Calls `gdpins_board_status()` on `x` and acts per `on_discrepancy`. Errors
@@ -64,6 +77,13 @@ NULL
   )
 
   if (is.null(status)) {
+    return(invisible(x))
+  }
+
+  # Only act when something is genuinely out of sync. "offline" rows are not a
+  # discrepancy: gdpins_board_status() has already warned about connectivity,
+  # and it cannot know the Drive side well enough to claim drift.
+  if (!.has_discrepancy(status)) {
     return(invisible(x))
   }
 
