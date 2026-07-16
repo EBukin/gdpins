@@ -1,3 +1,41 @@
+# gdpins 0.0.1.9013
+
+## New features
+
+* **Boards are now lazy.** `gdpins_init_board()` no longer touches Drive: it
+  records its arguments and connects on first use. Setting up three boards in a
+  script used to cost three Drive round-trips plus three sync checks even if you
+  only ever read one of them — now you pay only for the boards you touch. The
+  deferred work is the same work as before (online probe, Drive
+  existence/create check, folder-ID resolution, `pins` board construction, and
+  the `on_discrepancy` sync check); it just happens the first time something
+  reads the board's `drive_board`, `cache_board`, or `local_board`. In practice
+  that means the first `gdpins_pin_read()`/`gdpins_pin_write()`/
+  `gdpins_board_status()`/`gdpins_sync()`. See `?"lazy-boards"`.
+  - `gdpins_board_connect()` forces a lazy board to connect on demand, so you
+    can choose when to pay. It accepts an `on_discrepancy` override for that
+    connection.
+  - `gdpins_board_is_connected()` reports whether a board has connected yet,
+    without connecting it.
+  - `print()`, `format()` and `summary()` never connect a board — they describe
+    it from its declared config and report `connected: FALSE`.
+  - Connection state is shared across copies: passing a board to a function and
+    using it there connects the caller's board too, rather than reconnecting.
+
+## Breaking changes
+
+* **Board init errors and sync warnings now surface at first use, not at
+  `gdpins_init_board()`.** A mistyped `drive_path`, a missing folder with
+  `create = FALSE`, the `create = NA` interactive prompt, and the
+  `on_discrepancy` sync warning all move from the init call to the first board
+  access. To get the old timing back, call `gdpins_board_connect()` right after
+  init, pass `gdpins_init_board(lazy = FALSE)`, or set
+  `options(gdpins.lazy_boards = FALSE)` globally. An explicit `lazy` argument
+  always beats the option.
+* `$` and `[[` on a `gdpins_board` no longer partial-match field names:
+  `board$drive` is `NULL` rather than an ambiguous match against `drive_board`
+  and `drive_path`. Spell fields in full.
+
 # gdpins 0.0.1.9012
 
 ## New features

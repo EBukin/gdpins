@@ -78,6 +78,22 @@ bd_clean <- gdpins_init_board(
 )
 ```
 
+None of those calls touch Drive. Boards are lazy: each records its arguments
+and connects on first use, so setting up three boards and reading from one
+costs one connection, not three. Printing a board never connects it.
+
+```r
+gdpins_board_is_connected(bd_raw)   # FALSE — nothing has touched it yet
+gdpins_pin_read(bd_raw, "parcels")  # connects, then reads
+
+# Rather find out now that the Drive path is wrong? Connect on purpose:
+gdpins_board_connect(bd_raw)
+```
+
+The trade-off: init-time errors and sync warnings surface at first use instead.
+Pass `lazy = FALSE`, or set `options(gdpins.lazy_boards = FALSE)`, to get the
+old timing back. See `?"lazy-boards"`.
+
 Pin names are **bare snake_case** — the board encodes the pipeline layer.
 
 ```r

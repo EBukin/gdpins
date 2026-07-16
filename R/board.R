@@ -13,6 +13,27 @@ NULL
   "prompt", "warn", "sync_from_drive", "sync_to_drive", "ignore"
 )
 
+# ── Config → components ───────────────────────────────────────────────────────
+
+#' Board components implied by a config
+#'
+#' The config→components mapping is fixed by [new_gdpins_board()]. Deriving the
+#' component set from `config` rather than from `is.null(board$drive_board)`
+#' lets [format.gdpins_board()] and friends describe a board without forcing a
+#' lazy one to connect.
+#'
+#' @param config Character scalar. One of `.BOARD_CONFIGS`.
+#' @return Character vector of component field names.
+#' @keywords internal
+.config_components <- function(config) {
+  switch(config,
+    local_only        = "local_board",
+    drive_cache       = c("drive_board", "cache_board"),
+    drive_cache_local = c("drive_board", "cache_board", "local_board"),
+    character()
+  )
+}
+
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 #' @keywords internal
@@ -138,9 +159,15 @@ NULL
 #' - **`"drive_cache_local"`** — all three: `drive_path`, `cache_dir`, and
 #'   `local_dir`.
 #'
-#' On init the board checks for sync discrepancies between Drive and local
-#' (governed by `on_discrepancy`). Non-existent Drive boards are never
-#' auto-created unless `create = TRUE`.
+#' The board checks for sync discrepancies between Drive and local (governed by
+#' `on_discrepancy`). Non-existent Drive boards are never auto-created unless
+#' `create = TRUE`.
+#'
+#' By default (`lazy = TRUE`) none of that happens at init: the board records
+#' its arguments and connects on first use. Initialising several Drive boards
+#' is then free, and you only pay for the ones you touch. See [lazy-boards] for
+#' what forces a connection and how error timing changes, and
+#' [gdpins_board_connect()] to force one on purpose.
 #'
 #' @param name Character scalar. Board/layer label (e.g. `"data_raw"`).
 #' @param drive_path Character scalar. Drive path for the board (relative to
@@ -157,10 +184,15 @@ NULL
 #'   `c("prompt","warn","sync_from_drive","sync_to_drive","ignore")`. `NULL`
 #'   resolves to `"prompt"` interactively or `"warn"` non-interactively.
 #' @param adapter A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
+#' @param lazy Logical or `NULL`. `TRUE` (the default) defers all Drive work
+#'   and the sync check until the board is first used; `FALSE` does it during
+#'   this call. `NULL` uses the `gdpins.lazy_boards` option (default `TRUE`).
+#'   See [lazy-boards].
 #'
 #' @return A `gdpins_board` object.
 #' @seealso [gdpins_real_drive()] to create an adapter, [gdpins_go_offline()]
-#'   to temporarily detach an existing board from Drive and work locally.
+#'   to temporarily detach an existing board from Drive and work locally,
+#'   [gdpins_board_connect()] to connect a lazy board on demand.
 #' @examples
 #' # --- Fake adapter (no network) ---
 #' adapter <- gdpins_fake_drive()
@@ -202,7 +234,55 @@ gdpins_init_board <- function(
     versioned       = TRUE,
     create          = NA,
     on_discrepancy  = NULL,
-    adapter         = NULL
+    adapter         = NULL,
+    lazy            = NULL
+) {
+  spec <- .board_spec(
+    name           = name,
+    drive_path     = drive_path,
+    cache_dir      = cache_dir,
+    local_dir      = local_dir,
+    versioned      = versioned,
+    create         = create,
+    on_discrepancy = on_discrepancy,
+    adapter        = adapter
+  )
+
+  if (is.null(lazy)) {
+    lazy <- isTRUE(getOption("gdpins.lazy_boards", TRUE))
+  }
+  if (!is.logical(lazy) || length(lazy) != 1L || is.na(lazy)) {
+    cli::cli_abort("{.arg lazy} must be a non-NA logical scalar or {.code NULL}.")
+  }
+
+  if (lazy) {
+    return(new_gdpins_board_lazy(spec))
+  }
+
+  board <- .build_board(spec)
+  .handle_init_sync(board, spec$on_discrepancy)
+  board
+}
+
+#' Validate init arguments and derive the declared board spec
+#'
+#' Pure argument inspection — no network, no filesystem. Everything a lazy
+#' board must know before it connects. `config` here is the *declared* config;
+#' [.build_board()] may downgrade it to `"local_only"` when Drive turns out to
+#' be unreachable.
+#'
+#' @inheritParams gdpins_init_board
+#' @return A named list: the `gdpins_init_board()` arguments plus `config`.
+#' @keywords internal
+.board_spec <- function(
+    name,
+    drive_path     = NULL,
+    cache_dir      = NULL,
+    local_dir      = NULL,
+    versioned      = TRUE,
+    create         = NA,
+    on_discrepancy = NULL,
+    adapter        = NULL
 ) {
   # ── Validate name ────────────────────────────────────────────────────────────
   if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
@@ -256,6 +336,43 @@ gdpins_init_board <- function(
     "drive_cache_local"
   }
 
+  list(
+    name           = name,
+    drive_path     = drive_path,
+    cache_dir      = cache_dir,
+    local_dir      = local_dir,
+    versioned      = versioned,
+    create         = create,
+    on_discrepancy = on_discrepancy,
+    adapter        = adapter,
+    config         = config
+  )
+}
+
+#' Do the expensive half of board init
+#'
+#' Everything that touches the network or the filesystem: the online probe, the
+#' Drive existence/create dance, folder-ID resolution, and `pins` board
+#' construction. Called eagerly by [gdpins_init_board()] when `lazy = FALSE`,
+#' and on first component access when `lazy = TRUE`.
+#'
+#' Deliberately does **not** run the sync check — callers own that, so a lazy
+#' board can mark itself resolved before `.handle_init_sync()` reads it back.
+#'
+#' @param spec A list from [.board_spec()].
+#' @return A fully-resolved `gdpins_board`.
+#' @keywords internal
+.build_board <- function(spec) {
+  name           <- spec$name
+  drive_path     <- spec$drive_path
+  cache_dir      <- spec$cache_dir
+  local_dir      <- spec$local_dir
+  versioned      <- spec$versioned
+  create         <- spec$create
+  adapter        <- spec$adapter
+  config         <- spec$config
+  has_local      <- !is.null(local_dir)
+
   # ── local_only ───────────────────────────────────────────────────────────────
   if (config == "local_only") {
     if (!dir.exists(local_dir)) {
@@ -269,7 +386,6 @@ gdpins_init_board <- function(
       local_dir   = local_dir,
       versioned   = versioned
     )
-    .handle_init_sync(board, on_discrepancy)
     return(board)
   }
 
@@ -310,7 +426,6 @@ gdpins_init_board <- function(
         versioned   = versioned
       )
     }
-    .handle_init_sync(board, on_discrepancy)
     return(board)
   }
 
@@ -351,7 +466,6 @@ gdpins_init_board <- function(
         adapter     = adapter,
         versioned   = versioned
       )
-      .handle_init_sync(board, on_discrepancy)
       return(board)
     }
     if (!dir.exists(local_dir)) fs::dir_create(local_dir)
@@ -368,7 +482,6 @@ gdpins_init_board <- function(
       adapter     = adapter,
       versioned   = versioned
     )
-    .handle_init_sync(board, on_discrepancy)
     return(board)
     # nocov end
   }
@@ -450,7 +563,6 @@ gdpins_init_board <- function(
       adapter     = adapter,
       versioned   = versioned
     )
-    .handle_init_sync(board, on_discrepancy)
     return(board)
   }
 
@@ -472,13 +584,15 @@ gdpins_init_board <- function(
     adapter     = adapter,
     versioned   = versioned
   )
-  .handle_init_sync(board, on_discrepancy)
   board
 }
 
 # ── S3 print / format / summary ───────────────────────────────────────────────
 
 #' Format a gdpins_board as a compact one-line string (≤80 cols)
+#'
+#' Describes the board from its declared config, so formatting a lazy board
+#' never connects it. See [lazy-boards].
 #'
 #' @param x A `gdpins_board` object.
 #' @param ... Unused.
@@ -487,11 +601,14 @@ gdpins_init_board <- function(
 #' @export
 #' @exportS3Method format gdpins_board
 format.gdpins_board <- function(x, ...) {
-  # Components indicator: D=drive, C=cache, L=local
+  # Components indicator: D=drive, C=cache, L=local. Derived from config
+  # rather than the components themselves — reading those would force a lazy
+  # board to connect just to print it.
+  present <- .config_components(x$config)
   comps <- paste0(
-    if (!is.null(x$drive_board)) "D" else "-",
-    if (!is.null(x$cache_board)) "C" else "-",
-    if (!is.null(x$local_board)) "L" else "-"
+    if ("drive_board" %in% present) "D" else "-",
+    if ("cache_board" %in% present) "C" else "-",
+    if ("local_board" %in% present) "L" else "-"
   )
   ver <- if (isTRUE(x$versioned)) "v+" else "v-"
   cfg <- x$config
@@ -525,6 +642,9 @@ format.gdpins_board <- function(x, ...) {
 
 #' Print a gdpins_board object (compact, ≤80 cols)
 #'
+#' Never connects a lazy board — it reports `connected: FALSE` instead. See
+#' [lazy-boards].
+#'
 #' @param x A `gdpins_board` object.
 #' @param ... Unused.
 #'
@@ -536,7 +656,8 @@ print.gdpins_board <- function(x, ...) {
   gd_cli_kv(
     config    = x$config,
     name      = x$name,
-    versioned = as.character(x$versioned)
+    versioned = as.character(x$versioned),
+    connected = as.character(gdpins_board_is_connected(x))
   )
   if (!is.null(x$drive_path)) {
     gd_cli_kv(drive = x$drive_path)
@@ -553,6 +674,8 @@ print.gdpins_board <- function(x, ...) {
 #' Summarise a gdpins_board object
 #'
 #' Prints a compact summary (one row per board component) to the console.
+#' Never connects a lazy board — components are listed from the declared
+#' config. See [lazy-boards].
 #'
 #' @param object A `gdpins_board` object.
 #' @param ... Unused.
@@ -565,7 +688,8 @@ summary.gdpins_board <- function(object, ...) {
   gd_cli_kv(
     name      = object$name,
     config    = object$config,
-    versioned = as.character(object$versioned)
+    versioned = as.character(object$versioned),
+    connected = as.character(gdpins_board_is_connected(object))
   )
   if (!is.null(object$drive_path)) {
     gd_cli_kv(drive_path = object$drive_path)
@@ -576,12 +700,8 @@ summary.gdpins_board <- function(object, ...) {
   if (!is.null(object$local_dir)) {
     gd_cli_kv(local_dir = object$local_dir)
   }
-  # Component status
-  comps <- c(
-    if (!is.null(object$drive_board)) "drive_board" else NULL,
-    if (!is.null(object$cache_board)) "cache_board" else NULL,
-    if (!is.null(object$local_board)) "local_board" else NULL
+  gd_cli_kv(
+    components = paste(.config_components(object$config), collapse = ", ")
   )
-  gd_cli_kv(components = paste(comps, collapse = ", "))
   invisible(object)
 }

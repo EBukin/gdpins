@@ -1,6 +1,13 @@
 # test-board.R — WS3 tests for gdpins_init_board + S3 methods
 # Uses new_fake_board() harness (no network).
 
+# This file tests what init *builds* — components, the create/offline branches,
+# and the on_discrepancy sync check — so it pins boards to the eager path.
+# Under the lazy default that work is deferred to first use and none of these
+# assertions would fire at the init call. The deferral itself, and the fact
+# that this same work still happens on connect, is test-lazy.R's job.
+withr::local_options(gdpins.lazy_boards = FALSE)
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 # Mock gdpins_board_status to return a "no discrepancy" status silently
