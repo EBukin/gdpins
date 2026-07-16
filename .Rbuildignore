@@ -1,9 +1,11 @@
 ^renv$
 ^renv\.lock$
 ^\.posit$
-^_pkgdown\.yml$
+^_pkgdown\.yaml$
 ^docs$
 ^\.github$
 ^pkgdown$
 ^AGENTS\.md$
 ^CLAUDE\.md$
+^tools$
+^\.githooks$

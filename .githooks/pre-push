@@ -1,0 +1,17 @@
+#!/bin/sh
+# Catches the pkgdown "topics missing from index" failure before it hits CI.
+# Enable with: git config core.hooksPath .githooks
+
+if ! command -v Rscript >/dev/null 2>&1; then
+  echo "pre-push: Rscript not found, skipping pkgdown index check."
+  exit 0
+fi
+
+Rscript tools/check-pkgdown-index.R
+status=$?
+
+if [ "$status" -ne 0 ]; then
+  echo "pre-push: fix _pkgdown.yaml (see above) or push with --no-verify to skip."
+fi
+
+exit $status

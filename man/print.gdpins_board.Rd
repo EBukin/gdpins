@@ -15,5 +15,6 @@
 Invisibly \code{x}.
 }
 \description{
-Print a gdpins_board object (compact, ≤80 cols)
+Never connects a lazy board — it reports \code{connected: FALSE} instead. See
+\link{lazy-boards}.
 }

@@ -15,5 +15,6 @@
 Character scalar.
 }
 \description{
-Format a gdpins_board as a compact one-line string (≤80 cols)
+Describes the board from its declared config, so formatting a lazy board
+never connects it. See \link{lazy-boards}.
 }

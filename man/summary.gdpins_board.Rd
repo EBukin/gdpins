@@ -16,4 +16,6 @@ Invisibly \code{object}.
 }
 \description{
 Prints a compact summary (one row per board component) to the console.
+Never connects a lazy board — components are listed from the declared
+config. See \link{lazy-boards}.
 }

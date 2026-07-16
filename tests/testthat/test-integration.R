@@ -302,18 +302,20 @@ test_that("gdpins_init_board with on_discrepancy=sync_from_drive pulls Drive→l
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
   )
-  msgs <- testthat::capture_messages(
-    board <- gdpins_init_board(
-      name           = "data_raw",
-      drive_path     = drive_path,
-      cache_dir      = cache_dir,
-      adapter        = adapter,
-      create         = FALSE,
-      on_discrepancy = "sync_from_drive"
-    )
+  board <- gdpins_init_board(
+    name           = "data_raw",
+    drive_path     = drive_path,
+    cache_dir      = cache_dir,
+    adapter        = adapter,
+    create         = FALSE,
+    on_discrepancy = "sync_from_drive"
   )
-
   expect_s3_class(board, "gdpins_board")
+
+  # Boards are lazy by default, so the policy runs on connect rather than at
+  # init. gdpins_board_connect() is just the deliberate way to trigger it —
+  # a first gdpins_pin_read() would pull exactly the same way.
+  msgs <- testthat::capture_messages(gdpins_board_connect(board))
 
   msg_combined <- paste(msgs, collapse = " ")
   expect_true(
@@ -322,6 +324,13 @@ test_that("gdpins_init_board with on_discrepancy=sync_from_drive pulls Drive→l
       msg_combined, ignore.case = TRUE
     ),
     label = paste("Expected sync-from-drive message. Got:", msg_combined)
+  )
+
+  # The message is not the point — the pull is. The seeded Drive pin must be
+  # readable from the board now that it has connected.
+  expect_equal(
+    gdpins_pin_read(board, "seeded_pin"),
+    fx_plain_tbl()
   )
 })
 

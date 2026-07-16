@@ -1,7 +1,12 @@
 # test-board.R — WS3 tests for gdpins_init_board + S3 methods
 # Uses new_fake_board() harness (no network).
 
-# mock_status_*() fixtures live in helper-fakes.R.
+# This file tests what init *builds* — components, the create/offline branches,
+# and the on_discrepancy sync check — so it pins boards to the eager path.
+# Under the lazy default that work is deferred to first use and none of these
+# assertions would fire at the init call. The deferral itself, and the fact
+# that this same work still happens on connect, is test-lazy.R's job.
+withr::local_options(gdpins.lazy_boards = FALSE)
 
 # ── 1. Config: local_only ─────────────────────────────────────────────────────
 
@@ -12,8 +17,8 @@ test_that("local_only board builds with correct components", {
     .package = "gdpins"
   )
   board <- gdpins_init_board(
-    name       = "myboard",
-    local_dir  = local_dir,
+    name = "myboard",
+    local_dir = local_dir,
     on_discrepancy = "ignore"
   )
   expect_s3_class(board, "gdpins_board")
@@ -29,14 +34,14 @@ test_that("local_only board builds with correct components", {
 
 test_that("local_only board creates local_dir if missing", {
   parent_dir <- withr::local_tempdir()
-  local_dir  <- file.path(parent_dir, "new_subdir")
+  local_dir <- file.path(parent_dir, "new_subdir")
   testthat::local_mocked_bindings(
     gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
   board <- gdpins_init_board(
-    name           = "x",
-    local_dir      = local_dir,
+    name = "x",
+    local_dir = local_dir,
     on_discrepancy = "ignore"
   )
   expect_true(dir.exists(local_dir))
@@ -50,9 +55,9 @@ test_that("local_only board respects versioned = FALSE", {
     .package = "gdpins"
   )
   board <- gdpins_init_board(
-    name           = "unversioned",
-    local_dir      = local_dir,
-    versioned      = FALSE,
+    name = "unversioned",
+    local_dir = local_dir,
+    versioned = FALSE,
     on_discrepancy = "ignore"
   )
   expect_false(board$versioned)
@@ -61,23 +66,23 @@ test_that("local_only board respects versioned = FALSE", {
 # ── 2. Config: drive_cache ────────────────────────────────────────────────────
 
 test_that("drive_cache board builds with correct components (fake adapter)", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
   drive_path <- "boards/myboard"
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() TRUE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   board <- gdpins_init_board(
-    name           = "myboard",
-    drive_path     = drive_path,
-    cache_dir      = cache_dir,
-    adapter        = adapter,
-    create         = TRUE,
+    name = "myboard",
+    drive_path = drive_path,
+    cache_dir = cache_dir,
+    adapter = adapter,
+    create = TRUE,
     on_discrepancy = "ignore"
   )
 
@@ -93,23 +98,23 @@ test_that("drive_cache board builds with correct components (fake adapter)", {
 })
 
 test_that("drive_cache board drive_board uses board_folder over fake root", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
   drive_path <- "boards/test"
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() TRUE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   board <- gdpins_init_board(
-    name           = "test",
-    drive_path     = drive_path,
-    cache_dir      = cache_dir,
-    adapter        = adapter,
-    create         = TRUE,
+    name = "test",
+    drive_path = drive_path,
+    cache_dir = cache_dir,
+    adapter = adapter,
+    create = TRUE,
     on_discrepancy = "ignore"
   )
 
@@ -121,25 +126,25 @@ test_that("drive_cache board drive_board uses board_folder over fake root", {
 # ── 3. Config: drive_cache_local ──────────────────────────────────────────────
 
 test_that("drive_cache_local board builds with all three components", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  local_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  local_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
   drive_path <- "boards/superboard"
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() TRUE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   board <- gdpins_init_board(
-    name           = "superboard",
-    drive_path     = drive_path,
-    cache_dir      = cache_dir,
-    local_dir      = local_dir,
-    adapter        = adapter,
-    create         = TRUE,
+    name = "superboard",
+    drive_path = drive_path,
+    cache_dir = cache_dir,
+    local_dir = local_dir,
+    adapter = adapter,
+    create = TRUE,
     on_discrepancy = "ignore"
   )
 
@@ -155,9 +160,9 @@ test_that("drive_cache_local board builds with all three components", {
 # ── 4. create-confirm logic ───────────────────────────────────────────────────
 
 test_that("non-existent Drive path + create=FALSE -> error", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
@@ -166,33 +171,33 @@ test_that("non-existent Drive path + create=FALSE -> error", {
 
   expect_error(
     gdpins_init_board(
-      name       = "x",
+      name = "x",
       drive_path = "nonexistent/path",
-      cache_dir  = cache_dir,
-      adapter    = adapter,
-      create     = FALSE
+      cache_dir = cache_dir,
+      adapter = adapter,
+      create = FALSE
     ),
     "Drive board path does not exist"
   )
 })
 
 test_that("non-existent Drive path + create=TRUE -> creates and builds board", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() TRUE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   board <- gdpins_init_board(
-    name           = "newboard",
-    drive_path     = "new/path",
-    cache_dir      = cache_dir,
-    adapter        = adapter,
-    create         = TRUE,
+    name = "newboard",
+    drive_path = "new/path",
+    cache_dir = cache_dir,
+    adapter = adapter,
+    create = TRUE,
     on_discrepancy = "ignore"
   )
 
@@ -202,9 +207,9 @@ test_that("non-existent Drive path + create=TRUE -> creates and builds board", {
 })
 
 test_that("non-existent Drive path + create=NA + non-interactive -> error", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
@@ -214,11 +219,11 @@ test_that("non-existent Drive path + create=NA + non-interactive -> error", {
   # Non-interactive (test env): create=NA should error
   expect_error(
     gdpins_init_board(
-      name       = "x",
+      name = "x",
       drive_path = "nonexistent/path2",
-      cache_dir  = cache_dir,
-      adapter    = adapter,
-      create     = NA
+      cache_dir = cache_dir,
+      adapter = adapter,
+      create = NA
     ),
     "Non-interactive session"
   )
@@ -229,17 +234,17 @@ test_that("gdpins_init_board: fake adapter ignores .is_drive_id heuristic (path 
   cache_dir <- withr::local_tempdir()
 
   testthat::local_mocked_bindings(
-    gdpins_is_online    = function() TRUE,
+    gdpins_is_online = function() TRUE,
     gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   board <- gdpins_init_board(
-    name           = "test",
-    drive_path     = "nodash",
-    cache_dir      = cache_dir,
-    adapter        = adapter,
-    create         = TRUE,
+    name = "test",
+    drive_path = "nodash",
+    cache_dir = cache_dir,
+    adapter = adapter,
+    create = TRUE,
     on_discrepancy = "ignore"
   )
 
@@ -250,22 +255,22 @@ test_that("gdpins_init_board: fake adapter ignores .is_drive_id heuristic (path 
 # ── 5. Offline fallback ───────────────────────────────────────────────────────
 
 test_that("drive_cache offline -> falls back to local-only (cache dir), warns", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() FALSE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() FALSE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   expect_warning(
     board <- gdpins_init_board(
-      name           = "offline_board",
-      drive_path     = "some/path",
-      cache_dir      = cache_dir,
-      adapter        = adapter,
+      name = "offline_board",
+      drive_path = "some/path",
+      cache_dir = cache_dir,
+      adapter = adapter,
       on_discrepancy = "ignore"
     ),
     "No internet connection"
@@ -279,21 +284,21 @@ test_that("drive_cache_local offline -> falls back to local_dir-based board, war
   fake_root <- withr::local_tempdir()
   cache_dir <- withr::local_tempdir()
   local_dir <- withr::local_tempdir()
-  adapter   <- gdpins_fake_drive(root = fake_root)
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() FALSE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() FALSE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   expect_warning(
     board <- gdpins_init_board(
-      name           = "super_offline",
-      drive_path     = "x/y",
-      cache_dir      = cache_dir,
-      local_dir      = local_dir,
-      adapter        = adapter,
+      name = "super_offline",
+      drive_path = "x/y",
+      cache_dir = cache_dir,
+      local_dir = local_dir,
+      adapter = adapter,
       on_discrepancy = "ignore"
     ),
     "No internet connection"
@@ -314,8 +319,8 @@ test_that("on_discrepancy=ignore: no message on discrepancy", {
   # Should not warn or message
   expect_no_warning(
     gdpins_init_board(
-      name           = "x",
-      local_dir      = local_dir,
+      name = "x",
+      local_dir = local_dir,
       on_discrepancy = "ignore"
     )
   )
@@ -329,8 +334,8 @@ test_that("on_discrepancy=warn: emits a warning on discrepancy", {
   )
   expect_warning(
     gdpins_init_board(
-      name           = "x",
-      local_dir      = local_dir,
+      name = "x",
+      local_dir = local_dir,
       on_discrepancy = "warn"
     ),
     "sync discrepancy"
@@ -338,15 +343,15 @@ test_that("on_discrepancy=warn: emits a warning on discrepancy", {
 })
 
 test_that("on_discrepancy=sync_from_drive: attempts gdpins_sync from_drive", {
-  local_dir  <- withr::local_tempdir()
+  local_dir <- withr::local_tempdir()
   sync_called <- FALSE
-  sync_dir    <- NULL
+  sync_dir <- NULL
 
   testthat::local_mocked_bindings(
     gdpins_board_status = function(x) mock_status_discrepancy(),
     gdpins_sync = function(board, direction, ...) {
       sync_called <<- TRUE
-      sync_dir    <<- direction
+      sync_dir <<- direction
       invisible(board)
     },
     .package = "gdpins"
@@ -354,8 +359,8 @@ test_that("on_discrepancy=sync_from_drive: attempts gdpins_sync from_drive", {
 
   suppressMessages(
     gdpins_init_board(
-      name           = "x",
-      local_dir      = local_dir,
+      name = "x",
+      local_dir = local_dir,
       on_discrepancy = "sync_from_drive"
     )
   )
@@ -365,7 +370,7 @@ test_that("on_discrepancy=sync_from_drive: attempts gdpins_sync from_drive", {
 })
 
 test_that("on_discrepancy=sync_to_drive: attempts gdpins_sync to_drive", {
-  local_dir  <- withr::local_tempdir()
+  local_dir <- withr::local_tempdir()
   sync_called <- FALSE
 
   testthat::local_mocked_bindings(
@@ -379,8 +384,8 @@ test_that("on_discrepancy=sync_to_drive: attempts gdpins_sync to_drive", {
 
   suppressMessages(
     gdpins_init_board(
-      name           = "x",
-      local_dir      = local_dir,
+      name = "x",
+      local_dir = local_dir,
       on_discrepancy = "sync_to_drive"
     )
   )
@@ -397,8 +402,8 @@ test_that("on_discrepancy default = warn when non-interactive", {
   # Non-interactive (test) + NULL discrepancy -> warn
   expect_warning(
     gdpins_init_board(
-      name           = "x",
-      local_dir      = local_dir,
+      name = "x",
+      local_dir = local_dir,
       on_discrepancy = NULL
     ),
     "sync discrepancy"
@@ -414,8 +419,8 @@ test_that("gdpins_board_status error during init is caught and warned", {
   # Should warn but not error
   expect_warning(
     gdpins_init_board(
-      name           = "x",
-      local_dir      = local_dir,
+      name = "x",
+      local_dir = local_dir,
       on_discrepancy = "warn"
     ),
     "gdpins_board_status"
@@ -480,9 +485,9 @@ test_that("no drive_path and no local_dir -> error", {
 test_that("drive_path without adapter -> error", {
   expect_error(
     gdpins_init_board(
-      name      = "x",
+      name = "x",
       drive_path = "some/path",
-      cache_dir  = withr::local_tempdir()
+      cache_dir = withr::local_tempdir()
     ),
     "adapter.*required"
   )
@@ -496,9 +501,9 @@ test_that("drive_path without cache_dir -> error", {
   )
   expect_error(
     gdpins_init_board(
-      name       = "x",
+      name = "x",
       drive_path = "some/path",
-      adapter    = adapter
+      adapter = adapter
     ),
     "cache_dir.*required"
   )
@@ -508,7 +513,7 @@ test_that("drive_path without cache_dir -> error", {
 
 test_that("format.gdpins_board returns a string ≤ 80 chars", {
   board <- new_fake_board(config = "local_only")
-  fmt   <- format(board)
+  fmt <- format(board)
   expect_type(fmt, "character")
   expect_length(fmt, 1L)
   expect_lte(nchar(fmt), 80L)
@@ -517,7 +522,7 @@ test_that("format.gdpins_board returns a string ≤ 80 chars", {
 
 test_that("format.gdpins_board one-liner snapshot matches pattern", {
   board <- new_fake_board(config = "drive_cache", name = "snapshot_test")
-  fmt   <- format(board)
+  fmt <- format(board)
   # Should contain key fields
   expect_match(fmt, "drive_cache")
   expect_match(fmt, "snapshot_test")
@@ -544,7 +549,7 @@ test_that("print returns board invisibly", {
 test_that("format snapshot: all three config outputs stay ≤80 chars", {
   configs <- c("local_only", "drive_cache", "drive_cache_local")
   for (cfg in configs) {
-    b   <- new_fake_board(config = cfg, name = "chk")
+    b <- new_fake_board(config = cfg, name = "chk")
     fmt <- format(b)
     expect_lte(nchar(fmt), 80L, label = paste("config:", cfg))
   }
@@ -577,8 +582,8 @@ test_that("on_discrepancy=prompt non-interactive -> warns", {
   # Tests are non-interactive: prompt falls through to warn
   expect_warning(
     gdpins_init_board(
-      name           = "x",
-      local_dir      = local_dir,
+      name = "x",
+      local_dir = local_dir,
       on_discrepancy = "prompt"
     ),
     "sync discrepancy"
@@ -595,8 +600,8 @@ test_that("sync_from_drive failure is caught and warned", {
   suppressMessages(
     expect_warning(
       gdpins_init_board(
-        name           = "x",
-        local_dir      = local_dir,
+        name = "x",
+        local_dir = local_dir,
         on_discrepancy = "sync_from_drive"
       ),
       "Sync from Drive failed"
@@ -614,8 +619,8 @@ test_that("sync_to_drive failure is caught and warned", {
   suppressMessages(
     expect_warning(
       gdpins_init_board(
-        name           = "x",
-        local_dir      = local_dir,
+        name = "x",
+        local_dir = local_dir,
         on_discrepancy = "sync_to_drive"
       ),
       "Sync to Drive failed"
@@ -626,9 +631,9 @@ test_that("sync_to_drive failure is caught and warned", {
 test_that("format.gdpins_board: board with no drive_path, no local_dir", {
   # Construct manually to hit the else branch (path_str = "")
   board <- new_gdpins_board(
-    config      = "local_only",
-    name        = "bare",
-    versioned   = FALSE
+    config = "local_only",
+    name = "bare",
+    versioned = FALSE
   )
   fmt <- format(board)
   expect_type(fmt, "character")
@@ -649,23 +654,23 @@ test_that("summary.gdpins_board: local_only board (no drive_path, no cache_dir)"
 test_that("drive_cache_local offline with non-existing local_dir -> creates it", {
   fake_root <- withr::local_tempdir()
   cache_dir <- withr::local_tempdir()
-  parent    <- withr::local_tempdir()
-  local_dir <- file.path(parent, "new_local")  # doesn't exist yet
-  adapter   <- gdpins_fake_drive(root = fake_root)
+  parent <- withr::local_tempdir()
+  local_dir <- file.path(parent, "new_local") # doesn't exist yet
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() FALSE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() FALSE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   expect_warning(
     board <- gdpins_init_board(
-      name           = "offline_newlocal",
-      drive_path     = "x/y",
-      cache_dir      = cache_dir,
-      local_dir      = local_dir,
-      adapter        = adapter,
+      name = "offline_newlocal",
+      drive_path = "x/y",
+      cache_dir = cache_dir,
+      local_dir = local_dir,
+      adapter = adapter,
       on_discrepancy = "ignore"
     ),
     "No internet connection"
@@ -675,24 +680,24 @@ test_that("drive_cache_local offline with non-existing local_dir -> creates it",
 })
 
 test_that("drive_cache board with non-existing cache_dir -> creates it", {
-  fake_root  <- withr::local_tempdir()
-  parent     <- withr::local_tempdir()
-  cache_dir  <- file.path(parent, "new_cache")  # doesn't exist yet
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  parent <- withr::local_tempdir()
+  cache_dir <- file.path(parent, "new_cache") # doesn't exist yet
+  adapter <- gdpins_fake_drive(root = fake_root)
   drive_path <- "boards/newcache"
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() TRUE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   board <- gdpins_init_board(
-    name           = "newcacheboard",
-    drive_path     = drive_path,
-    cache_dir      = cache_dir,
-    adapter        = adapter,
-    create         = TRUE,
+    name = "newcacheboard",
+    drive_path = drive_path,
+    cache_dir = cache_dir,
+    adapter = adapter,
+    create = TRUE,
     on_discrepancy = "ignore"
   )
   expect_true(dir.exists(cache_dir))
@@ -700,26 +705,26 @@ test_that("drive_cache board with non-existing cache_dir -> creates it", {
 })
 
 test_that("drive_cache_local with non-existing local_dir -> creates it online", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  parent     <- withr::local_tempdir()
-  local_dir  <- file.path(parent, "new_local_online")  # doesn't exist yet
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  parent <- withr::local_tempdir()
+  local_dir <- file.path(parent, "new_local_online") # doesn't exist yet
+  adapter <- gdpins_fake_drive(root = fake_root)
   drive_path <- "boards/supernew"
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() TRUE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   board <- gdpins_init_board(
-    name           = "supernew",
-    drive_path     = drive_path,
-    cache_dir      = cache_dir,
-    local_dir      = local_dir,
-    adapter        = adapter,
-    create         = TRUE,
+    name = "supernew",
+    drive_path = drive_path,
+    cache_dir = cache_dir,
+    local_dir = local_dir,
+    adapter = adapter,
+    create = TRUE,
     on_discrepancy = "ignore"
   )
   expect_true(dir.exists(local_dir))
@@ -728,23 +733,23 @@ test_that("drive_cache_local with non-existing local_dir -> creates it online", 
 
 test_that("drive_cache offline with non-existing cache_dir -> creates it", {
   # Line 250: offline drive_cache where cache_dir does not yet exist
-  fake_root  <- withr::local_tempdir()
-  parent     <- withr::local_tempdir()
-  cache_dir  <- file.path(parent, "new_cache_offline")  # doesn't exist
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  parent <- withr::local_tempdir()
+  cache_dir <- file.path(parent, "new_cache_offline") # doesn't exist
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() FALSE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() FALSE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   expect_warning(
     board <- gdpins_init_board(
-      name           = "offline_cache_new",
-      drive_path     = "some/path",
-      cache_dir      = cache_dir,
-      adapter        = adapter,
+      name = "offline_cache_new",
+      drive_path = "some/path",
+      cache_dir = cache_dir,
+      adapter = adapter,
       on_discrepancy = "ignore"
     ),
     "No internet connection"
@@ -764,8 +769,8 @@ test_that("on_discrepancy=prompt in interactive session -> informs", {
   # In the fake interactive env, prompt branch should message (not warn)
   expect_message(
     gdpins_init_board(
-      name           = "x",
-      local_dir      = local_dir,
+      name = "x",
+      local_dir = local_dir,
       on_discrepancy = "prompt"
     ),
     "sync discrepancy"
@@ -773,13 +778,13 @@ test_that("on_discrepancy=prompt in interactive session -> informs", {
 })
 
 test_that("gdpins_init_board create=NA uses .board_readline not utils::askYesNo", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() TRUE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
@@ -795,11 +800,11 @@ test_that("gdpins_init_board create=NA uses .board_readline not utils::askYesNo"
   )
 
   board <- gdpins_init_board(
-    name           = "interactive_create",
-    drive_path     = "new/interactive/path",
-    cache_dir      = cache_dir,
-    adapter        = adapter,
-    create         = NA,
+    name = "interactive_create",
+    drive_path = "new/interactive/path",
+    cache_dir = cache_dir,
+    adapter = adapter,
+    create = NA,
     on_discrepancy = "ignore"
   )
   expect_s3_class(board, "gdpins_board")
@@ -807,9 +812,9 @@ test_that("gdpins_init_board create=NA uses .board_readline not utils::askYesNo"
 })
 
 test_that("create=NA + interactive + user says NO -> errors", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
 
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
@@ -825,37 +830,37 @@ test_that("create=NA + interactive + user says NO -> errors", {
 
   expect_error(
     gdpins_init_board(
-      name       = "interactive_no",
+      name = "interactive_no",
       drive_path = "new/interactive/no",
-      cache_dir  = cache_dir,
-      adapter    = adapter,
-      create     = NA
+      cache_dir = cache_dir,
+      adapter = adapter,
+      create = NA
     ),
     "Drive board path does not exist"
   )
 })
 
 test_that("drive_cache board already exists on fake drive: build succeeds", {
-  fake_root  <- withr::local_tempdir()
-  cache_dir  <- withr::local_tempdir()
-  adapter    <- gdpins_fake_drive(root = fake_root)
+  fake_root <- withr::local_tempdir()
+  cache_dir <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
   drive_path <- "existing/board"
 
   # Pre-create the directory so gd_exists returns TRUE
   fs::dir_create(file.path(fake_root, "existing", "board"))
 
   testthat::local_mocked_bindings(
-    gdpins_is_online        = function() TRUE,
-    gdpins_board_status     = function(x) mock_status_ok(),
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
 
   board <- gdpins_init_board(
-    name           = "existing_board",
-    drive_path     = drive_path,
-    cache_dir      = cache_dir,
-    adapter        = adapter,
-    create         = NA,
+    name = "existing_board",
+    drive_path = drive_path,
+    cache_dir = cache_dir,
+    adapter = adapter,
+    create = NA,
     on_discrepancy = "ignore"
   )
   expect_equal(board$config, "drive_cache")
@@ -871,8 +876,12 @@ test_that("drive_cache board already exists on fake drive: build succeeds", {
 # `state`. Nothing read them, so the drift was invisible. Pin them together.
 test_that("mock status fixtures match the real gdpins_board_status() schema", {
   real <- names(.empty_board_status_tbl())
-  for (m in list(mock_status_ok, mock_status_in_sync,
-                 mock_status_discrepancy, mock_status_offline)) {
+  for (m in list(
+    mock_status_ok,
+    mock_status_in_sync,
+    mock_status_discrepancy,
+    mock_status_offline
+  )) {
     expect_identical(names(m()), real)
   }
   expect_true("state" %in% real)
@@ -901,36 +910,48 @@ test_that(".has_discrepancy is TRUE only for actionable states", {
 test_that("init does not warn when board is in sync (on_discrepancy = 'warn')", {
   local_dir <- withr::local_tempdir()
   testthat::local_mocked_bindings(
-    gdpins_is_online    = function() TRUE,
+    gdpins_is_online = function() TRUE,
     gdpins_board_status = function(x) mock_status_in_sync(),
     .package = "gdpins"
   )
   expect_no_warning(
-    gdpins_init_board(name = "quiet", local_dir = local_dir, on_discrepancy = "warn")
+    gdpins_init_board(
+      name = "quiet",
+      local_dir = local_dir,
+      on_discrepancy = "warn"
+    )
   )
 })
 
 test_that("init does not warn when status is empty (nothing on either side)", {
   local_dir <- withr::local_tempdir()
   testthat::local_mocked_bindings(
-    gdpins_is_online    = function() TRUE,
+    gdpins_is_online = function() TRUE,
     gdpins_board_status = function(x) mock_status_ok(),
     .package = "gdpins"
   )
   expect_no_warning(
-    gdpins_init_board(name = "empty", local_dir = local_dir, on_discrepancy = "warn")
+    gdpins_init_board(
+      name = "empty",
+      local_dir = local_dir,
+      on_discrepancy = "warn"
+    )
   )
 })
 
 test_that("init still warns when there IS a real discrepancy", {
   local_dir <- withr::local_tempdir()
   testthat::local_mocked_bindings(
-    gdpins_is_online    = function() TRUE,
+    gdpins_is_online = function() TRUE,
     gdpins_board_status = function(x) mock_status_discrepancy(),
     .package = "gdpins"
   )
   expect_warning(
-    gdpins_init_board(name = "drifted", local_dir = local_dir, on_discrepancy = "warn"),
+    gdpins_init_board(
+      name = "drifted",
+      local_dir = local_dir,
+      on_discrepancy = "warn"
+    ),
     "sync discrepancy detected"
   )
 })
@@ -938,12 +959,16 @@ test_that("init still warns when there IS a real discrepancy", {
 test_that("init does not warn about discrepancy when offline", {
   local_dir <- withr::local_tempdir()
   testthat::local_mocked_bindings(
-    gdpins_is_online    = function() TRUE,
+    gdpins_is_online = function() TRUE,
     gdpins_board_status = function(x) mock_status_offline(),
     .package = "gdpins"
   )
   expect_no_warning(
-    gdpins_init_board(name = "offline_board", local_dir = local_dir, on_discrepancy = "warn")
+    gdpins_init_board(
+      name = "offline_board",
+      local_dir = local_dir,
+      on_discrepancy = "warn"
+    )
   )
 })
 
@@ -951,13 +976,18 @@ test_that("in-sync board is not re-synced under on_discrepancy = 'sync_from_driv
   local_dir <- withr::local_tempdir()
   synced <- FALSE
   testthat::local_mocked_bindings(
-    gdpins_is_online    = function() TRUE,
+    gdpins_is_online = function() TRUE,
     gdpins_board_status = function(x) mock_status_in_sync(),
-    gdpins_sync         = function(x, ...) { synced <<- TRUE; invisible(x) },
+    gdpins_sync = function(x, ...) {
+      synced <<- TRUE
+      invisible(x)
+    },
     .package = "gdpins"
   )
   gdpins_init_board(
-    name = "nosync", local_dir = local_dir, on_discrepancy = "sync_from_drive"
+    name = "nosync",
+    local_dir = local_dir,
+    on_discrepancy = "sync_from_drive"
   )
   expect_false(synced)
 })

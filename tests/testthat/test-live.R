@@ -429,6 +429,8 @@ test_that("[LIVE] init: create=FALSE errors when Drive folder absent", {
   adapter  <- gdpins_real_drive(root_id)
   missing  <- paste0("nonexistent-", format(Sys.time(), "%Y%m%dT%H%M%S"))
 
+  # lazy = FALSE: this asserts the create-confirm check itself, which the lazy
+  # default defers to first use. See ?`lazy-boards`.
   expect_error(
     gdpins_init_board(
       name           = "missing",
@@ -436,7 +438,8 @@ test_that("[LIVE] init: create=FALSE errors when Drive folder absent", {
       cache_dir      = tempfile(),
       adapter        = adapter,
       create         = FALSE,
-      on_discrepancy = "ignore"
+      on_discrepancy = "ignore",
+      lazy           = FALSE
     ),
     class = "rlang_error"
   )
@@ -460,7 +463,8 @@ test_that("[LIVE] init: create=TRUE creates Drive folder", {
     cache_dir      = cache_dir,
     adapter        = adapter,
     create         = TRUE,
-    on_discrepancy = "ignore"
+    on_discrepancy = "ignore",
+    lazy           = FALSE
   )
 
   expect_true(gd_exists(adapter, test_sub))

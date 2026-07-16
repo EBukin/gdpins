@@ -844,6 +844,17 @@ test_that(".copy_pin_to_board warns when pin not found on source", {
   )
 })
 
+test_that(".copy_pin_to_board preserves the source pin's type", {
+  b <- new_fake_board("drive_cache")
+  suppressMessages(
+    pins::pin_write(b$drive_board, fx_plain_tbl(), "typed_pin", type = "parquet")
+  )
+
+  gdpins:::.copy_pin_to_board(b$drive_board, b$cache_board, "typed_pin")
+
+  expect_equal(pins::pin_meta(b$cache_board, "typed_pin")$type, "parquet")
+})
+
 # Cover .sync_raw "skip" effective_dir (in_sync state with auto direction)
 test_that("sync_raw skips in_sync files without error", {
   conn <- new_fake_raw_conn("drive_local")

@@ -12,7 +12,8 @@ gdpins_init_board(
   versioned = TRUE,
   create = NA,
   on_discrepancy = NULL,
-  adapter = NULL
+  adapter = NULL,
+  lazy = NULL
 )
 }
 \arguments{
@@ -38,6 +39,11 @@ error.}
 resolves to \code{"prompt"} interactively or \code{"warn"} non-interactively.}
 
 \item{adapter}{A \code{gdpins_drive_adapter}, or \code{NULL} for \code{"local_only"}.}
+
+\item{lazy}{Logical or \code{NULL}. \code{TRUE} (the default) defers all Drive work
+and the sync check until the board is first used; \code{FALSE} does it during
+this call. \code{NULL} uses the \code{gdpins.lazy_boards} option (default \code{TRUE}).
+See \link{lazy-boards}.}
 }
 \value{
 A \code{gdpins_board} object.
@@ -55,9 +61,15 @@ combination of arguments supplied:
 \code{local_dir}.
 }
 
-On init the board checks for sync discrepancies between Drive and local
-(governed by \code{on_discrepancy}). Non-existent Drive boards are never
-auto-created unless \code{create = TRUE}.
+The board checks for sync discrepancies between Drive and local (governed by
+\code{on_discrepancy}). Non-existent Drive boards are never auto-created unless
+\code{create = TRUE}.
+
+By default (\code{lazy = TRUE}) none of that happens at init: the board records
+its arguments and connects on first use. Initialising several Drive boards
+is then free, and you only pay for the ones you touch. See \link{lazy-boards} for
+what forces a connection and how error timing changes, and
+\code{\link[=gdpins_board_connect]{gdpins_board_connect()}} to force one on purpose.
 }
 \examples{
 # --- Fake adapter (no network) ---
@@ -94,5 +106,6 @@ board2 <- gdpins_init_board(
 }
 \seealso{
 \code{\link[=gdpins_real_drive]{gdpins_real_drive()}} to create an adapter, \code{\link[=gdpins_go_offline]{gdpins_go_offline()}}
-to temporarily detach an existing board from Drive and work locally.
+to temporarily detach an existing board from Drive and work locally,
+\code{\link[=gdpins_board_connect]{gdpins_board_connect()}} to connect a lazy board on demand.
 }
