@@ -32,6 +32,29 @@ NULL
   }, error = function(e) NA_integer_)
 }
 
+# ── Listing class ─────────────────────────────────────────────────────────────
+
+# Tag a pin listing tibble. The class goes *ahead* of the tibble classes so the
+# print method wins while every tibble/dplyr operation still works and
+# inherits(x, "tbl_df") stays TRUE. Mirrors gdpins_raw_listing.
+.new_pin_listing <- function(x) {
+  class(x) <- unique(c("gdpins_pin_listing", class(x)))
+  x
+}
+
+#' @export
+print.gdpins_pin_listing <- function(x, ...) {
+  n <- nrow(x)
+  if (n == 0L) {
+    cli::cli_alert_info("No matching pins.")
+    return(invisible(x))
+  }
+  cli::cli_text("{.strong {n} pin{?s}}")
+  # Names only: a listing answers "what is there", not "what is in it".
+  cli::cli_ul(gsub("}", "}}", gsub("{", "{{", x$name, fixed = TRUE), fixed = TRUE))
+  invisible(x)
+}
+
 # ── Exported functions ───────────────────────────────────────────────────────
 
 #' List all pins in a board
@@ -58,28 +81,36 @@ gdpins_list_pins <- function(board) {
   names <- pins::pin_list(src)
 
   if (length(names) == 0L) {
-    return(tibble::tibble(
+    return(.new_pin_listing(tibble::tibble(
       name       = character(0),
       type       = character(0),
       n_versions = integer(0),
       size       = double(0),
       modified   = structure(numeric(0), class = c("POSIXct", "POSIXt"))
-    ))
+    )))
   }
 
   rows <- purrr::map(names, function(nm) {
     meta       <- pins::pin_meta(src, nm)
     n_versions <- nrow(pins::pin_versions(src, nm))
+    # A pin may hold several files (pins::pin_upload()), making meta$file_size a
+    # vector. Left as-is it recycles `name` and yields one row *per file*, so a
+    # two-file pin was listed twice. One pin is one row; size is the total.
+    size <- if (is.null(meta$file_size)) {
+      NA_real_
+    } else {
+      as.double(sum(meta$file_size))
+    }
     tibble::tibble(
       name       = nm,
-      type       = if (is.null(meta$type)) NA_character_ else meta$type,
+      type       = if (is.null(meta$type)) NA_character_ else meta$type[[1L]],
       n_versions = as.integer(n_versions),
-      size       = as.double(meta$file_size),
-      modified   = meta$created
+      size       = size,
+      modified   = meta$created[[1L]]
     )
   })
 
-  purrr::list_rbind(rows)
+  .new_pin_listing(purrr::list_rbind(rows))
 }
 
 #' Retrieve detailed metadata for a single pin

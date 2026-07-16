@@ -20,3 +20,32 @@ Invisibly \code{NULL}.
 Copies a local file byte-for-byte to Drive and mirrors locally. No R
 round-trip, no coercion — byte-faithful upload.
 }
+\section{Objects vs paths}{
+
+The governing rule across gdpins: \strong{\verb{*_get} / \verb{*_read} return objects,
+\verb{*_path} returns paths.} The extension never switches the mode.
+
+\code{\link[=gdpins_raw_get]{gdpins_raw_get()}} deserialises, so it only accepts the four formats gdpins
+knows how to read — \code{.rds}, \code{.parquet}, \code{.geojson}, \code{.csv}. Anything else is
+an error naming those formats and pointing at \code{\link[=gdpins_raw_path]{gdpins_raw_path()}}.
+
+\code{\link[=gdpins_raw_path]{gdpins_raw_path()}} returns a path for \strong{any} extension, downloading from
+Drive on demand. It is the escape hatch for formats gdpins does not read:
+get the path, then hand it to whatever package does.
+
+\code{\link[=gdpins_raw_put_file]{gdpins_raw_put_file()}} mirrors that asymmetry. It uploads bytes verbatim, so
+it accepts any extension (\code{.gpkg}, \code{.tif}, \code{.xlsx}, …) and only insists that
+there \emph{is} one.
+}
+
+\seealso{
+Other raw-connection: 
+\code{\link{gdpins_raw_connect}()},
+\code{\link{gdpins_raw_get}()},
+\code{\link{gdpins_raw_ls}()},
+\code{\link{gdpins_raw_path}()},
+\code{\link{gdpins_raw_put_object}()},
+\code{\link{gdpins_raw_remove}()},
+\code{\link{gdpins_refresh_disconnect}()}
+}
+\concept{raw-connection}

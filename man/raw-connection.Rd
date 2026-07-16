@@ -8,3 +8,86 @@ Plain-file interface for data as received from external APIs or sources.
 No pins metadata layer — files are stored verbatim or serialised from R
 objects. Drive path is the truth; a local directory mirrors it.
 }
+\section{Raw connection verbs}{
+\tabular{lll}{
+   Verb \tab Takes \tab Returns \cr
+   \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}} \tab \code{drive_path}, \code{local_path} \tab a \code{gdpins_raw_conn} \cr
+   \code{\link[=gdpins_raw_put_object]{gdpins_raw_put_object()}} \tab an R object + a \code{name} \tab invisibly \code{NULL} \cr
+   \code{\link[=gdpins_raw_put_file]{gdpins_raw_put_file()}} \tab a file \code{path} + a \code{name} \tab invisibly \code{NULL} \cr
+   \code{\link[=gdpins_raw_get]{gdpins_raw_get()}} \tab a \code{name} \tab \strong{the object} \cr
+   \code{\link[=gdpins_raw_path]{gdpins_raw_path()}} \tab a \code{name} or Drive ID \tab \strong{a path} \cr
+   \code{\link[=gdpins_raw_ls]{gdpins_raw_ls()}} \tab a \code{depth} \tab a listing tibble \cr
+   \code{\link[=gdpins_raw_remove]{gdpins_raw_remove()}} \tab a \code{name} \tab invisibly \code{NULL} \cr
+   \code{\link[=gdpins_refresh_disconnect]{gdpins_refresh_disconnect()}} \tab — \tab invisibly \code{NULL} \cr
+}
+}
+
+\section{Objects vs paths}{
+
+The governing rule across gdpins: \strong{\verb{*_get} / \verb{*_read} return objects,
+\verb{*_path} returns paths.} The extension never switches the mode.
+
+\code{\link[=gdpins_raw_get]{gdpins_raw_get()}} deserialises, so it only accepts the four formats gdpins
+knows how to read — \code{.rds}, \code{.parquet}, \code{.geojson}, \code{.csv}. Anything else is
+an error naming those formats and pointing at \code{\link[=gdpins_raw_path]{gdpins_raw_path()}}.
+
+\code{\link[=gdpins_raw_path]{gdpins_raw_path()}} returns a path for \strong{any} extension, downloading from
+Drive on demand. It is the escape hatch for formats gdpins does not read:
+get the path, then hand it to whatever package does.
+
+\code{\link[=gdpins_raw_put_file]{gdpins_raw_put_file()}} mirrors that asymmetry. It uploads bytes verbatim, so
+it accepts any extension (\code{.gpkg}, \code{.tif}, \code{.xlsx}, …) and only insists that
+there \emph{is} one.
+}
+
+\section{Name resolution}{
+
+\code{\link[=gdpins_raw_path]{gdpins_raw_path()}}, \code{\link[=gdpins_raw_get]{gdpins_raw_get()}} and \code{\link[=gdpins_pin_read]{gdpins_pin_read()}} resolve the
+name you pass against what actually exists, stopping at the first hit:
+\enumerate{
+\item Exact relative path → resolve.
+\item Exact basename, unique → resolve silently (\code{"cars.csv"} finds
+\code{"sub/cars.csv"}).
+\item Exact basename, several matches → error listing every full path.
+\item Case-insensitive exact, unique → resolve silently.
+\item Same stem, different extension → error, suggesting it (\code{"cars.csv"} when
+only \code{"cars.parquet"} exists).
+\item Close on edit distance → error, suggesting the 5 nearest.
+\item Nothing close → error naming the connection, pointing at listing mode.
+}
+
+Auto-resolve happens \strong{only} at rungs 1, 2 and 4, where the match is both
+exact and unique. Rungs 3 and 5–7 only ever suggest — they never guess.
+
+Rung 4 also settles a real platform difference: \code{file.exists()} is
+case-insensitive on Windows and case-sensitive elsewhere, so gdpins does the
+case-folding itself rather than letting the filesystem do it on one platform
+and not the other.
+
+\code{\link[=gdpins_pin_read]{gdpins_pin_read()}} and \code{\link[=gdpins_pin_path]{gdpins_pin_path()}} use the same ladder without rungs
+2–3: pin names are flat, so "path" and "basename" are the same question.
+
+\code{\link[=gdpins_raw_remove]{gdpins_raw_remove()}} uses \strong{rung 1 only}. It hard-deletes the local copy, so
+it never auto-resolves a near-miss onto a real file; a missing target stays an
+idempotent no-op.
+}
+
+\section{Glob and listing mode}{
+
+A \code{name} containing \code{*} or \verb{?} switches \code{\link[=gdpins_raw_path]{gdpins_raw_path()}},
+\code{\link[=gdpins_raw_get]{gdpins_raw_get()}}, \code{\link[=gdpins_raw_remove]{gdpins_raw_remove()}}, \code{\link[=gdpins_pin_read]{gdpins_pin_read()}} and
+\code{\link[=gdpins_pin_path]{gdpins_pin_path()}} into \strong{listing mode}: they return a listing of what
+matches instead of acting on one item. Listing mode never bulk-reads and never
+bulk-deletes.
+\itemize{
+\item \code{"*"} — everything.
+\item \code{"*.csv"} — every \code{.csv}, at \strong{any depth} (unlike \code{\link[=gdpins_raw_ls]{gdpins_raw_ls()}}, whose
+\code{depth = 2} default hides \code{sub/sub/folder/file.rds}).
+}
+
+Matching is case-sensitive on every platform, so \code{"*.csv"} does not match
+\code{"CARS.CSV"}. Raw verbs return a \code{gdpins_raw_listing}; pin verbs return a
+\code{gdpins_pin_listing}. Both are ordinary tibbles with a print method that shows
+names only.
+}
+

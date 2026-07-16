@@ -72,15 +72,21 @@ test_that("unknown extension aborts on put_object", {
   )
 })
 
-test_that("unknown extension aborts on get", {
+test_that("unknown extension aborts on get, naming the readable formats", {
   conn <- new_fake_raw_conn()
   # Create a local file with bad extension
   local_file <- file.path(conn$local_path, "test.xyz")
   writeLines("garbage", local_file)
-  expect_error(
-    gdpins_raw_get(conn, "test.xyz"),
-    "Unsupported file extension"
-  )
+  # An unreadable extension is not a dead end -- it means "this is a file, not
+  # an object" -- so the error names what gdpins_raw_get() can read and points
+  # at gdpins_raw_path(), which returns a path for any extension.
+  expect_error(gdpins_raw_get(conn, "test.xyz"), "Cannot read")
+  err <- tryCatch(gdpins_raw_get(conn, "test.xyz"), error = function(e) e)
+  msg <- paste(c(conditionMessage(err), err$body), collapse = " ")
+  for (ext in c("rds", "parquet", "geojson", "csv")) {
+    expect_match(msg, ext, fixed = TRUE)
+  }
+  expect_match(msg, "gdpins_raw_path", fixed = TRUE)
 })
 
 # ── sf via parquet — shared encoder ──────────────────────────────────────────
@@ -246,6 +252,41 @@ test_that("raw_remove ignores missing targets (idempotent no-op)", {
   expect_no_error(gdpins_raw_remove(conn_local, "missing.csv"))
 })
 
+# Rung 1 is case-exact, so a mis-cased name is a miss, not a hit. Only
+# *meaningful* on a case-folding filesystem (Windows/macOS); on a case-sensitive
+# one it passes vacuously, since nothing could have matched anyway.
+test_that("raw_remove does not delete a case-mismatched name", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "cars.csv")
+
+  local_file <- file.path(conn$local_path, "cars.csv")
+  drive_file <- paste0(conn$drive_path, "/cars.csv")
+
+  expect_no_error(gdpins_raw_remove(conn, "CARS.CSV"))
+
+  expect_true(file.exists(local_file))
+  expect_true(gd_exists(conn$adapter, drive_file))
+  expect_true(any(gdpins_raw_ls(conn)$name == "cars.csv"))
+})
+
+test_that("raw_remove does not delete a case-mismatched name (local_only)", {
+  conn <- new_fake_raw_conn("local_only")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "cars.csv")
+
+  expect_no_error(gdpins_raw_remove(conn, "CARS.CSV"))
+  expect_true(file.exists(file.path(conn$local_path, "cars.csv")))
+})
+
+test_that("raw_remove does not delete on a case-mismatched directory", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "sub/cars.csv")
+
+  expect_no_error(gdpins_raw_remove(conn, "SUB/cars.csv"))
+
+  expect_true(file.exists(file.path(conn$local_path, "sub", "cars.csv")))
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/sub/cars.csv")))
+})
+
 test_that("raw_remove validates conn and name", {
   expect_error(
     gdpins_raw_remove(list(), "x.csv"),
@@ -311,12 +352,26 @@ test_that("force_refresh = TRUE errors if local_only (no adapter to pull from)",
   expect_equal(result$value, rep(0, nrow(tbl)))
 })
 
-test_that("get errors when local file absent and no force_refresh", {
+test_that("get errors when the name matches nothing at all", {
   conn <- new_fake_raw_conn()
-  expect_error(
-    gdpins_raw_get(conn, "does_not_exist.rds"),
-    "Local file not found"
-  )
+  # Empty connection: the name-resolution ladder reports that up front rather
+  # than blaming the local mirror for a file that exists nowhere.
+  expect_error(gdpins_raw_get(conn, "does_not_exist.rds"), "no files")
+})
+
+test_that("get errors when the file is on Drive but not mirrored locally", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "remote.csv")
+  # Drop the local mirror so the file exists only on the (fake) Drive side.
+  fs::file_delete(file.path(conn$local_path, "remote.csv"))
+
+  # gdpins_raw_get() reads the local mirror by default and does not silently
+  # reach for the network; force_refresh is the documented way to do that.
+  expect_error(gdpins_raw_get(conn, "remote.csv"), "Local file not found")
+  expect_error(gdpins_raw_get(conn, "remote.csv"), "force_refresh")
+
+  expect_equal(gdpins_raw_get(conn, "remote.csv", force_refresh = TRUE),
+               fx_plain_tbl())
 })
 
 test_that("gdpins_raw_connect: fake adapter with ID-like drive_path still works as path", {
@@ -461,7 +516,7 @@ test_that("raw_ls: non-standard filenames (spaces, parens, special chars) appear
   non_dir <- result[!result$is_dir, ]
   expect_true(all(nzchar(non_dir$local_path)))
 })
-
+
 # ── gdpins_raw_path ───────────────────────────────────────────────────────────
 
 test_that("gdpins_raw_path: relative path returns absolute path when file exists locally", {
@@ -476,6 +531,20 @@ test_that("gdpins_raw_path: relative path returns absolute path when file exists
     normalizePath(result, mustWork = TRUE),
     normalizePath(file.path(conn$local_path, "data.csv"), mustWork = TRUE)
   )
+})
+
+# Rung 1 must be case-exact on every path component, not just the basename, so a
+# mis-cased directory falls through to rung 4 and comes back spelled as on disk.
+# Only *meaningful* where the filesystem case-folds; vacuous elsewhere.
+test_that("gdpins_raw_path: case-mismatched directory resolves to the real spelling", {
+  conn <- new_fake_raw_conn("drive_local")
+  gdpins_raw_put_object(conn, fx_plain_tbl(), "sub/cars.csv")
+
+  expect_false(.local_exists_exact(conn, "SUB/cars.csv"))
+
+  result <- gdpins_raw_path(conn, "SUB/cars.csv")
+  expect_true(file.exists(result))
+  expect_equal(basename(dirname(result)), "sub")
 })
 
 test_that("gdpins_raw_path: relative path downloads from Drive when not local", {

@@ -4,6 +4,79 @@
 #' No pins metadata layer — files are stored verbatim or serialised from R
 #' objects. Drive path is the truth; a local directory mirrors it.
 #'
+#' @section Raw connection verbs:
+#' | Verb | Takes | Returns |
+#' | --- | --- | --- |
+#' | [gdpins_raw_connect()] | `drive_path`, `local_path` | a `gdpins_raw_conn` |
+#' | [gdpins_raw_put_object()] | an R object + a `name` | invisibly `NULL` |
+#' | [gdpins_raw_put_file()] | a file `path` + a `name` | invisibly `NULL` |
+#' | [gdpins_raw_get()] | a `name` | **the object** |
+#' | [gdpins_raw_path()] | a `name` or Drive ID | **a path** |
+#' | [gdpins_raw_ls()] | a `depth` | a listing tibble |
+#' | [gdpins_raw_remove()] | a `name` | invisibly `NULL` |
+#' | [gdpins_refresh_disconnect()] | — | invisibly `NULL` |
+#'
+#' @section Objects vs paths:
+#' The governing rule across gdpins: **`*_get` / `*_read` return objects,
+#' `*_path` returns paths.** The extension never switches the mode.
+#'
+#' [gdpins_raw_get()] deserialises, so it only accepts the four formats gdpins
+#' knows how to read — `.rds`, `.parquet`, `.geojson`, `.csv`. Anything else is
+#' an error naming those formats and pointing at [gdpins_raw_path()].
+#'
+#' [gdpins_raw_path()] returns a path for **any** extension, downloading from
+#' Drive on demand. It is the escape hatch for formats gdpins does not read:
+#' get the path, then hand it to whatever package does.
+#'
+#' [gdpins_raw_put_file()] mirrors that asymmetry. It uploads bytes verbatim, so
+#' it accepts any extension (`.gpkg`, `.tif`, `.xlsx`, …) and only insists that
+#' there *is* one.
+#'
+#' @section Name resolution:
+#' [gdpins_raw_path()], [gdpins_raw_get()] and [gdpins_pin_read()] resolve the
+#' name you pass against what actually exists, stopping at the first hit:
+#'
+#' 1. Exact relative path → resolve.
+#' 2. Exact basename, unique → resolve silently (`"cars.csv"` finds
+#'    `"sub/cars.csv"`).
+#' 3. Exact basename, several matches → error listing every full path.
+#' 4. Case-insensitive exact, unique → resolve silently.
+#' 5. Same stem, different extension → error, suggesting it (`"cars.csv"` when
+#'    only `"cars.parquet"` exists).
+#' 6. Close on edit distance → error, suggesting the 5 nearest.
+#' 7. Nothing close → error naming the connection, pointing at listing mode.
+#'
+#' Auto-resolve happens **only** at rungs 1, 2 and 4, where the match is both
+#' exact and unique. Rungs 3 and 5–7 only ever suggest — they never guess.
+#'
+#' Rung 4 also settles a real platform difference: `file.exists()` is
+#' case-insensitive on Windows and case-sensitive elsewhere, so gdpins does the
+#' case-folding itself rather than letting the filesystem do it on one platform
+#' and not the other.
+#'
+#' [gdpins_pin_read()] and [gdpins_pin_path()] use the same ladder without rungs
+#' 2–3: pin names are flat, so "path" and "basename" are the same question.
+#'
+#' [gdpins_raw_remove()] uses **rung 1 only**. It hard-deletes the local copy, so
+#' it never auto-resolves a near-miss onto a real file; a missing target stays an
+#' idempotent no-op.
+#'
+#' @section Glob and listing mode:
+#' A `name` containing `*` or `?` switches [gdpins_raw_path()],
+#' [gdpins_raw_get()], [gdpins_raw_remove()], [gdpins_pin_read()] and
+#' [gdpins_pin_path()] into **listing mode**: they return a listing of what
+#' matches instead of acting on one item. Listing mode never bulk-reads and never
+#' bulk-deletes.
+#'
+#' - `"*"` — everything.
+#' - `"*.csv"` — every `.csv`, at **any depth** (unlike [gdpins_raw_ls()], whose
+#'   `depth = 2` default hides `sub/sub/folder/file.rds`).
+#'
+#' Matching is case-sensitive on every platform, so `"*.csv"` does not match
+#' `"CARS.CSV"`. Raw verbs return a `gdpins_raw_listing`; pin verbs return a
+#' `gdpins_pin_listing`. Both are ordinary tibbles with a print method that shows
+#' names only.
+#'
 #' @name raw-connection
 NULL
 
@@ -53,17 +126,216 @@ NULL
   paste0(".", ext)
 }
 
+# The formats gdpins can serialise/deserialise as R objects.
+.RAW_OBJECT_EXTS <- c(".rds", ".parquet", ".geojson", ".csv")
+
 # Validate that extension is supported (abort on unknown)
 .check_ext <- function(name) {
   ext <- .raw_ext(name)
-  supported <- c(".rds", ".parquet", ".geojson", ".csv")
-  if (!ext %in% supported) {
+  if (!ext %in% .RAW_OBJECT_EXTS) {
+    # Local binding: cli >= 3.4 reads a leading dot inside {} as a style name.
+    supported <- .RAW_OBJECT_EXTS
     cli::cli_abort(c(
       "Unsupported file extension {.val {ext}} in {.val {name}}.",
       i = "Supported extensions: {.val {supported}}."
     ))
   }
   ext
+}
+
+# As .check_ext(), but phrased for gdpins_raw_get(): an unreadable extension is
+# not a dead end, it just means "this is a file, not an object" -- so point at
+# gdpins_raw_path(), which returns a path for any extension.
+.check_ext_get <- function(name) {
+  ext <- .raw_ext(name)
+  if (!ext %in% .RAW_OBJECT_EXTS) {
+    # Local binding: cli >= 3.4 reads a leading dot inside {} as a style name.
+    supported <- .RAW_OBJECT_EXTS
+    shown     <- if (nzchar(ext)) ext else "<none>"
+    cli::cli_abort(c(
+      "Cannot read {.val {name}} as an R object.",
+      x = "{.fn gdpins_raw_get} reads only {.val {supported}}; got {.val {shown}}.",
+      i = "Use {.fn gdpins_raw_path} to get the file path instead, then read it
+           with whatever package handles this format."
+    ))
+  }
+  ext
+}
+
+# ── Listing class ─────────────────────────────────────────────────────────────
+
+# Tag a raw listing tibble. The class goes *ahead* of the tibble classes so the
+# print method takes precedence while every tibble/dplyr operation still works
+# and `inherits(x, "tbl_df")` stays TRUE.
+.new_raw_listing <- function(x) {
+  class(x) <- unique(c("gdpins_raw_listing", class(x)))
+  x
+}
+
+#' @export
+print.gdpins_raw_listing <- function(x, ...) {
+  n <- nrow(x)
+  if (n == 0L) {
+    cli::cli_alert_info("No matching files.")
+    return(invisible(x))
+  }
+  cli::cli_text("{.strong {n} file{?s}}")
+  # Names/paths only: a listing answers "what is there", not "what is in it".
+  cli::cli_ul(gsub("}", "}}", gsub("{", "{{", x$name, fixed = TRUE), fixed = TRUE))
+  invisible(x)
+}
+
+# ── Name resolution ───────────────────────────────────────────────────────────
+
+# TRUE when `name` asks for a listing rather than one specific file.
+.is_glob <- function(name) grepl("[*?]", name)
+
+# Does `name` exist locally, spelled exactly as given?
+#
+# file.exists() is case-insensitive on Windows and case-sensitive elsewhere, so
+# a plain file.exists() fast path would answer TRUE for "CARS.CSV" on Windows
+# and return a path spelled differently from the file on disk -- while Linux
+# fell through to rung 4 and returned the real spelling. Comparing against the
+# actual directory entries is case-exact on every platform, so rung 4 does the
+# case-folding uniformly instead of the filesystem doing it on one platform.
+# Every component must match case-exactly, not just the basename: dirname() is
+# resolved by the filesystem too, so "SUB/cars.csv" would otherwise pass rung 1
+# on Windows and return a path spelled unlike the directory on disk.
+.local_exists_exact <- function(conn, name) {
+  if (!file.exists(.local_full_path(conn, name))) return(FALSE)
+  parts <- strsplit(name, "[/\\\\]")[[1L]]
+  parts <- parts[nzchar(parts)]
+  if (length(parts) == 0L) return(FALSE)
+  # Walk down from the root, listing one directory per component -- cheaper than
+  # a recursive listing, and only ever reached when file.exists() already hit.
+  dir <- conn$local_path
+  for (part in parts) {
+    if (!part %in% list.files(dir, all.files = TRUE, no.. = TRUE)) return(FALSE)
+    dir <- file.path(dir, part)
+  }
+  TRUE
+}
+
+# Every file in the connection, full depth, as relative "/"-separated paths.
+# Drive is the truth and the local directory mirrors it, so gdpins_raw_ls()
+# reports the Drive side whenever an adapter is attached. depth = Inf because
+# the default depth = 2 hides sub/sub/folder/file.rds.
+.raw_file_candidates <- function(conn) {
+  listing <- gdpins_raw_ls(conn, depth = Inf)
+  if (nrow(listing) == 0L) return(character())
+  listing$name[!listing$is_dir]
+}
+
+# Listing mode: files matching a glob, full depth. Never reads any of them.
+.raw_glob_listing <- function(conn, pattern) {
+  listing <- gdpins_raw_ls(conn, depth = Inf)
+  listing <- listing[!listing$is_dir, , drop = FALSE]
+  matched <- fs::path_filter(listing$name, glob = pattern)
+  .new_raw_listing(listing[listing$name %in% matched, , drop = FALSE])
+}
+
+# Bullet list of candidate paths for error messages, capped so a wide
+# connection cannot flood the console.
+.raw_suggest_bullets <- function(paths, max_n = 5L) {
+  # cli interpolates {...}; a filename may legally contain braces, so escape
+  # them rather than let a stray "{" turn a helpful error into a glue failure.
+  esc <- function(x) {
+    gsub("}", "}}", gsub("{", "{{", x, fixed = TRUE), fixed = TRUE)
+  }
+  shown      <- utils::head(paths, max_n)
+  out        <- esc(shown)
+  names(out) <- rep("*", length(out))
+  if (length(paths) > max_n) {
+    extra        <- paste0("... and ", length(paths) - max_n, " more")
+    names(extra) <- "i"
+    out <- c(out, extra)
+  }
+  out
+}
+
+#' Resolve a user-supplied name to a file in a raw connection
+#'
+#' Walks the name-resolution ladder documented on [raw-connection]. Auto-resolve
+#' happens only where the match is both exact and unique (rungs 1, 2, 4); every
+#' looser rung only ever *suggests*, via an error.
+#'
+#' @param conn A `gdpins_raw_conn` object.
+#' @param name Character scalar. The name as the user typed it.
+#' @param verb Character scalar. Calling verb, used in error text.
+#'
+#' @return Character scalar. A relative path known to the connection.
+#' @keywords internal
+.resolve_raw_name <- function(conn, name, verb = "gdpins_raw_path") {
+  # Rung 1 -- exact relative path. Checked against the local mirror first so a
+  # file that is already here never triggers a Drive listing.
+  if (.local_exists_exact(conn, name)) return(name)
+
+  cands <- .raw_file_candidates(conn)
+  if (name %in% cands) return(name)
+
+  glob_hint <- paste0(verb, '(conn, "*")')
+
+  if (length(cands) == 0L) {
+    cli::cli_abort(c(
+      "File not found in raw connection: {.path {name}}",
+      x = "The connection has no files.",
+      i = "Add one with {.fn gdpins_raw_put_file} or {.fn gdpins_raw_put_object}."
+    ))
+  }
+
+  base_q <- basename(name)
+  bases  <- basename(cands)
+
+  # Rungs 2/3 -- exact basename.
+  by_base <- cands[bases == base_q]
+  if (length(by_base) > 1L) {
+    cli::cli_abort(c(
+      "Ambiguous name {.val {name}}: {length(by_base)} files share that name.",
+      i = "Use the full relative path. Matches:",
+      .raw_suggest_bullets(by_base, max_n = length(by_base))
+    ))
+  }
+  if (length(by_base) == 1L) return(by_base)
+
+  # Rung 4 -- case-insensitive exact, on the full path or the basename.
+  ci <- cands[tolower(cands) == tolower(name) | tolower(bases) == tolower(base_q)]
+  ci <- unique(ci)
+  if (length(ci) == 1L) return(ci)
+
+  # Everything below only suggests.
+  near <- unique(c(by_base, ci))
+
+  # Rung 5 -- same stem, different extension. Distance-exempt: "cars.csv" should
+  # find "cars.parquet" however far apart the extensions look.
+  stem_q  <- tools::file_path_sans_ext(base_q)
+  by_stem <- cands[tolower(tools::file_path_sans_ext(bases)) == tolower(stem_q)]
+  near    <- unique(c(near, by_stem))
+
+  # Rung 6 -- edit distance on the lowercased basename.
+  if (length(near) == 0L) {
+    d   <- utils::adist(tolower(base_q), tolower(bases))[1L, ]
+    thr <- max(2L, floor(0.34 * nchar(base_q)))
+    within <- which(d <= thr)
+    near   <- cands[within[order(d[within])]]
+    near   <- utils::head(near, 5L)
+  }
+
+  # Rung 7 -- nothing close.
+  if (length(near) == 0L) {
+    root <- if (!is.null(conn$drive_path)) conn$drive_path else conn$local_path
+    cli::cli_abort(c(
+      "File not found in raw connection: {.path {name}}",
+      i = "Connection root: {.path {root}}",
+      i = "List everything with {.code {glob_hint}}."
+    ))
+  }
+
+  cli::cli_abort(c(
+    "File not found in raw connection: {.path {name}}",
+    i = "Did you mean:",
+    .raw_suggest_bullets(near),
+    i = "List everything with {.code {glob_hint}}."
+  ))
 }
 
 # Serialise x to a temp file using the writer for ext; return temp path
@@ -240,6 +512,7 @@ NULL
 #'   adapter    = adapter
 #' )
 #' }
+#' @family raw-connection
 #' @export
 gdpins_raw_connect <- function(
     drive_path,
@@ -433,6 +706,8 @@ gdpins_raw_connect <- function(
 #'   the `gdpins.wkt_engine` option. See [gdpins_sf_to_parquet()].
 #'
 #' @return Invisibly `NULL`.
+#' @inheritSection raw-connection Objects vs paths
+#' @family raw-connection
 #' @export
 gdpins_raw_put_object <- function(conn, x, name, wkt_engine = NULL) {
   .check_ext(name)
@@ -464,10 +739,25 @@ gdpins_raw_put_object <- function(conn, x, name, wkt_engine = NULL) {
 #' @param name Character scalar. Relative destination path within the raw-root.
 #'
 #' @return Invisibly `NULL`.
+#' @inheritSection raw-connection Objects vs paths
+#' @family raw-connection
 #' @export
 gdpins_raw_put_file <- function(conn, path, name) {
   if (!file.exists(path)) {
     cli::cli_abort("Source file not found: {.path {path}}")
+  }
+
+  # Any extension, but there must be one. Deliberately NOT .check_ext(): this
+  # verb uploads bytes verbatim, so restricting it to the four readable formats
+  # would reject .gpkg/.tif/.xlsx -- precisely what it exists to carry. An
+  # extension is still required so the file stays identifiable on Drive.
+  if (!nzchar(tools::file_ext(name))) {
+    cli::cli_abort(c(
+      "{.arg name} must include a file extension.",
+      x = "Got {.val {name}}.",
+      i = "Any extension is accepted (e.g. {.val .gpkg}, {.val .tif}, {.val .xlsx});
+           it is kept verbatim on Drive."
+    ))
   }
 
   local_dest <- .local_full_path(conn, name)
@@ -503,6 +793,9 @@ gdpins_raw_put_file <- function(conn, path, name) {
 #' )
 #' gdpins_raw_put_object(conn, mtcars, "cars.csv")
 #' gdpins_raw_remove(conn, "cars.csv")
+#' @inheritSection raw-connection Name resolution
+#' @inheritSection raw-connection Glob and listing mode
+#' @family raw-connection
 #' @export
 gdpins_raw_remove <- function(conn, name) {
   if (!inherits(conn, "gdpins_raw_conn")) {
@@ -515,14 +808,37 @@ gdpins_raw_remove <- function(conn, name) {
     cli::cli_abort("{.arg name} must be a non-empty character scalar.")
   }
 
-  local_file <- .local_full_path(conn, name)
-  if (file.exists(local_file)) {
-    fs::file_delete(local_file)
+  # Listing mode. Never bulk-deletes -- a glob shows what *would* match, and the
+  # caller removes files one exact path at a time.
+  if (.is_glob(name)) {
+    return(.raw_glob_listing(conn, name))
+  }
+
+  # Rung 1 only -- the name-resolution ladder is deliberately NOT applied here.
+  # Removal hard-deletes the local copy, and auto-resolving a near-miss onto a
+  # real file is exactly the guess a delete-guarded package must never make.
+  # Missing targets stay an idempotent no-op, so there is no error path to hang
+  # "did you mean" suggestions on.
+  #
+  # Both sides are gated on a case-exact hit, and nothing is touched unless one
+  # of them hits. A bare file.exists() / adapter-side lookup is case-insensitive
+  # on Windows, which would make "CARS.CSV" delete cars.csv on one platform and
+  # no-op on another -- the exact guess this rung exists to forbid.
+  found_local <- .local_exists_exact(conn, name)
+
+  # Drive is the truth, so a file can be there without being mirrored. Only
+  # listed when the local check missed: the listing costs a Drive call.
+  found_drive <- !found_local && !is.null(conn$adapter) &&
+    name %in% .raw_file_candidates(conn)
+
+  if (!found_local && !found_drive) return(invisible(NULL))
+
+  if (found_local) {
+    fs::file_delete(.local_full_path(conn, name))
   }
 
   if (!is.null(conn$adapter)) {
-    drive_file <- .drive_full_path(conn, name)
-    gd_trash(conn$adapter, drive_file)
+    gd_trash(conn$adapter, .drive_full_path(conn, name))
   }
 
   invisible(NULL)
@@ -601,6 +917,10 @@ gdpins_raw_remove <- function(conn, name) {
 #' local_path <- gdpins_raw_path(conn_real, file_id)
 #' arrow::read_parquet(local_path)
 #' }
+#' @inheritSection raw-connection Name resolution
+#' @inheritSection raw-connection Glob and listing mode
+#' @inheritSection raw-connection Objects vs paths
+#' @family raw-connection
 #' @export
 gdpins_raw_path <- function(conn, name_or_id) {
   if (!inherits(conn, "gdpins_raw_conn")) {
@@ -611,6 +931,13 @@ gdpins_raw_path <- function(conn, name_or_id) {
   }
   if (!is.character(name_or_id) || length(name_or_id) != 1L || !nzchar(name_or_id)) {
     cli::cli_abort("{.arg name_or_id} must be a non-empty character scalar.")
+  }
+
+  # ── Listing branch ───────────────────────────────────────────────────────────
+  # Checked before the Drive-ID heuristic: a Drive ID is purely alphanumeric and
+  # so can never contain "*" or "?".
+  if (.is_glob(name_or_id)) {
+    return(.raw_glob_listing(conn, name_or_id))
   }
 
   # ── Drive ID branch ──────────────────────────────────────────────────────────
@@ -653,15 +980,23 @@ gdpins_raw_path <- function(conn, name_or_id) {
   }
 
   # ── Relative path branch ─────────────────────────────────────────────────────
-  local_dest <- .local_full_path(conn, name_or_id)
+  # Fast path: already mirrored locally under exactly this spelling, so there is
+  # nothing to resolve and no reason to list Drive.
+  if (.local_exists_exact(conn, name_or_id)) {
+    return(.local_full_path(conn, name_or_id))
+  }
 
+  # Walk the ladder. Auto-resolves only on an exact, unique match; otherwise it
+  # aborts with suggestions, so anything returned here is a real relative path.
+  name       <- .resolve_raw_name(conn, name_or_id, verb = "gdpins_raw_path")
+  local_dest <- .local_full_path(conn, name)
   if (file.exists(local_dest)) return(local_dest)
 
   if (!is.null(conn$adapter)) {
-    drive_src <- .drive_full_path(conn, name_or_id)
+    drive_src <- .drive_full_path(conn, name)
     if (!gd_exists(conn$adapter, drive_src)) {
       cli::cli_abort(c(
-        "File not found on Drive: {.path {name_or_id}}",
+        "File not found on Drive: {.path {name}}",
         i = "Check the path with {.fn gdpins_raw_ls} or upload the file first."
       ))
     }
@@ -694,20 +1029,51 @@ gdpins_raw_path <- function(conn, name_or_id) {
 #'   [gdpins_parquet_to_sf()].
 #'
 #' @return The deserialised R object.
+#' @inheritSection raw-connection Name resolution
+#' @inheritSection raw-connection Glob and listing mode
+#' @inheritSection raw-connection Objects vs paths
+#' @family raw-connection
 #' @export
 gdpins_raw_get <- function(conn, name, force_refresh = FALSE, wkt_engine = NULL) {
+  if (!inherits(conn, "gdpins_raw_conn")) {
+    cli::cli_abort(c(
+      "{.arg conn} must be a {.cls gdpins_raw_conn}.",
+      x = "Got {.cls {class(conn)}}."
+    ))
+  }
+  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
+    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
+  }
+
+  # Listing mode never reads: a glob asks what is there, not for its contents.
+  if (.is_glob(name)) {
+    return(.raw_glob_listing(conn, name))
+  }
+
+  # Resolve before touching the extension, so a near-miss reports "did you mean"
+  # rather than complaining about the extension of a file that does not exist.
+  if (!.local_exists_exact(conn, name)) {
+    name <- .resolve_raw_name(conn, name, verb = "gdpins_raw_get")
+  }
+
+  # Refuse unreadable formats up front, and point at the verb that does work.
+  .check_ext_get(name)
+
   local_file <- .local_full_path(conn, name)
 
   if (isTRUE(force_refresh) && !is.null(conn$adapter)) {
-    drive_src  <- .drive_full_path(conn, name)
+    drive_src <- .drive_full_path(conn, name)
     fs::dir_create(dirname(local_file))
     gd_download(conn$adapter, drive_src, local_file)
   }
 
+  # Deliberately does NOT auto-download: gdpins_raw_get() reads the local mirror
+  # by default, and force_refresh is the documented way to reach Drive.
   if (!file.exists(local_file)) {
     cli::cli_abort(c(
       "Local file not found: {.path {local_file}}",
-      i = "Use {.code force_refresh = TRUE} to pull from Drive first."
+      i = "Use {.code force_refresh = TRUE} to pull from Drive first.",
+      i = "Or call {.code gdpins_raw_path(conn, {.str {name}})}, which downloads on demand."
     ))
   }
 
@@ -751,9 +1117,11 @@ gdpins_raw_get <- function(conn, name, force_refresh = FALSE, wkt_engine = NULL)
 #' tbl <- gdpins_raw_ls(conn)
 #' tbl$local_path   # absolute local path
 #' tbl$drive_id     # NA for fake adapter; real Drive ID with real adapter
+#' @inheritSection raw-connection Glob and listing mode
+#' @family raw-connection
 #' @export
 gdpins_raw_ls <- function(conn, depth = 2) {
-  empty <- tibble::tibble(
+  empty <- .new_raw_listing(tibble::tibble(
     name       = character(),
     is_dir     = logical(),
     size       = double(),
@@ -762,7 +1130,7 @@ gdpins_raw_ls <- function(conn, depth = 2) {
     local_path = character(),
     drive_id   = character(),
     drive_url  = character()
-  )
+  ))
 
   if (!is.null(conn$adapter)) {
     # Drive-backed: use gd_ls with recursive = TRUE then filter by depth
@@ -790,7 +1158,7 @@ gdpins_raw_ls <- function(conn, depth = 2) {
     drive_id_col  <- listing$drive_id
     drive_url_col <- .make_drive_url(drive_id_col, listing$is_dir)
 
-    tibble::tibble(
+    .new_raw_listing(tibble::tibble(
       name       = rel_path,
       is_dir     = listing$is_dir,
       size       = listing$size,
@@ -799,7 +1167,7 @@ gdpins_raw_ls <- function(conn, depth = 2) {
       local_path = local_path_col,
       drive_id   = drive_id_col,
       drive_url  = drive_url_col
-    )
+    ))
   } else {
     # local_only
     abs_paths <- fs::dir_ls(conn$local_path, recurse = TRUE, all = FALSE)
@@ -824,7 +1192,7 @@ gdpins_raw_ls <- function(conn, depth = 2) {
     rel_keep <- rel_paths[keep]
     dep_keep <- entry_depth[keep]
 
-    tibble::tibble(
+    .new_raw_listing(tibble::tibble(
       name       = rel_keep,
       is_dir     = fs::is_dir(abs_keep),
       size       = vapply(abs_keep, function(p) {
@@ -835,7 +1203,7 @@ gdpins_raw_ls <- function(conn, depth = 2) {
       local_path = abs_keep,
       drive_id   = rep(NA_character_, length(rel_keep)),
       drive_url  = rep(NA_character_, length(rel_keep))
-    )
+    ))
   }
 }
 
@@ -849,6 +1217,7 @@ gdpins_raw_ls <- function(conn, depth = 2) {
 #' @param conn A `gdpins_raw_conn` object.
 #'
 #' @return Invisibly `NULL`.
+#' @family raw-connection
 #' @export
 gdpins_refresh_disconnect <- function(conn) {
   if (!is.null(conn$adapter)) {

@@ -16,3 +16,14 @@ Invisibly \code{NULL}.
 Pulls all files from Drive to the local mirror, then invalidates the
 connection object.
 }
+\seealso{
+Other raw-connection: 
+\code{\link{gdpins_raw_connect}()},
+\code{\link{gdpins_raw_get}()},
+\code{\link{gdpins_raw_ls}()},
+\code{\link{gdpins_raw_path}()},
+\code{\link{gdpins_raw_put_file}()},
+\code{\link{gdpins_raw_put_object}()},
+\code{\link{gdpins_raw_remove}()}
+}
+\concept{raw-connection}

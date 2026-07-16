@@ -32,6 +32,7 @@ reference:
     Read and write versioned R objects (tibbles, sf, lists) to a board.
   contents:
   - gdpins_pin_read
+  - gdpins_pin_path
   - gdpins_pin_write
   - gdpins_pin_info
   - gdpins_list_pins

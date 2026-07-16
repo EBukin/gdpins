@@ -88,6 +88,9 @@ gdpins_pin_write(bd_raw, parcels,  "parcels")   # sf auto-encoded as parquet
 # Read back
 gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")
 parcels   <- gdpins_pin_read(bd_raw, "parcels")  # sf restored with CRS intact
+
+# Need the file rather than the object? *_read returns objects, *_path returns paths
+path <- gdpins_pin_path(bd_raw, "parcels")
 ```
 
 ## Raw-exogenous connection
@@ -109,6 +112,14 @@ gdpins_raw_put_file(conn, path = "downloads/data.geojson", name = "data.geojson"
 
 # Retrieve (reads local mirror; hits Drive only if absent locally)
 result <- gdpins_raw_get(conn, "gdp_2024.parquet")
+
+# Names resolve: a unique basename or the wrong case is enough. A near-miss is
+# reported with suggestions, never silently resolved to a different file.
+result <- gdpins_raw_get(conn, "gdp_2024.parquet")   # even if nested under api/
+
+# "*" or "?" switches to listing mode -- shows what matches, reads nothing
+gdpins_raw_path(conn, "*")        # everything, at any depth
+gdpins_raw_path(conn, "*.csv")    # every CSV, however deeply nested
 
 # List contents
 gdpins_raw_ls(conn, depth = 2)
