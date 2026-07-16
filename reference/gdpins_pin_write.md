@@ -78,13 +78,11 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
-#>   `gdpins_sync()` to reconcile.
 
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260715T125502Z-c0340'
+#> Creating new version '20260716T190822Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260715T125502Z-c0340'
+#> Creating new version '20260716T190822Z-c0340'
 #> Writing to pin 'cars'
 
 if (FALSE) { # \dontrun{

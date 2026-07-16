@@ -61,6 +61,40 @@ with 8 columns:
   `https://drive.google.com/drive/folders/<id>` for folders), or
   `NA_character_` when `drive_id` is `NA`.
 
+## Glob and listing mode
+
+A `name` containing `*` or `?` switches
+[`gdpins_raw_path()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_path.md),
+[`gdpins_raw_get()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_get.md),
+[`gdpins_raw_remove()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_remove.md),
+[`gdpins_pin_read()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_read.md)
+and
+[`gdpins_pin_path()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_path.md)
+into **listing mode**: they return a listing of what matches instead of
+acting on one item. Listing mode never bulk-reads and never
+bulk-deletes.
+
+- `"*"` — everything.
+
+- `"*.csv"` — every `.csv`, at **any depth** (unlike `gdpins_raw_ls()`,
+  whose `depth = 2` default hides `sub/sub/folder/file.rds`).
+
+Matching is case-sensitive on every platform, so `"*.csv"` does not
+match `"CARS.CSV"`. Raw verbs return a `gdpins_raw_listing`; pin verbs
+return a `gdpins_pin_listing`. Both are ordinary tibbles with a print
+method that shows names only.
+
+## See also
+
+Other raw-connection:
+[`gdpins_raw_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_connect.md),
+[`gdpins_raw_get()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_get.md),
+[`gdpins_raw_path()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_path.md),
+[`gdpins_raw_put_file()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_put_file.md),
+[`gdpins_raw_put_object()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_put_object.md),
+[`gdpins_raw_remove()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_remove.md),
+[`gdpins_refresh_disconnect()`](https://ebukin.github.io/gdpins/reference/gdpins_refresh_disconnect.md)
+
 ## Examples
 
 ``` r
@@ -74,7 +108,7 @@ conn <- gdpins_raw_connect(
 gdpins_raw_put_object(conn, mtcars, "cars.csv")
 tbl <- gdpins_raw_ls(conn)
 tbl$local_path   # absolute local path
-#> [1] "/tmp/Rtmp7u8b8x/raw_24f96fdfc54d/cars.csv"
+#> [1] "/tmp/RtmplHQDVx/raw_1e0c6cf2aa31/cars.csv"
 tbl$drive_id     # NA for fake adapter; real Drive ID with real adapter
 #> [1] NA
 ```

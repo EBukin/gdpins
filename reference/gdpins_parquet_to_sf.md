@@ -36,11 +36,16 @@ gdpins_parquet_to_sf(x, engine = NULL)
 An `sf` object. Column names are restored to their original form (suffix
 stripped). CRS is set from the EPSG code embedded in the name.
 
+## See also
+
+[`gdpins_as_sf()`](https://ebukin.github.io/gdpins/reference/gdpins_as_sf.md)
+for a single-column decoder that autodetects the geometry column and
+infers the CRS from messier column names.
+
 ## Examples
 
 ``` r
 library(sf)
-#> Linking to GEOS 3.12.1, GDAL 3.8.4, PROJ 9.4.0; sf_use_s2() is TRUE
 pts <- st_sf(
   id = 1:2,
   geometry = st_sfc(st_point(c(71, 51)), st_point(c(76, 43)), crs = 4326)

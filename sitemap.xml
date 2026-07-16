@@ -1,6 +1,7 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://ebukin.github.io/gdpins/404.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/AGENTS.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/CLAUDE.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/LICENSE-text.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/articles/gdpins-usage.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/articles/google-drive-adapter.html</loc></url>
@@ -10,15 +11,23 @@
 <url><loc>https://ebukin.github.io/gdpins/index.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/news/index.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/auth.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/board-extract.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/board.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/classes.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/cli-helpers.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/discovery.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-board_field.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-board_force.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-board_lazy_state.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-board_spec.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-build_board.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-collect_figures_work.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-collect_tables_work.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-config_components.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-drive_rel.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-gdpins_wkt_engine.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-handle_init_sync.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-has_discrepancy.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-is_drive_id.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-is_sf_like.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-prune_check_threshold.html</loc></url>
@@ -30,6 +39,8 @@
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-real_ls_recursive.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-remove_local_version.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-resolve_on_discrepancy.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-resolve_pin_name.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-resolve_raw_name.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-resolve_read_board.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-resolve_real_path.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-trash_drive_version.html</loc></url>
@@ -49,6 +60,9 @@
 <url><loc>https://ebukin.github.io/gdpins/reference/gd_trash.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gd_upload.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins-package.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/gdpins_as_sf.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/gdpins_board_connect.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/gdpins_board_is_connected.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_board_status.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_detect_format.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_drive_url.html</loc></url>
@@ -59,6 +73,7 @@
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_list_pins.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_parquet_to_sf.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_pin_info.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/gdpins_pin_path.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_pin_read.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_pin_remove.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_pin_write.html</loc></url>
@@ -79,7 +94,9 @@
 <url><loc>https://ebukin.github.io/gdpins/reference/gdpins_sync.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/index.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/io-formats.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/lazy-boards.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/new_gdpins_board.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/new_gdpins_board_lazy.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/new_gdpins_raw_conn.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/offline-mode.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/output.html</loc></url>

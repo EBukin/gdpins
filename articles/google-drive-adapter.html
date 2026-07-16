@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -206,15 +206,14 @@ offline testing:</p>
 <span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span>
 <span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: <span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">"test_board"</span>: sync discrepancy detected between Drive and local. Run</span></span>
-<span><span class="co">#&gt;   `gdpins_sync()` to reconcile.</span></span>
 <span><span class="va">board</span></span>
 <span><span class="co">#&gt; &lt;gdpins_board&gt; [DC-] v+ cfg=drive_cache name=test_board path=project/data-raw</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">config</span>: <span style="color: #0000BB;">"drive_cache"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">name</span>: <span style="color: #0000BB;">"test_board"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">versioned</span>: <span style="color: #0000BB;">"TRUE"</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">connected</span>: <span style="color: #0000BB;">"FALSE"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">drive</span>: <span style="color: #0000BB;">"project/data-raw"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpLFZGtB/cache_2aeb61da65b2"</span></span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpqiDLsK/cache_24cf1e59cb3d"</span></span></span></code></pre></div>
 <p>The fake adapter mirrors Drive operations on the local filesystem —
 no credentials, no network, fully reproducible.</p>
 <p>Note that <code><a href="../reference/gdpins_fake_drive.html">gdpins_fake_drive()</a></code> is a <strong>test
@@ -248,8 +247,6 @@ files:</p>
 <span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span>
 <span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: <span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">"data_raw"</span>: sync discrepancy detected between Drive and local. Run</span></span>
-<span><span class="co">#&gt;   `gdpins_sync()` to reconcile.</span></span>
 <span></span>
 <span><span class="va">board_offline</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/offline-mode.html">gdpins_go_offline</a></span><span class="op">(</span><span class="va">board</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Board <span style="color: #0000BB;">"data_raw"</span> switched to local-only (offline) mode.</span></span>
@@ -259,7 +256,7 @@ files:</p>
 <span></span>
 <span><span class="co"># Reads and writes stay local -- no network calls, no blocked writes</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Creating new version '20260715T125513Z-c0340'</span></span>
+<span><span class="co">#&gt; Creating new version '20260716T190834Z-c0340'</span></span>
 <span><span class="co">#&gt; Writing to pin 'cars'</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="st">"cars"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 32 × 11</span></span></span>

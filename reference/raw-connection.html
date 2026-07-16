@@ -11,7 +11,7 @@ objects. Drive path is the truth; a local directory mirrors it."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -48,8 +48,71 @@ objects. Drive path is the truth; a local directory mirrors it.</p>
     </div>
 
 
+    <div class="section level2">
+    <h2 id="raw-connection-verbs">Raw connection verbs<a class="anchor" aria-label="anchor" href="#raw-connection-verbs"></a></h2>
 
-  </main></div>
+<table class="table table"><tr><td>Verb</td><td>Takes</td><td>Returns</td></tr><tr><td><code><a href="gdpins_raw_connect.html">gdpins_raw_connect()</a></code></td><td><code>drive_path</code>, <code>local_path</code></td><td>a <code>gdpins_raw_conn</code></td></tr><tr><td><code><a href="gdpins_raw_put_object.html">gdpins_raw_put_object()</a></code></td><td>an R object + a <code>name</code></td><td>invisibly <code>NULL</code></td></tr><tr><td><code><a href="gdpins_raw_put_file.html">gdpins_raw_put_file()</a></code></td><td>a file <code>path</code> + a <code>name</code></td><td>invisibly <code>NULL</code></td></tr><tr><td><code><a href="gdpins_raw_get.html">gdpins_raw_get()</a></code></td><td>a <code>name</code></td><td><strong>the object</strong></td></tr><tr><td><code><a href="gdpins_raw_path.html">gdpins_raw_path()</a></code></td><td>a <code>name</code> or Drive ID</td><td><strong>a path</strong></td></tr><tr><td><code><a href="gdpins_raw_ls.html">gdpins_raw_ls()</a></code></td><td>a <code>depth</code></td><td>a listing tibble</td></tr><tr><td><code><a href="gdpins_raw_remove.html">gdpins_raw_remove()</a></code></td><td>a <code>name</code></td><td>invisibly <code>NULL</code></td></tr><tr><td><code><a href="gdpins_refresh_disconnect.html">gdpins_refresh_disconnect()</a></code></td><td>—</td><td>invisibly <code>NULL</code></td></tr></table></div>
+    <div class="section level2">
+    <h2 id="objects-vs-paths">Objects vs paths<a class="anchor" aria-label="anchor" href="#objects-vs-paths"></a></h2>
+
+
+<p>The governing rule across gdpins: <strong><code>*_get</code> / <code>*_read</code> return objects,
+<code>*_path</code> returns paths.</strong> The extension never switches the mode.</p>
+<p><code><a href="gdpins_raw_get.html">gdpins_raw_get()</a></code> deserialises, so it only accepts the four formats gdpins
+knows how to read — <code>.rds</code>, <code>.parquet</code>, <code>.geojson</code>, <code>.csv</code>. Anything else is
+an error naming those formats and pointing at <code><a href="gdpins_raw_path.html">gdpins_raw_path()</a></code>.</p>
+<p><code><a href="gdpins_raw_path.html">gdpins_raw_path()</a></code> returns a path for <strong>any</strong> extension, downloading from
+Drive on demand. It is the escape hatch for formats gdpins does not read:
+get the path, then hand it to whatever package does.</p>
+<p><code><a href="gdpins_raw_put_file.html">gdpins_raw_put_file()</a></code> mirrors that asymmetry. It uploads bytes verbatim, so
+it accepts any extension (<code>.gpkg</code>, <code>.tif</code>, <code>.xlsx</code>, …) and only insists that
+there <em>is</em> one.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="name-resolution">Name resolution<a class="anchor" aria-label="anchor" href="#name-resolution"></a></h2>
+
+
+<p><code><a href="gdpins_raw_path.html">gdpins_raw_path()</a></code>, <code><a href="gdpins_raw_get.html">gdpins_raw_get()</a></code> and <code><a href="gdpins_pin_read.html">gdpins_pin_read()</a></code> resolve the
+name you pass against what actually exists, stopping at the first hit:</p><ol><li><p>Exact relative path → resolve.</p></li>
+<li><p>Exact basename, unique → resolve silently (<code>"cars.csv"</code> finds
+<code>"sub/cars.csv"</code>).</p></li>
+<li><p>Exact basename, several matches → error listing every full path.</p></li>
+<li><p>Case-insensitive exact, unique → resolve silently.</p></li>
+<li><p>Same stem, different extension → error, suggesting it (<code>"cars.csv"</code> when
+only <code>"cars.parquet"</code> exists).</p></li>
+<li><p>Close on edit distance → error, suggesting the 5 nearest.</p></li>
+<li><p>Nothing close → error naming the connection, pointing at listing mode.</p></li>
+</ol><p>Auto-resolve happens <strong>only</strong> at rungs 1, 2 and 4, where the match is both
+exact and unique. Rungs 3 and 5–7 only ever suggest — they never guess.</p>
+<p>Rung 4 also settles a real platform difference: <code><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists()</a></code> is
+case-insensitive on Windows and case-sensitive elsewhere, so gdpins does the
+case-folding itself rather than letting the filesystem do it on one platform
+and not the other.</p>
+<p><code><a href="gdpins_pin_read.html">gdpins_pin_read()</a></code> and <code><a href="gdpins_pin_path.html">gdpins_pin_path()</a></code> use the same ladder without rungs
+2–3: pin names are flat, so "path" and "basename" are the same question.</p>
+<p><code><a href="gdpins_raw_remove.html">gdpins_raw_remove()</a></code> uses <strong>rung 1 only</strong>. It hard-deletes the local copy, so
+it never auto-resolves a near-miss onto a real file; a missing target stays an
+idempotent no-op.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="glob-and-listing-mode">Glob and listing mode<a class="anchor" aria-label="anchor" href="#glob-and-listing-mode"></a></h2>
+
+
+<p>A <code>name</code> containing <code>*</code> or <code>?</code> switches <code><a href="gdpins_raw_path.html">gdpins_raw_path()</a></code>,
+<code><a href="gdpins_raw_get.html">gdpins_raw_get()</a></code>, <code><a href="gdpins_raw_remove.html">gdpins_raw_remove()</a></code>, <code><a href="gdpins_pin_read.html">gdpins_pin_read()</a></code> and
+<code><a href="gdpins_pin_path.html">gdpins_pin_path()</a></code> into <strong>listing mode</strong>: they return a listing of what
+matches instead of acting on one item. Listing mode never bulk-reads and never
+bulk-deletes.</p><ul><li><p><code>"*"</code> — everything.</p></li>
+<li><p><code>"*.csv"</code> — every <code>.csv</code>, at <strong>any depth</strong> (unlike <code><a href="gdpins_raw_ls.html">gdpins_raw_ls()</a></code>, whose
+<code>depth = 2</code> default hides <code>sub/sub/folder/file.rds</code>).</p></li>
+</ul><p>Matching is case-sensitive on every platform, so <code>"*.csv"</code> does not match
+<code>"CARS.CSV"</code>. Raw verbs return a <code>gdpins_raw_listing</code>; pin verbs return a
+<code>gdpins_pin_listing</code>. Both are ordinary tibbles with a print method that shows
+names only.</p>
+    </div>
+
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

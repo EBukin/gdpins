@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,99 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.0.1.9022" id="gdpins-0019022">gdpins 0.0.1.9022<a class="anchor" aria-label="anchor" href="#gdpins-0019022"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-0-0-1-9022">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-0-1-9022"></a></h3>
+<ul><li>
+<strong>Fixed pin type drift when copying pins between boards.</strong> <code><a href="../reference/gdpins_sync.html">gdpins_sync()</a></code> and <code>on_discrepancy = "sync_from_drive"</code>/<code>"sync_to_drive"</code> copy pins via an internal helper that used to write with <code>pins</code>’ default type (<code>"rds"</code>) regardless of how the source pin was stored. A parquet pin synced between boards silently became an rds pin — on either side, including Drive itself for <code>to_drive</code> syncs — and lost the tibble-normalisation that <code><a href="../reference/gdpins_pin_read.html">gdpins_pin_read()</a></code> applies to parquet reads. The copy now preserves the source pin’s <code><a href="https://pins.rstudio.com/reference/pin_meta.html" class="external-link">pins::pin_meta()</a></code> type.</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.0.1.9021" id="gdpins-0019021">gdpins 0.0.1.9021<a class="anchor" aria-label="anchor" href="#gdpins-0019021"></a></h2>
+<div class="section level3">
+<h3 id="new-features-0-0-1-9021">New features<a class="anchor" aria-label="anchor" href="#new-features-0-0-1-9021"></a></h3>
+<ul><li>
+<strong>Boards are now lazy.</strong> <code><a href="../reference/gdpins_init_board.html">gdpins_init_board()</a></code> no longer touches Drive: it records its arguments and connects on first use. Setting up three boards in a script used to cost three Drive round-trips plus three sync checks even if you only ever read one of them — now you pay only for the boards you touch. The deferred work is the same work as before (online probe, Drive existence/create check, folder-ID resolution, <code>pins</code> board construction, and the <code>on_discrepancy</code> sync check); it just happens the first time something reads the board’s <code>drive_board</code>, <code>cache_board</code>, or <code>local_board</code>. In practice that means the first <code><a href="../reference/gdpins_pin_read.html">gdpins_pin_read()</a></code>/<code><a href="../reference/gdpins_pin_write.html">gdpins_pin_write()</a></code>/ <code><a href="../reference/gdpins_board_status.html">gdpins_board_status()</a></code>/<code><a href="../reference/gdpins_sync.html">gdpins_sync()</a></code>. See <code><a href="../reference/lazy-boards.html">?"lazy-boards"</a></code>.
+<ul><li>
+<code><a href="../reference/gdpins_board_connect.html">gdpins_board_connect()</a></code> forces a lazy board to connect on demand, so you can choose when to pay. It accepts an <code>on_discrepancy</code> override for that connection.</li>
+<li>
+<code><a href="../reference/gdpins_board_is_connected.html">gdpins_board_is_connected()</a></code> reports whether a board has connected yet, without connecting it.</li>
+<li>
+<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/base/format.html" class="external-link">format()</a></code> and <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> never connect a board — they describe it from its declared config and report <code>connected: FALSE</code>.</li>
+<li>Connection state is shared across copies: passing a board to a function and using it there connects the caller’s board too, rather than reconnecting.</li>
+</ul></li>
+</ul></div>
+<div class="section level3">
+<h3 id="breaking-changes-0-0-1-9021">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-0-1-9021"></a></h3>
+<ul><li>
+<strong>Board init errors and sync warnings now surface at first use, not at <code><a href="../reference/gdpins_init_board.html">gdpins_init_board()</a></code>.</strong> A mistyped <code>drive_path</code>, a missing folder with <code>create = FALSE</code>, the <code>create = NA</code> interactive prompt, and the <code>on_discrepancy</code> sync warning all move from the init call to the first board access. To get the old timing back, call <code><a href="../reference/gdpins_board_connect.html">gdpins_board_connect()</a></code> right after init, pass <code>gdpins_init_board(lazy = FALSE)</code>, or set <code>options(gdpins.lazy_boards = FALSE)</code> globally. An explicit <code>lazy</code> argument always beats the option.</li>
+<li>
+<code>$</code> and <code>[[</code> on a <code>gdpins_board</code> no longer partial-match field names: <code>board$drive</code> is <code>NULL</code> rather than an ambiguous match against <code>drive_board</code> and <code>drive_path</code>. Spell fields in full.</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.0.1.9015" id="gdpins-0019015">gdpins 0.0.1.9015<a class="anchor" aria-label="anchor" href="#gdpins-0019015"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-0-0-1-9015">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-0-1-9015"></a></h3>
+<ul><li>
+<p><strong><code><a href="../reference/gdpins_init_board.html">gdpins_init_board()</a></code> no longer reports a sync discrepancy when there is none.</strong> The init-time check ran its <code>on_discrepancy</code> action for <em>any</em> status it managed to compute, without ever inspecting the result: only an outright error in <code><a href="../reference/gdpins_board_status.html">gdpins_board_status()</a></code> suppressed it. Every board therefore warned <code>"&lt;board&gt;": sync discrepancy detected</code> on every call — including brand-new empty boards and boards that were fully in sync — and <code>on_discrepancy = "sync_from_drive"</code> / <code>"sync_to_drive"</code> re-synced boards that needed nothing. The status is now inspected, and the action fires only when a row genuinely needs reconciling. Real drift still warns and still syncs.</p>
+<ul><li>An <strong>empty</strong> status (nothing on either side) is not a discrepancy.</li>
+<li>
+<strong><code>"offline"</code></strong> rows are not a discrepancy: <code><a href="../reference/gdpins_board_status.html">gdpins_board_status()</a></code> has already warned about connectivity and cannot know the Drive side.</li>
+</ul></li>
+<li><p><strong><code><a href="../reference/gdpins_sync.html">gdpins_sync()</a></code> is no longer silent when there is nothing to do.</strong> Both the board and raw-connection paths skipped every in-sync item and returned without printing anything, which was indistinguishable from a no-op failure. They now report <code>everything in sync, nothing to reconcile (N pin/file(s) checked)</code>.</p></li>
+<li><p><strong><code><a href="../reference/gdpins_sync.html">gdpins_sync()</a></code> board messages now name the board</strong>, e.g. <code>Board "data_raw": synced "cars" Drive -&gt; local.</code>, so sync output is unambiguous when several boards are reconciled in one session. Conflict resolutions and interactive choices are now reported too, rather than only the directional copies.</p></li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.0.1.9012" id="gdpins-0019012">gdpins 0.0.1.9012<a class="anchor" aria-label="anchor" href="#gdpins-0019012"></a></h2>
+<div class="section level3">
+<h3 id="new-features-0-0-1-9012">New features<a class="anchor" aria-label="anchor" href="#new-features-0-0-1-9012"></a></h3>
+<ul><li>
+<p><strong>Names now resolve instead of just failing.</strong> <code><a href="../reference/gdpins_raw_path.html">gdpins_raw_path()</a></code>, <code><a href="../reference/gdpins_raw_get.html">gdpins_raw_get()</a></code> and <code><a href="../reference/gdpins_pin_read.html">gdpins_pin_read()</a></code> match the name you pass against what actually exists, stopping at the first hit: exact path → unique basename → case-insensitive exact → same-stem-different-extension → edit-distance neighbours → “nothing close”. A name is auto-resolved <strong>only</strong> when the match is exact <em>and</em> unique; every looser rung merely suggests, so gdpins never silently reads a different file than you asked for. <code>"cars.csv"</code> now finds <code>"sub/cars.csv"</code>; a typo gets a “did you mean” listing the nearest candidates. See <code><a href="../reference/raw-connection.html">?"raw-connection"</a></code> for the full ladder.</p>
+<ul><li>
+<code><a href="../reference/gdpins_raw_remove.html">gdpins_raw_remove()</a></code> deliberately uses <strong>only</strong> the exact-path rung. It hard-deletes the local copy, so it never guesses; missing targets remain an idempotent no-op.</li>
+<li>The case-insensitive rung also settles a real platform difference: <code><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists()</a></code> is case-insensitive on Windows and case-sensitive elsewhere, so gdpins now does the case-folding itself and returns the on-disk spelling on every platform.</li>
+</ul></li>
+<li><p><strong>Glob / listing mode.</strong> A <code>name</code> containing <code>*</code> or <code>?</code> switches <code><a href="../reference/gdpins_raw_path.html">gdpins_raw_path()</a></code>, <code><a href="../reference/gdpins_raw_get.html">gdpins_raw_get()</a></code>, <code><a href="../reference/gdpins_raw_remove.html">gdpins_raw_remove()</a></code>, <code><a href="../reference/gdpins_pin_read.html">gdpins_pin_read()</a></code> and <code><a href="../reference/gdpins_pin_path.html">gdpins_pin_path()</a></code> into listing mode: they return what matches rather than acting on one item. Listing mode never bulk-reads and never bulk-deletes. <code>"*"</code> lists everything; <code>"*.csv"</code> matches at <strong>any</strong> depth (unlike <code><a href="../reference/gdpins_raw_ls.html">gdpins_raw_ls()</a></code>, whose <code>depth = 2</code> default hides <code>sub/sub/folder/file.rds</code>). Matching is case-sensitive on every platform.</p></li>
+<li><p><strong><code><a href="../reference/gdpins_pin_path.html">gdpins_pin_path()</a></code></strong> — the path counterpart of <code><a href="../reference/gdpins_pin_read.html">gdpins_pin_read()</a></code>, completing the <code>*_get</code>/<code>*_read</code> return <strong>objects</strong>, <code>*_path</code> returns <strong>paths</strong> rule on the pins side. Same board, same name, same local-first resolution (local → cache → Drive), but returns where the pin’s file(s) live. The pin is materialised when Drive holds the only copy, as <code><a href="../reference/gdpins_raw_path.html">gdpins_raw_path()</a></code> already does. Returns a character vector: length 1 for an ordinary pin, longer for a multi-file pin written with <code><a href="https://pins.rstudio.com/reference/pin_download.html" class="external-link">pins::pin_upload()</a></code>.</p></li>
+<li><p><strong>Listings are classed and print compactly.</strong> <code><a href="../reference/gdpins_raw_ls.html">gdpins_raw_ls()</a></code> gains class <code>gdpins_raw_listing</code> and <code><a href="../reference/gdpins_list_pins.html">gdpins_list_pins()</a></code> gains <code>gdpins_pin_listing</code>, each ahead of the tibble classes. Both keep their existing columns and remain ordinary tibbles (<code>inherits(x, "tbl_df")</code> is still <code>TRUE</code>); the new <code>print</code> methods show names only.</p></li>
+</ul></div>
+<div class="section level3">
+<h3 id="bug-fixes-0-0-1-9012">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-0-1-9012"></a></h3>
+<ul><li>
+<strong>A multi-file pin is no longer listed once per file.</strong> <code><a href="../reference/gdpins_list_pins.html">gdpins_list_pins()</a></code> built its row from <code>pins::pin_meta()$file_size</code>, which is a <em>vector</em> for a pin written with <code><a href="https://pins.rstudio.com/reference/pin_download.html" class="external-link">pins::pin_upload()</a></code>. That recycled <code>name</code> and produced one row per file, so a two-file pin appeared twice. One pin is now one row, with the total size.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="breaking-changes-0-0-1-9012">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-0-1-9012"></a></h3>
+<ul><li>
+<code><a href="../reference/gdpins_raw_put_file.html">gdpins_raw_put_file()</a></code> now requires <code>name</code> to carry a file extension (any extension — it uploads bytes verbatim, so <code>.gpkg</code>/<code>.tif</code>/<code>.xlsx</code> are all fine). Previously an extensionless name was accepted and produced a file that could not be identified on Drive.</li>
+<li>
+<code><a href="../reference/gdpins_raw_get.html">gdpins_raw_get()</a></code> on an extension it cannot deserialise now errors naming the four readable formats (<code>.rds</code>, <code>.parquet</code>, <code>.geojson</code>, <code>.csv</code>) and pointing at <code><a href="../reference/gdpins_raw_path.html">gdpins_raw_path()</a></code>, which returns a path for <em>any</em> extension. The previous message named only the offending extension.</li>
+<li>
+<code><a href="../reference/gdpins_raw_get.html">gdpins_raw_get()</a></code> on a name that matches nothing now reports that the name is unknown (with suggestions) instead of blaming the local mirror for a file that exists nowhere. A name that exists on Drive but is not mirrored locally still reports <code>Local file not found</code> and points at <code>force_refresh</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="internal-0-0-1-9012">Internal<a class="anchor" aria-label="anchor" href="#internal-0-0-1-9012"></a></h3>
+<ul><li>
+<code>tools</code> and <code>utils</code> added to <code>Imports</code>. Both were already used on always-run code paths (<code><a href="https://rdrr.io/r/tools/md5sum.html" class="external-link">tools::md5sum()</a></code>, <code><a href="https://rdrr.io/r/tools/fileutils.html" class="external-link">tools::file_ext()</a></code>); <code><a href="https://rdrr.io/r/utils/adist.html" class="external-link">utils::adist()</a></code> powers the edit-distance rung. This also clears a pre-existing <code>R CMD check --as-cran</code> NOTE.</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.0.1.9010" id="gdpins-0019010">gdpins 0.0.1.9010<a class="anchor" aria-label="anchor" href="#gdpins-0019010"></a></h2>
+<div class="section level3">
+<h3 id="new-features-0-0-1-9010">New features<a class="anchor" aria-label="anchor" href="#new-features-0-0-1-9010"></a></h3>
+<ul><li>
+<strong>Keep geometry as raw WKT text on read.</strong> <code><a href="../reference/gdpins_pin_read.html">gdpins_pin_read()</a></code> now accepts <code>wkt_engine = "none"</code>, which skips <code>sf</code> restoration and returns the geometry columns as WKT character vectors (names keep their <code>__&lt;epsg&gt;__</code> suffix). The <code>"none"</code> value is read-only — it is not a valid <code>gdpins.wkt_engine</code> option and never applies to writes.</li>
+<li>
+<strong><code><a href="../reference/gdpins_as_sf.html">gdpins_as_sf()</a></code></strong> — a user-facing, autodetecting WKT → <code>sf</code> converter.
+<ul><li>Autodetects the geometry column (character column named like <code>geom__4326__</code>, <code>geom</code>, or <code>wkt</code>). Returns the input unchanged with a warning when none is found (plain, non-spatial data passes through); errors asking for <code>column</code> only when several candidates match.</li>
+<li>Infers the CRS from the column name: the standard <code>__&lt;epsg&gt;__</code> pattern is trusted silently, a non-standard digit run (e.g. <code>geom_1111</code>) is used with a message, and a name with no digits falls back to <code>default_epsg</code> (4326) with a warning. Pass <code>epsg</code> explicitly to silence inference.</li>
+<li>Uses the same swappable WKT engine (<code>"wk"</code> default / <code>"sf"</code>) as the rest of the package. Pairs with <code>gdpins_pin_read(wkt_engine = "none")</code>.</li>
+</ul></li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.0.1.0" id="gdpins-0010">gdpins 0.0.1.0<a class="anchor" aria-label="anchor" href="#gdpins-0010"></a></h2>
 <div class="section level3">

@@ -14,7 +14,8 @@ gdpins_init_board(
   versioned = TRUE,
   create = NA,
   on_discrepancy = NULL,
-  adapter = NULL
+  adapter = NULL,
+  lazy = NULL
 )
 ```
 
@@ -57,6 +58,14 @@ gdpins_init_board(
 
   A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
 
+- lazy:
+
+  Logical or `NULL`. `TRUE` (the default) defers all Drive work and the
+  sync check until the board is first used; `FALSE` does it during this
+  call. `NULL` uses the `gdpins.lazy_boards` option (default `TRUE`).
+  See
+  [lazy-boards](https://ebukin.github.io/gdpins/reference/lazy-boards.md).
+
 ## Value
 
 A `gdpins_board` object.
@@ -71,16 +80,26 @@ A `gdpins_board` object.
 - **`"drive_cache_local"`** — all three: `drive_path`, `cache_dir`, and
   `local_dir`.
 
-On init the board checks for sync discrepancies between Drive and local
+The board checks for sync discrepancies between Drive and local
 (governed by `on_discrepancy`). Non-existent Drive boards are never
 auto-created unless `create = TRUE`.
+
+By default (`lazy = TRUE`) none of that happens at init: the board
+records its arguments and connects on first use. Initialising several
+Drive boards is then free, and you only pay for the ones you touch. See
+[lazy-boards](https://ebukin.github.io/gdpins/reference/lazy-boards.md)
+for what forces a connection and how error timing changes, and
+[`gdpins_board_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_board_connect.md)
+to force one on purpose.
 
 ## See also
 
 [`gdpins_real_drive()`](https://ebukin.github.io/gdpins/reference/gdpins_real_drive.md)
 to create an adapter,
 [`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
-to temporarily detach an existing board from Drive and work locally.
+to temporarily detach an existing board from Drive and work locally,
+[`gdpins_board_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_board_connect.md)
+to connect a lazy board on demand.
 
 ## Examples
 
@@ -94,15 +113,14 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
-#>   `gdpins_sync()` to reconcile.
 board
 #> <gdpins_board> [DC-] v+ cfg=drive_cache name=data_raw path=my-project/data-raw
 #> config: "drive_cache"
 #> name: "data_raw"
 #> versioned: "TRUE"
+#> connected: "FALSE"
 #> drive: "my-project/data-raw"
-#> cache: "/tmp/Rtmp7u8b8x/cache_24f967e50144"
+#> cache: "/tmp/RtmplHQDVx/cache_1e0cbfb9719"
 
 # --- Real adapter (requires Google Drive auth) ---
 if (FALSE) { # \dontrun{

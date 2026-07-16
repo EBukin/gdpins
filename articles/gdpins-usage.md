@@ -74,8 +74,9 @@ gdpins_drive_url(adapter, "kazLandEconImpact-data/data-raw")  # subfolder
 ```
 
 You can also pass a Drive folder ID directly as `drive_path` when you
-know exactly which folder to use — `gdpins` will verify it exists and
-error immediately if not:
+know exactly which folder to use. `gdpins` verifies the folder exists
+and errors if not — though by default that check happens when the board
+is first used, not here; see [Lazy connection](#lazy-connection) below:
 
 ``` r
 
@@ -129,6 +130,62 @@ bd_clean <- gdpins_init_board(
   versioned  = TRUE
 )
 ```
+
+## Lazy connection
+
+The three chunks above cost nothing.
+[`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md)
+does no Drive work: it records what you asked for and connects the first
+time you actually use the board. A script that sets up `bd_local`,
+`bd_raw` and `bd_clean` but only ever reads from `bd_raw` pays for one
+board, not three.
+
+Connecting is what costs — the online probe, the Drive existence/create
+check, resolving the folder ID, building the `pins` boards, and the
+`on_discrepancy` sync check. It is triggered by the first verb that
+touches board contents:
+[`gdpins_pin_read()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_read.md),
+[`gdpins_pin_write()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_write.md),
+[`gdpins_board_status()`](https://ebukin.github.io/gdpins/reference/gdpins_board_status.md),
+[`gdpins_sync()`](https://ebukin.github.io/gdpins/reference/gdpins_sync.md),
+and friends. Printing a board does *not* connect it.
+
+``` r
+
+gdpins_board_is_connected(bd_raw)   # FALSE — nothing has touched it yet
+
+gdpins_pin_read(bd_raw, "parcels")  # connects, then reads
+gdpins_board_is_connected(bd_raw)   # TRUE
+```
+
+The catch is that init-time errors move to first use: a mistyped
+`drive_path`, a missing folder with `create = FALSE`, the `create = NA`
+prompt, and the sync warning all surface later than they used to. When
+you would rather find out immediately, connect on purpose:
+
+``` r
+
+# Force the Drive check and sync check now
+gdpins_board_connect(bd_raw)
+
+# ... or just for this connection, with a different discrepancy policy
+gdpins_board_connect(bd_clean, on_discrepancy = "sync_from_drive")
+```
+
+To opt out entirely, per board or globally:
+
+``` r
+
+bd_raw <- gdpins_init_board(name = "data_raw", drive_path = "...",
+                            cache_dir = "...", adapter = adapter,
+                            lazy = FALSE)
+
+options(gdpins.lazy_boards = FALSE)   # every board, this session
+```
+
+See
+[`?"lazy-boards"`](https://ebukin.github.io/gdpins/reference/lazy-boards.md)
+for the full picture.
 
 ## Writing and reading pins
 
@@ -233,6 +290,37 @@ restored <- gdpins_parquet_to_sf(encoded)      # sf with CRS restored
 > proj-string-only CRS will error. Set a CRS first with
 > [`sf::st_set_crs()`](https://r-spatial.github.io/sf/reference/st_crs.html).
 
+### Keeping geometry as WKT text (`wkt_engine = "none"`)
+
+Sometimes you want the geometry back as raw WKT text — to inspect it,
+hand it to another tool, or skip the cost of building an `sf` object.
+Pass `wkt_engine = "none"` to
+[`gdpins_pin_read()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_read.md):
+the geometry columns come back as character vectors, their names still
+carrying the `__<epsg>__` suffix.
+
+[`gdpins_as_sf()`](https://ebukin.github.io/gdpins/reference/gdpins_as_sf.md)
+converts such a data frame back to `sf`. It autodetects the geometry
+column (a character column named like `geom__4326__`, `geom`, or `wkt`)
+and infers the CRS from the name — trusting the standard `__<epsg>__`
+pattern silently, using a non-standard digit run (`geom_1111`) with a
+message, and falling back to `default_epsg` with a warning when the name
+has no digits. Pass `epsg` (and `column`, if several candidates match)
+to be explicit.
+
+``` r
+
+txt <- gdpins_pin_read(bd_raw, "parcels", wkt_engine = "none")
+class(txt)                # a plain tibble; geometry is WKT text
+
+parcels_again <- gdpins_as_sf(txt)           # autodetect column + EPSG
+sf::st_crs(parcels_again)$epsg
+
+# Firmly set the CRS when the column name does not encode it
+df <- data.frame(geom = "POINT (0 0)")
+gdpins_as_sf(df, epsg = 4326)
+```
+
 ### Choosing the WKT engine
 
 The geometry ↔︎ WKT conversion is done by one of two interchangeable
@@ -315,9 +403,8 @@ gdpins_prune_pin_versions(bd_raw, "gdp_panel", keep = 3, dry_run = FALSE)
 
 ## Offline behaviour
 
-When Drive is unreachable (no internet, VPN down),
-[`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md)
-falls back automatically:
+When Drive is unreachable (no internet, VPN down), a board falls back
+automatically as it connects:
 
 | Config              | Offline behaviour                                 |
 |---------------------|---------------------------------------------------|

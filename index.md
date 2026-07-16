@@ -81,6 +81,25 @@ bd_clean <- gdpins_init_board(
 )
 ```
 
+None of those calls touch Drive. Boards are lazy: each records its
+arguments and connects on first use, so setting up three boards and
+reading from one costs one connection, not three. Printing a board never
+connects it.
+
+``` r
+
+gdpins_board_is_connected(bd_raw)   # FALSE — nothing has touched it yet
+gdpins_pin_read(bd_raw, "parcels")  # connects, then reads
+
+# Rather find out now that the Drive path is wrong? Connect on purpose:
+gdpins_board_connect(bd_raw)
+```
+
+The trade-off: init-time errors and sync warnings surface at first use
+instead. Pass `lazy = FALSE`, or set
+`options(gdpins.lazy_boards = FALSE)`, to get the old timing back. See
+[`?"lazy-boards"`](https://ebukin.github.io/gdpins/reference/lazy-boards.md).
+
 Pin names are **bare snake_case** — the board encodes the pipeline
 layer.
 
@@ -93,6 +112,9 @@ gdpins_pin_write(bd_raw, parcels,  "parcels")   # sf auto-encoded as parquet
 # Read back
 gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")
 parcels   <- gdpins_pin_read(bd_raw, "parcels")  # sf restored with CRS intact
+
+# Need the file rather than the object? *_read returns objects, *_path returns paths
+path <- gdpins_pin_path(bd_raw, "parcels")
 ```
 
 ## Raw-exogenous connection
@@ -116,6 +138,14 @@ gdpins_raw_put_file(conn, path = "downloads/data.geojson", name = "data.geojson"
 
 # Retrieve (reads local mirror; hits Drive only if absent locally)
 result <- gdpins_raw_get(conn, "gdp_2024.parquet")
+
+# Names resolve: a unique basename or the wrong case is enough. A near-miss is
+# reported with suggestions, never silently resolved to a different file.
+result <- gdpins_raw_get(conn, "gdp_2024.parquet")   # even if nested under api/
+
+# "*" or "?" switches to listing mode -- shows what matches, reads nothing
+gdpins_raw_path(conn, "*")        # everything, at any depth
+gdpins_raw_path(conn, "*.csv")    # every CSV, however deeply nested
 
 # List contents
 gdpins_raw_ls(conn, depth = 2)
@@ -196,6 +226,19 @@ on read.
 
 gdpins_sf_to_parquet(sf_obj)   # df with WKT geometry columns
 gdpins_parquet_to_sf(df)       # sf with original CRS restored
+```
+
+To keep geometry as raw WKT text on read (no `sf` restoration), pass
+`wkt_engine = "none"`.
+[`gdpins_as_sf()`](https://ebukin.github.io/gdpins/reference/gdpins_as_sf.md)
+converts such a data frame back to `sf`, autodetecting the geometry
+column and inferring the CRS from its name:
+
+``` r
+
+txt <- gdpins_pin_read(board, "parcels", wkt_engine = "none")  # WKT text cols
+gdpins_as_sf(txt)                    # autodetect column + EPSG -> sf
+gdpins_as_sf(df, column = "geom", epsg = 4326)  # be explicit when unsure
 ```
 
 ### WKT engine

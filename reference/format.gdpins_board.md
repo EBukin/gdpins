@@ -1,6 +1,8 @@
 # Format a gdpins_board as a compact one-line string (≤80 cols)
 
-Format a gdpins_board as a compact one-line string (≤80 cols)
+Describes the board from its declared config, so formatting a lazy board
+never connects it. See
+[lazy-boards](https://ebukin.github.io/gdpins/reference/lazy-boards.md).
 
 ## Usage
 

@@ -1,6 +1,7 @@
 # Print a gdpins_board object (compact, ≤80 cols)
 
-Print a gdpins_board object (compact, ≤80 cols)
+Never connects a lazy board — it reports `connected: FALSE` instead. See
+[lazy-boards](https://ebukin.github.io/gdpins/reference/lazy-boards.md).
 
 ## Usage
 

@@ -6,6 +6,10 @@ Initialise a pins board backed by Google Drive and manage credentials.
 
 - [`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md)
   : Initialise a gdpins board
+- [`gdpins_board_connect()`](https://ebukin.github.io/gdpins/reference/gdpins_board_connect.md)
+  : Connect a lazy board now
+- [`gdpins_board_is_connected()`](https://ebukin.github.io/gdpins/reference/gdpins_board_is_connected.md)
+  : Has a board connected yet?
 - [`gdpins_ensure_drive_auth()`](https://ebukin.github.io/gdpins/reference/gdpins_ensure_drive_auth.md)
   : Ensure Google Drive is authenticated
 - [`gdpins_is_online()`](https://ebukin.github.io/gdpins/reference/gdpins_is_online.md)
@@ -24,6 +28,8 @@ Read and write versioned R objects (tibbles, sf, lists) to a board.
 
 - [`gdpins_pin_read()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_read.md)
   : Read a pin from a gdpins board
+- [`gdpins_pin_path()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_path.md)
+  : Resolve a pin to its file path(s) on disk
 - [`gdpins_pin_write()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_write.md)
   : Write a pin to a gdpins board
 - [`gdpins_pin_info()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_info.md)
@@ -82,6 +88,9 @@ Convert between sf objects and Parquet files.
   : Convert an sf object to a plain tibble suitable for parquet storage
 - [`gdpins_parquet_to_sf()`](https://ebukin.github.io/gdpins/reference/gdpins_parquet_to_sf.md)
   : Restore an sf object from a parquet-encoded tibble
+- [`gdpins_as_sf()`](https://ebukin.github.io/gdpins/reference/gdpins_as_sf.md)
+  : Convert a data frame with a WKT text column to an sf object
+  (autodetecting)
 
 ## Package docs & methods
 
@@ -91,6 +100,9 @@ Package-level topics, S3 methods, and conceptual helper pages.
   Authentication helpers for Google Drive
 - [`board`](https://ebukin.github.io/gdpins/reference/board.md) : Board
   initialisation and S3 methods for gdpins_board
+- [`` `$`( ``*`<gdpins_board>`*`)`](https://ebukin.github.io/gdpins/reference/board-extract.md)
+  [`` `[[`( ``*`<gdpins_board>`*`)`](https://ebukin.github.io/gdpins/reference/board-extract.md)
+  : Extract a field from a gdpins_board
 - [`discovery`](https://ebukin.github.io/gdpins/reference/discovery.md)
   : Pin discovery and metadata
 - [`format(`*`<gdpins_board>`*`)`](https://ebukin.github.io/gdpins/reference/format.gdpins_board.md)
@@ -103,6 +115,8 @@ Package-level topics, S3 methods, and conceptual helper pages.
   : Create a real Google Drive adapter
 - [`io-formats`](https://ebukin.github.io/gdpins/reference/io-formats.md)
   : I/O format detection and geospatial encoding
+- [`lazy-boards`](https://ebukin.github.io/gdpins/reference/lazy-boards.md)
+  : Lazy board connection
 - [`output`](https://ebukin.github.io/gdpins/reference/output.md) :
   Output rendering and Drive publishing
 - [`print(`*`<gdpins_board>`*`)`](https://ebukin.github.io/gdpins/reference/print.gdpins_board.md)

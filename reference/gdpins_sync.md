@@ -79,8 +79,6 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
-#>   `gdpins_sync()` to reconcile.
 gdpins_sync(board)
 #> ℹ Nothing to sync for board "data_raw".
 

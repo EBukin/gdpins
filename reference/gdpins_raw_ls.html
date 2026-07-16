@@ -9,7 +9,7 @@ of depth."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -93,6 +93,33 @@ for local-only connections and the fake adapter.</p></dd>
 
 
 </dl></div>
+    <div class="section level2">
+    <h2 id="glob-and-listing-mode">Glob and listing mode<a class="anchor" aria-label="anchor" href="#glob-and-listing-mode"></a></h2>
+
+
+<p>A <code>name</code> containing <code>*</code> or <code>?</code> switches <code><a href="gdpins_raw_path.html">gdpins_raw_path()</a></code>,
+<code><a href="gdpins_raw_get.html">gdpins_raw_get()</a></code>, <code><a href="gdpins_raw_remove.html">gdpins_raw_remove()</a></code>, <code><a href="gdpins_pin_read.html">gdpins_pin_read()</a></code> and
+<code><a href="gdpins_pin_path.html">gdpins_pin_path()</a></code> into <strong>listing mode</strong>: they return a listing of what
+matches instead of acting on one item. Listing mode never bulk-reads and never
+bulk-deletes.</p><ul><li><p><code>"*"</code> — everything.</p></li>
+<li><p><code>"*.csv"</code> — every <code>.csv</code>, at <strong>any depth</strong> (unlike <code>gdpins_raw_ls()</code>, whose
+<code>depth = 2</code> default hides <code>sub/sub/folder/file.rds</code>).</p></li>
+</ul><p>Matching is case-sensitive on every platform, so <code>"*.csv"</code> does not match
+<code>"CARS.CSV"</code>. Raw verbs return a <code>gdpins_raw_listing</code>; pin verbs return a
+<code>gdpins_pin_listing</code>. Both are ordinary tibbles with a print method that shows
+names only.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p>Other raw-connection:
+<code><a href="gdpins_raw_connect.html">gdpins_raw_connect()</a></code>,
+<code><a href="gdpins_raw_get.html">gdpins_raw_get()</a></code>,
+<code><a href="gdpins_raw_path.html">gdpins_raw_path()</a></code>,
+<code><a href="gdpins_raw_put_file.html">gdpins_raw_put_file()</a></code>,
+<code><a href="gdpins_raw_put_object.html">gdpins_raw_put_object()</a></code>,
+<code><a href="gdpins_raw_remove.html">gdpins_raw_remove()</a></code>,
+<code><a href="gdpins_refresh_disconnect.html">gdpins_refresh_disconnect()</a></code></p></div>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
@@ -106,7 +133,7 @@ for local-only connections and the fake adapter.</p></dd>
 <span class="r-in"><span><span class="fu"><a href="gdpins_raw_put_object.html">gdpins_raw_put_object</a></span><span class="op">(</span><span class="va">conn</span>, <span class="va">mtcars</span>, <span class="st">"cars.csv"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">tbl</span> <span class="op">&lt;-</span> <span class="fu">gdpins_raw_ls</span><span class="op">(</span><span class="va">conn</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">tbl</span><span class="op">$</span><span class="va">local_path</span>   <span class="co"># absolute local path</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "/tmp/Rtmp7u8b8x/raw_24f96fdfc54d/cars.csv"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "/tmp/RtmplHQDVx/raw_1e0c6cf2aa31/cars.csv"</span>
 <span class="r-in"><span><span class="va">tbl</span><span class="op">$</span><span class="va">drive_id</span>     <span class="co"># NA for fake adapter; real Drive ID with real adapter</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
 </code></pre></div>

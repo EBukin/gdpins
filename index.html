@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -142,21 +142,32 @@
 <span>  local_dir  <span class="op">=</span> <span class="st">"path/to/data-clean-local"</span>,</span>
 <span>  versioned  <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Pin names are <strong>bare snake_case</strong> — the board encodes the pipeline layer.</p>
+<p>None of those calls touch Drive. Boards are lazy: each records its arguments and connects on first use, so setting up three boards and reading from one costs one connection, not three. Printing a board never connects it.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/gdpins_board_is_connected.html">gdpins_board_is_connected</a></span><span class="op">(</span><span class="va">bd_raw</span><span class="op">)</span>   <span class="co"># FALSE — nothing has touched it yet</span></span>
+<span><span class="fu"><a href="reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"parcels"</span><span class="op">)</span>  <span class="co"># connects, then reads</span></span>
+<span></span>
+<span><span class="co"># Rather find out now that the Drive path is wrong? Connect on purpose:</span></span>
+<span><span class="fu"><a href="reference/gdpins_board_connect.html">gdpins_board_connect</a></span><span class="op">(</span><span class="va">bd_raw</span><span class="op">)</span></span></code></pre></div>
+<p>The trade-off: init-time errors and sync warnings surface at first use instead. Pass <code>lazy = FALSE</code>, or set <code>options(gdpins.lazy_boards = FALSE)</code>, to get the old timing back. See <code><a href="reference/lazy-boards.html">?"lazy-boards"</a></code>.</p>
+<p>Pin names are <strong>bare snake_case</strong> — the board encodes the pipeline layer.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Write any R object — tibble, sf, list, nested tibble</span></span>
 <span><span class="fu"><a href="reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="va">gdp_tbl</span>,  <span class="st">"gdp_panel"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="va">parcels</span>,  <span class="st">"parcels"</span><span class="op">)</span>   <span class="co"># sf auto-encoded as parquet</span></span>
 <span></span>
 <span><span class="co"># Read back</span></span>
 <span><span class="va">gdp_panel</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span><span class="op">)</span></span>
-<span><span class="va">parcels</span>   <span class="op">&lt;-</span> <span class="fu"><a href="reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"parcels"</span><span class="op">)</span>  <span class="co"># sf restored with CRS intact</span></span></code></pre></div>
+<span><span class="va">parcels</span>   <span class="op">&lt;-</span> <span class="fu"><a href="reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"parcels"</span><span class="op">)</span>  <span class="co"># sf restored with CRS intact</span></span>
+<span></span>
+<span><span class="co"># Need the file rather than the object? *_read returns objects, *_path returns paths</span></span>
+<span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/gdpins_pin_path.html">gdpins_pin_path</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"parcels"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="raw-exogenous-connection">Raw-exogenous connection<a class="anchor" aria-label="anchor" href="#raw-exogenous-connection"></a>
 </h2>
 <p>For data as received from external sources — plain files, no pins metadata.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">conn</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/gdpins_raw_connect.html">gdpins_raw_connect</a></span><span class="op">(</span></span>
 <span>  drive_path <span class="op">=</span> <span class="st">"my-project-data/raw-exogenous/worldbank-api"</span>,</span>
 <span>  local_path <span class="op">=</span> <span class="st">"path/to/raw-exogenous/worldbank-api"</span>,</span>
@@ -172,6 +183,14 @@
 <span><span class="co"># Retrieve (reads local mirror; hits Drive only if absent locally)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/gdpins_raw_get.html">gdpins_raw_get</a></span><span class="op">(</span><span class="va">conn</span>, <span class="st">"gdp_2024.parquet"</span><span class="op">)</span></span>
 <span></span>
+<span><span class="co"># Names resolve: a unique basename or the wrong case is enough. A near-miss is</span></span>
+<span><span class="co"># reported with suggestions, never silently resolved to a different file.</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/gdpins_raw_get.html">gdpins_raw_get</a></span><span class="op">(</span><span class="va">conn</span>, <span class="st">"gdp_2024.parquet"</span><span class="op">)</span>   <span class="co"># even if nested under api/</span></span>
+<span></span>
+<span><span class="co"># "*" or "?" switches to listing mode -- shows what matches, reads nothing</span></span>
+<span><span class="fu"><a href="reference/gdpins_raw_path.html">gdpins_raw_path</a></span><span class="op">(</span><span class="va">conn</span>, <span class="st">"*"</span><span class="op">)</span>        <span class="co"># everything, at any depth</span></span>
+<span><span class="fu"><a href="reference/gdpins_raw_path.html">gdpins_raw_path</a></span><span class="op">(</span><span class="va">conn</span>, <span class="st">"*.csv"</span><span class="op">)</span>    <span class="co"># every CSV, however deeply nested</span></span>
+<span></span>
 <span><span class="co"># List contents</span></span>
 <span><span class="fu"><a href="reference/gdpins_raw_ls.html">gdpins_raw_ls</a></span><span class="op">(</span><span class="va">conn</span>, depth <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -179,7 +198,7 @@
 <h2 id="sync">Sync<a class="anchor" aria-label="anchor" href="#sync"></a>
 </h2>
 <p>Sync is <strong>always explicit</strong> — never automatic.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Auto: newer side wins, both directions</span></span>
 <span><span class="fu"><a href="reference/gdpins_sync.html">gdpins_sync</a></span><span class="op">(</span><span class="va">bd_raw</span><span class="op">)</span></span>
 <span></span>
@@ -194,7 +213,7 @@
 <div class="section level2">
 <h2 id="discovery-and-output">Discovery and output<a class="anchor" aria-label="anchor" href="#discovery-and-output"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/gdpins_list_pins.html">gdpins_list_pins</a></span><span class="op">(</span><span class="va">bd_clean</span><span class="op">)</span>          <span class="co"># tibble: name, type, n_versions, size</span></span>
 <span><span class="fu"><a href="reference/gdpins_pin_info.html">gdpins_pin_info</a></span><span class="op">(</span><span class="va">bd_clean</span>, <span class="st">"parcels"</span><span class="op">)</span></span>
 <span></span>
@@ -214,7 +233,7 @@
 <div class="section level2">
 <h2 id="pruning-old-versions">Pruning old versions<a class="anchor" aria-label="anchor" href="#pruning-old-versions"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Preview (dry_run = TRUE is the default)</span></span>
 <span><span class="fu"><a href="reference/gdpins_prune_pin_versions.html">gdpins_prune_pin_versions</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span>, keep <span class="op">=</span> <span class="fl">3</span>, dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
@@ -235,9 +254,14 @@
 <h2 id="geospatial-encoding">Geospatial encoding<a class="anchor" aria-label="anchor" href="#geospatial-encoding"></a>
 </h2>
 <p><code>sf</code> objects are stored as parquet with geometry columns encoded as WKT and the CRS (EPSG code) embedded in the column name (<code>geom__4326__</code>). The round-trip is lossless — CRS and geometry are restored automatically on read.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/gdpins_sf_to_parquet.html">gdpins_sf_to_parquet</a></span><span class="op">(</span><span class="va">sf_obj</span><span class="op">)</span>   <span class="co"># df with WKT geometry columns</span></span>
 <span><span class="fu"><a href="reference/gdpins_parquet_to_sf.html">gdpins_parquet_to_sf</a></span><span class="op">(</span><span class="va">df</span><span class="op">)</span>       <span class="co"># sf with original CRS restored</span></span></code></pre></div>
+<p>To keep geometry as raw WKT text on read (no <code>sf</code> restoration), pass <code>wkt_engine = "none"</code>. <code><a href="reference/gdpins_as_sf.html">gdpins_as_sf()</a></code> converts such a data frame back to <code>sf</code>, autodetecting the geometry column and inferring the CRS from its name:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">txt</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">board</span>, <span class="st">"parcels"</span>, wkt_engine <span class="op">=</span> <span class="st">"none"</span><span class="op">)</span>  <span class="co"># WKT text cols</span></span>
+<span><span class="fu"><a href="reference/gdpins_as_sf.html">gdpins_as_sf</a></span><span class="op">(</span><span class="va">txt</span><span class="op">)</span>                    <span class="co"># autodetect column + EPSG -&gt; sf</span></span>
+<span><span class="fu"><a href="reference/gdpins_as_sf.html">gdpins_as_sf</a></span><span class="op">(</span><span class="va">df</span>, column <span class="op">=</span> <span class="st">"geom"</span>, epsg <span class="op">=</span> <span class="fl">4326</span><span class="op">)</span>  <span class="co"># be explicit when unsure</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="wkt-engine">WKT engine<a class="anchor" aria-label="anchor" href="#wkt-engine"></a>
 </h3>
@@ -249,7 +273,7 @@
 <code>"sf"</code> — uses <code><a href="https://r-spatial.github.io/sf/reference/st_as_text.html" class="external-link">sf::st_as_text()</a></code> (pinned to <code>digits = 15</code>, so also full-precision). A dependency-light fallback.</li>
 </ul>
 <p>Both are read-compatible: WKT written by one engine reads back correctly with the other, so you can switch at any time without re-encoding stored data.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board</span>, <span class="va">sf_obj</span>, <span class="st">"parcels"</span><span class="op">)</span>                    <span class="co"># default "wk"</span></span>
 <span><span class="fu"><a href="reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board</span>, <span class="va">sf_obj</span>, <span class="st">"parcels"</span>, wkt_engine <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span> <span class="co"># force sf</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>gdpins.wkt_engine <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span>                             <span class="co"># switch globally</span></span></code></pre></div>
@@ -262,11 +286,11 @@
 <h2 id="testing">Testing<a class="anchor" aria-label="anchor" href="#testing"></a>
 </h2>
 <p>Unit tests use a fake Drive adapter and run without authentication or network:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">testthat</span><span class="fu">::</span><span class="fu"><a href="https://testthat.r-lib.org/reference/test_package.html" class="external-link">test_package</a></span><span class="op">(</span><span class="st">"gdpins"</span><span class="op">)</span></span></code></pre></div>
 <p>Live tests run against a real Google Drive folder and are skipped by default. To run them:</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="va">$env</span><span class="op">:</span><span class="va">GDRIVE_TEST_FOLDER</span> <span class="op">=</span> <span class="st">"&lt;your-test-folder-id&gt;"</span></span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>Rscript <span class="op">--</span>no-init-file <span class="op">-</span>e <span class="st">'testthat::test_file("tests/testthat/test-live.R")'</span></span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="va">$env</span><span class="op">:</span><span class="va">GDRIVE_TEST_FOLDER</span> <span class="op">=</span> <span class="st">"&lt;your-test-folder-id&gt;"</span></span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>Rscript <span class="op">--</span>no-init-file <span class="op">-</span>e <span class="st">'testthat::test_file("tests/testthat/test-live.R")'</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>

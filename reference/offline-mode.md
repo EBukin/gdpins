@@ -105,8 +105,6 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
-#>   `gdpins_sync()` to reconcile.
 
 # Work disconnected for a while -- writes/reads stay local
 board_offline <- gdpins_go_offline(board)
@@ -115,13 +113,13 @@ board_offline <- gdpins_go_offline(board)
 board_offline$config   # "local_only"
 #> [1] "local_only"
 gdpins_pin_write(board_offline, mtcars, "cars")
-#> Creating new version '20260715T125505Z-c0340'
+#> Creating new version '20260716T190826Z-c0340'
 #> Writing to pin 'cars'
 
 # Reconnect and push local changes back up to Drive
 board_online <- gdpins_go_online(board_offline, on_discrepancy = "sync_to_drive")
 #> Syncing "data_raw" to Drive (on_discrepancy = "sync_to_drive").
-#> ✔ Synced "cars": local -> Drive.
+#> ✔ Board "data_raw": synced "cars" local -> Drive.
 #> ✔ Board "data_raw" reconnected to Drive ("drive_cache_local").
 board_online$config    # "drive_cache_local"
 #> [1] "drive_cache_local"

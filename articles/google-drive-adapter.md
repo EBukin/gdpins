@@ -173,15 +173,14 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! "test_board": sync discrepancy detected between Drive and local. Run
-#>   `gdpins_sync()` to reconcile.
 board
 #> <gdpins_board> [DC-] v+ cfg=drive_cache name=test_board path=project/data-raw
 #> config: "drive_cache"
 #> name: "test_board"
 #> versioned: "TRUE"
+#> connected: "FALSE"
 #> drive: "project/data-raw"
-#> cache: "/tmp/RtmpLFZGtB/cache_2aeb61da65b2"
+#> cache: "/tmp/RtmpqiDLsK/cache_24cf1e59cb3d"
 ```
 
 The fake adapter mirrors Drive operations on the local filesystem — no
@@ -225,8 +224,6 @@ board <- gdpins_init_board(
   adapter    = adapter,
   create     = TRUE
 )
-#> Warning: ! "data_raw": sync discrepancy detected between Drive and local. Run
-#>   `gdpins_sync()` to reconcile.
 
 board_offline <- gdpins_go_offline(board)
 #> ℹ Board "data_raw" switched to local-only (offline) mode.
@@ -236,7 +233,7 @@ board_offline$config   # "local_only"
 
 # Reads and writes stay local -- no network calls, no blocked writes
 gdpins_pin_write(board_offline, mtcars, "cars")
-#> Creating new version '20260715T125513Z-c0340'
+#> Creating new version '20260716T190834Z-c0340'
 #> Writing to pin 'cars'
 gdpins_pin_read(board_offline, "cars")
 #> # A tibble: 32 × 11
