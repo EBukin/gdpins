@@ -1,6 +1,6 @@
 Package: gdpins
 Title: Google Drive + pins Data Management for R Projects
-Version: 0.0.1.9012
+Version: 0.0.1.9015
 Authors@R:
     person("Eduard", "Bukin", email = "ebukin@worldbank.org",
            role = c("aut", "cre"))

@@ -1,20 +1,7 @@
 # test-board.R — WS3 tests for gdpins_init_board + S3 methods
 # Uses new_fake_board() harness (no network).
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-# Mock gdpins_board_status to return a "no discrepancy" status silently
-mock_status_ok <- function() {
-  tibble::tibble(name = character(0), status = character(0), detail = character(0))
-}
-
-mock_status_discrepancy <- function() {
-  tibble::tibble(
-    name   = "some_pin",
-    status = "local_ahead",
-    detail = "local has newer version"
-  )
-}
+# mock_status_*() fixtures live in helper-fakes.R.
 
 # ── 1. Config: local_only ─────────────────────────────────────────────────────
 
@@ -872,4 +859,105 @@ test_that("drive_cache board already exists on fake drive: build succeeds", {
     on_discrepancy = "ignore"
   )
   expect_equal(board$config, "drive_cache")
+})
+
+# ── .has_discrepancy / .handle_init_sync ──────────────────────────────────────
+# Regression: .handle_init_sync() used to fire its on_discrepancy action for any
+# non-NULL status, so a fully in-sync (or empty) board warned "sync discrepancy
+# detected" on every gdpins_init_board() call, and on_discrepancy = "sync_*"
+# re-synced boards that needed nothing.
+
+# The mocks previously used a `status` column where the real schema says
+# `state`. Nothing read them, so the drift was invisible. Pin them together.
+test_that("mock status fixtures match the real gdpins_board_status() schema", {
+  real <- names(.empty_board_status_tbl())
+  for (m in list(mock_status_ok, mock_status_in_sync,
+                 mock_status_discrepancy, mock_status_offline)) {
+    expect_identical(names(m()), real)
+  }
+  expect_true("state" %in% real)
+  expect_false("status" %in% real)
+})
+
+test_that(".has_discrepancy is FALSE for empty and all-in-sync status", {
+  expect_false(.has_discrepancy(mock_status_ok()))
+  expect_false(.has_discrepancy(mock_status_in_sync()))
+  expect_false(.has_discrepancy(NULL))
+})
+
+test_that(".has_discrepancy treats offline as 'cannot tell', not drift", {
+  expect_false(.has_discrepancy(mock_status_offline()))
+})
+
+test_that(".has_discrepancy is TRUE only for actionable states", {
+  expect_true(.has_discrepancy(mock_status_discrepancy()))
+  for (s in c("local_ahead", "drive_ahead", "conflict")) {
+    st <- mock_status_in_sync()
+    st$state <- s
+    expect_true(.has_discrepancy(st), info = s)
+  }
+})
+
+test_that("init does not warn when board is in sync (on_discrepancy = 'warn')", {
+  local_dir <- withr::local_tempdir()
+  testthat::local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) mock_status_in_sync(),
+    .package = "gdpins"
+  )
+  expect_no_warning(
+    gdpins_init_board(name = "quiet", local_dir = local_dir, on_discrepancy = "warn")
+  )
+})
+
+test_that("init does not warn when status is empty (nothing on either side)", {
+  local_dir <- withr::local_tempdir()
+  testthat::local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
+    .package = "gdpins"
+  )
+  expect_no_warning(
+    gdpins_init_board(name = "empty", local_dir = local_dir, on_discrepancy = "warn")
+  )
+})
+
+test_that("init still warns when there IS a real discrepancy", {
+  local_dir <- withr::local_tempdir()
+  testthat::local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) mock_status_discrepancy(),
+    .package = "gdpins"
+  )
+  expect_warning(
+    gdpins_init_board(name = "drifted", local_dir = local_dir, on_discrepancy = "warn"),
+    "sync discrepancy detected"
+  )
+})
+
+test_that("init does not warn about discrepancy when offline", {
+  local_dir <- withr::local_tempdir()
+  testthat::local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) mock_status_offline(),
+    .package = "gdpins"
+  )
+  expect_no_warning(
+    gdpins_init_board(name = "offline_board", local_dir = local_dir, on_discrepancy = "warn")
+  )
+})
+
+test_that("in-sync board is not re-synced under on_discrepancy = 'sync_from_drive'", {
+  local_dir <- withr::local_tempdir()
+  synced <- FALSE
+  testthat::local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) mock_status_in_sync(),
+    gdpins_sync         = function(x, ...) { synced <<- TRUE; invisible(x) },
+    .package = "gdpins"
+  )
+  gdpins_init_board(
+    name = "nosync", local_dir = local_dir, on_discrepancy = "sync_from_drive"
+  )
+  expect_false(synced)
 })

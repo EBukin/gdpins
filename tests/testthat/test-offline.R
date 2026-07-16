@@ -2,11 +2,7 @@
 # Uses new_fake_board()/new_fake_raw_conn() harnesses (no network) for the
 # bulk of coverage; one gated test exercises a real Drive folder.
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-mock_status_ok <- function() {
-  tibble::tibble(name = character(0), status = character(0), detail = character(0))
-}
+# mock_status_*() fixtures live in helper-fakes.R.
 
 # ── Generic dispatch ──────────────────────────────────────────────────────────
 
@@ -145,9 +141,9 @@ test_that("gdpins_go_online() runs a sync when on_discrepancy = sync_to_drive", 
   sync_called <- FALSE
   testthat::local_mocked_bindings(
     gdpins_is_online    = function() TRUE,
-    gdpins_board_status = function(x) {
-      tibble::tibble(name = "cars", status = "local_ahead", detail = "x")
-    },
+    gdpins_board_status = function(x) mock_status_row(
+      name = "cars", state = "local_ahead", local_version = "20260102T120000Z-bbb"
+    ),
     gdpins_sync = function(x, direction, ...) {
       sync_called <<- TRUE
       invisible(x)
