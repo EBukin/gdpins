@@ -164,6 +164,70 @@ readxl::read_excel(path_xlsx)
 
 ---
 
+## Getting the name slightly wrong
+
+You do not have to remember the exact path. `gdpins_raw_path()`,
+`gdpins_raw_get()` and `gdpins_pin_read()` resolve the name you pass against
+what is actually there:
+
+```{r raw-resolve}
+# The file lives at "api/worldbank/gdp_2024.parquet" -- the basename is enough,
+# as long as it is unique.
+gdpins_raw_get(conn, "gdp_2024.parquet")
+
+# Case does not have to match either.
+gdpins_raw_get(conn, "GDP_2024.parquet")
+
+# A near-miss is never guessed at -- you get told, with candidates:
+gdpins_raw_get(conn, "gdp_2024.csv")
+#> Error: File not found in raw connection: 'gdp_2024.csv'
+#> i Did you mean:
+#> * api/worldbank/gdp_2024.parquet
+#> i List everything with `gdpins_raw_get(conn, "*")`.
+```
+
+The rule is that gdpins auto-resolves **only** when the match is both exact and
+unique. Anything looser is reported rather than acted on, so it can never
+quietly read a different file than you meant. Two basenames that clash are an
+error listing both full paths, not a coin flip.
+
+`gdpins_raw_remove()` opts out entirely: it matches the exact path only. It
+deletes your local copy, so it is the one verb that must never guess.
+
+## Listing mode: `"*"`
+
+A name containing `*` or `?` flips these verbs into **listing mode** — they show
+you what matches instead of acting on it. Nothing is read; nothing is deleted.
+
+```{r raw-glob}
+# Everything, at any depth
+gdpins_raw_path(conn, "*")
+#> 4 files
+#> * gdp_2024.parquet
+#> * metadata.csv
+#> * api/worldbank/gdp_2024.parquet
+#> * sub/sub/folder/notes.rds
+
+# Every CSV, however deeply nested
+gdpins_raw_path(conn, "*.csv")
+```
+
+This is the quickest way to answer "what is actually in here?", and it is what
+the error messages above point you at. Unlike `gdpins_raw_ls()` — whose
+`depth = 2` default hides `sub/sub/folder/notes.rds` — listing mode always
+recurses the whole tree. Matching is case-sensitive on every platform, so
+`"*.csv"` will not match `CARS.CSV`.
+
+The result is an ordinary tibble (it just prints as names), so you can go
+straight on with it:
+
+```{r raw-glob-tbl}
+big <- gdpins_raw_path(conn, "*.parquet")
+big[big$size > 1e6, c("name", "size")]
+```
+
+---
+
 ## Listing files with `gdpins_raw_ls()`
 
 `gdpins_raw_ls()` returns an 8-column tibble describing everything inside the

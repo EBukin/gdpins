@@ -32,6 +32,25 @@ for local-only connections and the fake adapter.}
 Returns a compact folder tree for the raw connection, defaulting to 2 levels
 of depth.
 }
+\section{Glob and listing mode}{
+
+A \code{name} containing \code{*} or \verb{?} switches \code{\link[=gdpins_raw_path]{gdpins_raw_path()}},
+\code{\link[=gdpins_raw_get]{gdpins_raw_get()}}, \code{\link[=gdpins_raw_remove]{gdpins_raw_remove()}}, \code{\link[=gdpins_pin_read]{gdpins_pin_read()}} and
+\code{\link[=gdpins_pin_path]{gdpins_pin_path()}} into \strong{listing mode}: they return a listing of what
+matches instead of acting on one item. Listing mode never bulk-reads and never
+bulk-deletes.
+\itemize{
+\item \code{"*"} — everything.
+\item \code{"*.csv"} — every \code{.csv}, at \strong{any depth} (unlike \code{\link[=gdpins_raw_ls]{gdpins_raw_ls()}}, whose
+\code{depth = 2} default hides \code{sub/sub/folder/file.rds}).
+}
+
+Matching is case-sensitive on every platform, so \code{"*.csv"} does not match
+\code{"CARS.CSV"}. Raw verbs return a \code{gdpins_raw_listing}; pin verbs return a
+\code{gdpins_pin_listing}. Both are ordinary tibbles with a print method that shows
+names only.
+}
+
 \examples{
 adapter <- gdpins_fake_drive()
 conn <- gdpins_raw_connect(
@@ -45,3 +64,14 @@ tbl <- gdpins_raw_ls(conn)
 tbl$local_path   # absolute local path
 tbl$drive_id     # NA for fake adapter; real Drive ID with real adapter
 }
+\seealso{
+Other raw-connection: 
+\code{\link{gdpins_raw_connect}()},
+\code{\link{gdpins_raw_get}()},
+\code{\link{gdpins_raw_path}()},
+\code{\link{gdpins_raw_put_file}()},
+\code{\link{gdpins_raw_put_object}()},
+\code{\link{gdpins_raw_remove}()},
+\code{\link{gdpins_refresh_disconnect}()}
+}
+\concept{raw-connection}

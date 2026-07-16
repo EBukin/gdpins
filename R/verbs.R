@@ -168,6 +168,179 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
   any(vapply(x, inherits, logical(1L), "sfc"))
 }
 
+# ── Pin name resolution ───────────────────────────────────────────────────────
+
+# The board components a read may come from, in local-first order.
+#
+# Deliberately NOT filtered by gdpins_is_online(). Resolution only answers "does
+# this name exist anywhere on this board"; gdpins_pin_read() owns the offline
+# semantics and warns + returns NULL for a pin that lives only on Drive.
+# Dropping the Drive component here would turn that warning into a "pin not
+# found" abort. When Drive is genuinely unreachable, pin_list() below fails and
+# contributes nothing, which is the same answer by a slower route.
+.pin_sources <- function(board) {
+  srcs <- list(
+    local = board$local_board,
+    cache = board$cache_board,
+    drive = board$drive_board
+  )
+  srcs[!vapply(srcs, is.null, logical(1L))]
+}
+
+# Every pin name reachable from the board, deduped across components.
+.pin_candidates <- function(board) {
+  out <- character()
+  for (src in .pin_sources(board)) {
+    out <- c(out, tryCatch(pins::pin_list(src), error = function(e) character()))
+  }
+  unique(out)
+}
+
+# Listing mode for pins: the gdpins_list_pins() tibble, filtered by glob.
+.pin_glob_listing <- function(board, pattern) {
+  listing <- gdpins_list_pins(board)
+  matched <- fs::path_filter(listing$name, glob = pattern)
+  .new_pin_listing(listing[listing$name %in% matched, , drop = FALSE])
+}
+
+#' Resolve a user-supplied pin name
+#'
+#' The [raw-connection] name-resolution ladder, minus the basename rungs: pin
+#' names are flat, so "exact path" and "exact basename" are the same question.
+#' Auto-resolve still happens only on an exact, unique match.
+#'
+#' @param board A `gdpins_board` object.
+#' @param name Character scalar. The name as the user typed it.
+#' @param verb Character scalar. Calling verb, used in error text.
+#'
+#' @return Character scalar. A pin name known to the board.
+#' @keywords internal
+.resolve_pin_name <- function(board, name, verb = "gdpins_pin_read") {
+  cands <- .pin_candidates(board)
+
+  # Rung 1 -- exact name.
+  if (name %in% cands) return(name)
+
+  glob_hint <- paste0(verb, '(board, "*")')
+
+  if (length(cands) == 0L) {
+    cli::cli_abort(c(
+      "Pin {.val {name}} not found in any board component.",
+      x = "The board has no pins.",
+      i = "Write one with {.fn gdpins_pin_write}."
+    ))
+  }
+
+  # Rung 4 -- case-insensitive exact, unique.
+  ci <- unique(cands[tolower(cands) == tolower(name)])
+  if (length(ci) == 1L) return(ci)
+
+  near <- ci
+
+  # Rung 5 -- same stem, different extension. Rarely fires for pins (names are
+  # usually extensionless) but catches pin_read(board, "cars.csv") for "cars".
+  by_stem <- cands[
+    tolower(tools::file_path_sans_ext(cands)) ==
+      tolower(tools::file_path_sans_ext(name))
+  ]
+  near <- unique(c(near, by_stem))
+
+  # Rung 6 -- edit distance on the lowercased name.
+  if (length(near) == 0L) {
+    d      <- utils::adist(tolower(name), tolower(cands))[1L, ]
+    thr    <- max(2L, floor(0.34 * nchar(name)))
+    within <- which(d <= thr)
+    near   <- utils::head(cands[within[order(d[within])]], 5L)
+  }
+
+  # Rung 7 -- nothing close.
+  if (length(near) == 0L) {
+    cli::cli_abort(c(
+      "Pin {.val {name}} not found in any board component.",
+      i = "Board: {.val {board$name}}",
+      i = "List every pin with {.code {glob_hint}}."
+    ))
+  }
+
+  cli::cli_abort(c(
+    "Pin {.val {name}} not found in any board component.",
+    i = "Did you mean:",
+    .raw_suggest_bullets(near),
+    i = "List every pin with {.code {glob_hint}}."
+  ))
+}
+
+#' Resolve a pin to its file path(s) on disk
+#'
+#' The path counterpart of [gdpins_pin_read()]: same board, same name, same
+#' local-first resolution, but returns where the pin's file(s) live rather than
+#' the object inside them. Use it to hand a pin to a reader gdpins does not
+#' know about, or to inspect the stored bytes.
+#'
+#' Resolution mirrors [gdpins_pin_read()] exactly — local board, then cache
+#' board, then Drive — and the pin is materialised (downloaded into the pins
+#' cache) when Drive holds the only copy, just as [gdpins_raw_path()] downloads
+#' on demand.
+#'
+#' @param board A `gdpins_board` object.
+#' @param name Character scalar. Pin name. A `name` containing `*` or `?`
+#'   switches to listing mode; see the Glob section on [raw-connection].
+#' @param version Character scalar or `NULL`. Pin version; `NULL` = latest.
+#'
+#' @return Character vector of absolute paths — length 1 for an ordinary pin,
+#'   longer for a multi-file pin written with [pins::pin_upload()]. In listing
+#'   mode, a `gdpins_pin_listing` tibble instead.
+#' @seealso [gdpins_pin_read()], [gdpins_raw_path()].
+#' @examples
+#' adapter <- gdpins_fake_drive()
+#' board <- gdpins_init_board(
+#'   name       = "data_raw",
+#'   drive_path = "my-project/data-raw",
+#'   cache_dir  = tempfile("cache_"),
+#'   adapter    = adapter,
+#'   create     = TRUE
+#' )
+#' gdpins_pin_write(board, mtcars, "cars")
+#' p <- gdpins_pin_path(board, "cars")
+#' file.exists(p)
+#' @inheritSection raw-connection Name resolution
+#' @inheritSection raw-connection Glob and listing mode
+#' @inheritSection raw-connection Objects vs paths
+#' @export
+gdpins_pin_path <- function(board, name, version = NULL) {
+  if (!inherits(board, "gdpins_board")) {
+    cli::cli_abort(c(
+      "{.arg board} must be a {.cls gdpins_board}.",
+      x = "Got {.cls {class(board)}}."
+    ))
+  }
+  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
+    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
+  }
+
+  if (.is_glob(name)) {
+    return(.pin_glob_listing(board, name))
+  }
+
+  name <- .resolve_pin_name(board, name, verb = "gdpins_pin_path")
+
+  for (src in .pin_sources(board)) {
+    found <- tryCatch(pins::pin_exists(src, name), error = function(e) FALSE)
+    if (!isTRUE(found)) next
+    paths <- tryCatch(
+      pins::pin_download(src, name, version = version),
+      error = function(e) NULL
+    )
+    if (!is.null(paths)) return(as.character(paths))
+  }
+
+  cli::cli_abort(c(
+    "Could not resolve a path for pin {.val {name}}.",
+    i = "The pin is known to the board but no component could produce its files.",
+    i = "If it lives only on Drive, check your connection."
+  ))
+}
+
 #' Read a pin from a gdpins board
 #'
 #' Reads from the local-first source: local board if present, else cache board,
@@ -213,6 +386,8 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
 #' )
 #' gdpins_pin_read(board, "cars")
 #' }
+#' @inheritSection raw-connection Name resolution
+#' @inheritSection raw-connection Glob and listing mode
 #' @export
 gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
   if (!inherits(board, "gdpins_board")) {
@@ -224,6 +399,13 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
   if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
     cli::cli_abort("{.arg name} must be a non-empty character scalar.")
   }
+
+  # Listing mode. Never bulk-reads: a glob asks which pins exist.
+  if (.is_glob(name)) {
+    return(.pin_glob_listing(board, name))
+  }
+
+  name <- .resolve_pin_name(board, name, verb = "gdpins_pin_read")
   if (!is.null(wkt_engine) &&
       !(is.character(wkt_engine) && length(wkt_engine) == 1L &&
         wkt_engine %in% c("wk", "sf", "none"))) {
