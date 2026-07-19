@@ -18,7 +18,7 @@ NULL
 # Detect sf CRS from geometry__<epsg>__ column names; NA_integer_ if none found.
 .detect_sf_crs <- function(src, name) {
   tryCatch({
-    dat <- pins::pin_read(src, name)
+    dat <- .read_from_board(src, name, NULL)
     if (!is.data.frame(dat)) return(NA_integer_)
     # Look for __<epsg>__ pattern (4–5 digit EPSG)
     geo_cols <- grep("^.*__\\d{4,5}__$", names(dat), value = TRUE)

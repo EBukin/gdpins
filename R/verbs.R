@@ -19,22 +19,42 @@ NULL
 #'
 #' @keywords internal
 .write_to_board <- function(pins_board, x, name, fmt, versioned) {
-  type <- switch(fmt,
-    parquet = "parquet",
-    rds     = "rds",
+  if (identical(fmt, "parquet")) {
+    # Write parquet through the configured engine (default arrow) rather than
+    # pins::pin_write(type = "parquet"), which is hardwired to nanoparquet.
+    # nanoparquet-authored files can also make its own reader allocate tens of
+    # GB, so writing them at all is a latent hazard. The arrow-written .parquet
+    # is stored as a pins "file" pin via pin_upload(); versioning follows the
+    # board's own `versioned` flag.
+    dir <- tempfile("gdpins_pq_")
+    fs::dir_create(dir)
+    on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+    tmp <- fs::path(dir, paste0(name, ".parquet"))
+    .write_parquet_file(x, tmp)
+    suppressMessages(pins::pin_upload(pins_board, as.character(tmp), name = name))
+  } else if (identical(fmt, "rds")) {
+    pins::pin_write(
+      pins_board,
+      x,
+      name      = name,
+      type      = "rds",
+      versioned = versioned
+    )
+  } else {
     cli::cli_abort("Unknown format {.val {fmt}}.")
-  )
-  pins::pin_write(
-    pins_board,
-    x,
-    name      = name,
-    type      = type,
-    versioned = versioned
-  )
+  }
   invisible(NULL)
 }
 
 #' Read from a single pins board
+#'
+#' Parquet pins are read through the configured parquet engine
+#' (`.gdpins_parquet_engine()`, default arrow) instead of `pins::pin_read()`,
+#' which is hardwired to nanoparquet and can exhaust memory on large-string
+#' columns. This covers both native `"parquet"` pins (legacy, nanoparquet-
+#' authored) and the `"file"` pins gdpins now writes (an arrow-authored
+#' `.parquet` uploaded with [pins::pin_upload()]). All other pin types keep the
+#' pins-native reader.
 #'
 #' @param pins_board A pins board object.
 #' @param name Pin name.
@@ -42,6 +62,22 @@ NULL
 #'
 #' @keywords internal
 .read_from_board <- function(pins_board, name, version) {
+  type <- tryCatch(
+    pins::pin_meta(pins_board, name, version = version)$type,
+    error = function(e) NA_character_
+  )
+  type <- if (length(type)) type[[1L]] else NA_character_
+
+  if (identical(type, "parquet") || identical(type, "file")) {
+    paths <- pins::pin_download(pins_board, name, version = version)
+    pq    <- paths[grepl("[.]parquet$", paths, ignore.case = TRUE)]
+    if (length(pq) >= 1L) {
+      return(.read_parquet_file(pq[[1L]]))
+    }
+    # A "file" pin that is not parquet: fall through to the pins reader, which
+    # will raise its own informative error.
+  }
+
   if (is.null(version)) {
     pins::pin_read(pins_board, name)
   } else {
@@ -465,10 +501,6 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
     )
 
     if (!is.null(result)) {
-      result_type <- tryCatch(
-        pins::pin_meta(src, name, version = version)$type,
-        error = function(e) NA_character_
-      )
       break
     }
   }
@@ -481,14 +513,10 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
   }
 
   if (is.data.frame(result)) {
-    # nanoparquet::read_parquet() (used by pins type "parquet") returns plain
-    # data frames rather than tibbles; normalise so parquet reads are still
-    # tibbles like before. Leave "rds" reads untouched so arbitrary
-    # data-frame subclasses (e.g. base data.frame with row names) round-trip
-    # byte-for-byte, as saveRDS()/readRDS() already guarantee.
-    if (identical(result_type, "parquet") && !inherits(result, "tbl_df")) {
-      result <- tibble::as_tibble(result)
-    }
+    # Parquet reads already come back as tibbles via .read_parquet_file(); rds
+    # reads are left untouched so arbitrary data-frame subclasses (e.g. base
+    # data.frame with row names) round-trip byte-for-byte, as readRDS()
+    # guarantees.
 
     # Auto-decode sf: if any column matches the __epsg__ pattern, restore sf.
     # wkt_engine = "none" opts out: geometry stays as raw WKT text columns.

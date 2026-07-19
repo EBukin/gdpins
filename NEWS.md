@@ -1,3 +1,28 @@
+# gdpins 0.0.1.9023
+
+## New features
+
+* **Parquet is now read and written with arrow by default.** A new
+  `gdpins.parquet_engine` option selects the parquet engine — `"arrow"`
+  (default) or `"nanoparquet"`. Set `options(gdpins.parquet_engine =
+  "nanoparquet")` to restore the previous behaviour. Both engines write
+  standard parquet that either can read, so the choice is transparent apart
+  from memory use. See `?"io-formats"`.
+
+## Bug fixes
+
+* **Fixed a memory explosion when reading pins with large geometry columns.**
+  `gdpins_pin_read()` (and the internal copy used by `gdpins_sync()`) read
+  parquet through `pins`, which is hardwired to `nanoparquet`. On a pin whose
+  WKT geometry column holds a few large (multi-MB) string cells — e.g. one row
+  per administrative region — `nanoparquet::read_parquet()` allocates tens of
+  gigabytes and crashes the R session, even though the file is only ~15 MB on
+  disk. gdpins now reads parquet with arrow by default, which reads the same
+  bytes in bounded memory. Existing pins are read unchanged; no re-write is
+  needed. New parquet pins are written by arrow (stored as a `pins` `"file"`
+  pin) so they never carry the nanoparquet-authored payload that triggers the
+  blow-up. The upstream `nanoparquet` bug is tracked separately.
+
 # gdpins 0.0.1.9022
 
 ## Bug fixes

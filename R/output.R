@@ -178,7 +178,7 @@ gdpins_publish_output <- function(
     gd_mkdir(adapter, drive_tables)
     src_board <- .resolve_read_board(tables_board)
     purrr::walk(tables_work$pin_name, function(pin_nm) {
-      obj <- pins::pin_read(src_board, pin_nm)
+      obj <- .read_from_board(src_board, pin_nm, NULL)
       tmp <- tempfile(fileext = ".rds")
       on.exit(unlink(tmp), add = TRUE)
       saveRDS(obj, tmp)

@@ -31,3 +31,22 @@ to ~0.5 m. gdpins always pins \code{digits = 15} for the \code{"sf"} engine to a
 this; the \code{"wk"} engine is full-precision by construction.
 }
 
+\section{Parquet engine}{
+
+The parquet files behind pins are read and written by one of two engines,
+controlled package-wide by the \code{gdpins.parquet_engine} option:
+\itemize{
+\item \code{"arrow"} (default) — uses \code{\link[arrow:read_parquet]{arrow::read_parquet()}} / \code{\link[arrow:write_parquet]{arrow::write_parquet()}}.
+\item \code{"nanoparquet"} — uses \code{\link[nanoparquet:read_parquet]{nanoparquet::read_parquet()}} /
+\code{\link[nanoparquet:write_parquet]{nanoparquet::write_parquet()}}.
+}
+
+arrow is the default because nanoparquet's reader can allocate tens of
+gigabytes and crash the session on files that hold a few large (multi-MB)
+string cells — for example a WKT geometry column with one row per region.
+arrow reads the identical bytes in bounded memory. Both engines write
+standard parquet that either can read, so the choice is transparent apart
+from the memory behaviour. Switch with
+\code{options(gdpins.parquet_engine = "nanoparquet")}.
+}
+

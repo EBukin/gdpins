@@ -9,3 +9,5 @@
 ^CLAUDE\.md$
 ^tools$
 ^\.githooks$
+^test\.R$
+^nanotest\.R$

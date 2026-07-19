@@ -689,8 +689,37 @@ gdpins_sync.default <- function(
 
 #' @keywords internal
 .copy_pin_to_board <- function(src_board, dst_board, pin_name) {
+  pin_type <- tryCatch(
+    pins::pin_meta(src_board, pin_name)$type,
+    error = function(e) NULL
+  )
+  pin_type <- if (length(pin_type)) pin_type[[1L]] else NULL
+  if (!is.null(pin_type) && is.na(pin_type)) pin_type <- NULL
+
+  # "file" pins (how gdpins now stores parquet) are copied byte-for-byte with
+  # download + upload; pins::pin_read() cannot read them and pin_write() cannot
+  # re-emit them.
+  if (identical(pin_type, "file")) {
+    paths <- tryCatch(
+      pins::pin_download(src_board, pin_name),
+      error = function(e) {
+        cli::cli_warn(
+          "Could not read pin {.val {pin_name}} from source board: {e$message}"
+        )
+        NULL
+      }
+    )
+    if (!is.null(paths)) {
+      suppressMessages(pins::pin_upload(dst_board, as.character(paths), pin_name))
+    }
+    return(invisible(NULL))
+  }
+
+  # Other pins: read the object (parquet routed through the arrow engine by
+  # .read_from_board, avoiding nanoparquet's read-time memory blow-up) and
+  # re-write preserving the original pin type.
   obj <- tryCatch(
-    pins::pin_read(src_board, pin_name),
+    .read_from_board(src_board, pin_name, NULL),
     error = function(e) {
       cli::cli_warn(
         "Could not read pin {.val {pin_name}} from source board: {e$message}"
@@ -699,11 +728,6 @@ gdpins_sync.default <- function(
     }
   )
   if (!is.null(obj)) {
-    pin_type <- tryCatch(
-      pins::pin_meta(src_board, pin_name)$type,
-      error = function(e) NULL
-    )
-    if (is.null(pin_type) || is.na(pin_type)) pin_type <- NULL
     suppressMessages(pins::pin_write(dst_board, obj, pin_name, type = pin_type))
   }
   invisible(NULL)

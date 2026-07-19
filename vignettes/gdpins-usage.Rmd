@@ -215,8 +215,11 @@ rules, in order:
 |-------------|--------------|---------|
 | Not a data frame (list, model, …) | `"rds"` | `saveRDS()` |
 | Data frame with list-columns (non-sf) | `"rds"` | `saveRDS()` |
-| Plain tibble / data frame | `"parquet"` | Parquet via `nanoparquet` |
+| Plain tibble / data frame | `"parquet"` | Parquet via `arrow` (default) |
 | `sf` object (all list-cols are `sfc`) | `"parquet"` | Parquet (geometry WKT-encoded) |
+
+Parquet is read and written with `arrow` by default. Switch engines with
+`options(gdpins.parquet_engine = "nanoparquet")`; see `?"io-formats"`.
 
 ```{r format-auto}
 gdpins_detect_format(mtcars)         # "parquet"  — plain data frame

@@ -24,6 +24,22 @@
 #' to ~0.5 m. gdpins always pins `digits = 15` for the `"sf"` engine to avoid
 #' this; the `"wk"` engine is full-precision by construction.
 #'
+#' @section Parquet engine:
+#' The parquet files behind pins are read and written by one of two engines,
+#' controlled package-wide by the `gdpins.parquet_engine` option:
+#'
+#' * `"arrow"` (default) — uses [arrow::read_parquet()] / [arrow::write_parquet()].
+#' * `"nanoparquet"` — uses [nanoparquet::read_parquet()] /
+#'   [nanoparquet::write_parquet()].
+#'
+#' arrow is the default because nanoparquet's reader can allocate tens of
+#' gigabytes and crash the session on files that hold a few large (multi-MB)
+#' string cells — for example a WKT geometry column with one row per region.
+#' arrow reads the identical bytes in bounded memory. Both engines write
+#' standard parquet that either can read, so the choice is transparent apart
+#' from the memory behaviour. Switch with
+#' `options(gdpins.parquet_engine = "nanoparquet")`.
+#'
 #' @name io-formats
 NULL
 
@@ -53,6 +69,61 @@ NULL
     ))
   }
   engine
+}
+
+#' Resolve the parquet (de)serialisation engine
+#'
+#' @param engine Character scalar `"arrow"` or `"nanoparquet"`, or `NULL` to
+#'   fall back to the `gdpins.parquet_engine` option (default `"arrow"`).
+#' @return `"arrow"` or `"nanoparquet"`.
+#' @keywords internal
+.gdpins_parquet_engine <- function(engine = NULL) {
+  if (is.null(engine)) {
+    engine <- getOption("gdpins.parquet_engine", "arrow")
+  }
+  engine <- tryCatch(
+    match.arg(engine, c("arrow", "nanoparquet")),
+    error = function(e) {
+      cli::cli_abort(c(
+        "Invalid parquet {.arg engine}: {.val {engine}}.",
+        i = "Must be one of {.val arrow} or {.val nanoparquet}."
+      ))
+    }
+  )
+  if (!requireNamespace(engine, quietly = TRUE)) {
+    cli::cli_abort(c(
+      "Parquet engine {.val {engine}} requested but the {.pkg {engine}} package is not installed.",
+      i = "Install it, or select the other engine via {.code options(gdpins.parquet_engine = ...)}."
+    ))
+  }
+  engine
+}
+
+# Read a parquet file into a tibble using the selected engine. arrow is the
+# default: nanoparquet's reader can allocate tens of GB on files holding a few
+# large (~MB) string cells (e.g. WKT geometry), whereas arrow reads the same
+# bytes in bounded memory. mmap = FALSE because memory-mapping a file on a
+# cloud-sync mount (OneDrive/SharePoint) segfaults when the backing pages are
+# invalidated mid-read.
+.read_parquet_file <- function(path, engine = NULL) {
+  engine <- .gdpins_parquet_engine(engine)
+  tbl <- if (identical(engine, "arrow")) {
+    arrow::read_parquet(path, mmap = FALSE)
+  } else {
+    nanoparquet::read_parquet(path)
+  }
+  tibble::as_tibble(tbl)
+}
+
+# Write a data frame to a parquet file using the selected engine.
+.write_parquet_file <- function(x, path, engine = NULL) {
+  engine <- .gdpins_parquet_engine(engine)
+  if (identical(engine, "arrow")) {
+    arrow::write_parquet(x, path)
+  } else {
+    nanoparquet::write_parquet(x, path)
+  }
+  invisible(path)
 }
 
 # sfc -> character WKT (one column), full precision, chosen engine
