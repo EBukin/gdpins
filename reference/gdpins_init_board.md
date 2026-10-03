@@ -32,11 +32,20 @@ gdpins_init_board(
 
 - cache_dir:
 
-  Character scalar. Local cache directory path, or `NULL`.
+  Character scalar, `TRUE`, `FALSE`, or `NULL` (default). Path of the
+  board's one local copy. `NULL`/`TRUE` use the default path under
+  `getOption("gdpins.cache_dir")`; `FALSE` means no local copy
+  (`"drive_only"`); a path uses that directory. For boards without
+  `drive_path` (`"local_only"`), `cache_dir` must be a non-empty
+  character path — the local board's directory; `NULL`/`TRUE`/`FALSE`
+  error ("Supply `drive_path`, or `cache_dir` as a path for a local-only
+  board.").
 
 - local_dir:
 
-  Character scalar. Standalone local board directory path, or `NULL`.
+  Character scalar. Deprecated as of 0.0.1.9025; superseded by
+  `cache_dir`. If supplied while `cache_dir` is `NULL`, it is used as
+  `cache_dir`; otherwise it is ignored (with a deprecation warning).
 
 - versioned:
 
@@ -72,13 +81,15 @@ A `gdpins_board` object.
 
 ## Details
 
-- **`"local_only"`** — `local_dir` provided, no `drive_path`/`adapter`.
+- **`"local_only"`** — no `drive_path`; `cache_dir` is the local board
+  path.
 
-- **`"drive_cache"`** — `drive_path` + `adapter` + `cache_dir`, no
-  `local_dir`.
+- **`"drive_cache"`** — `drive_path` + `adapter`; one local copy at
+  `cache_dir` (default `NULL`/`TRUE`:
+  `getOption("gdpins.cache_dir")/<root>/<drive_path>`).
 
-- **`"drive_cache_local"`** — all three: `drive_path`, `cache_dir`, and
-  `local_dir`.
+- **`"drive_only"`** — `drive_path` + `adapter` + `cache_dir = FALSE`;
+  no local copy, Drive downloads go to a session temp dir.
 
 The board checks for sync discrepancies between Drive and local
 (governed by `on_discrepancy`). Non-existent Drive boards are never
@@ -120,15 +131,16 @@ board
 #> versioned: "TRUE"
 #> connected: "FALSE"
 #> drive: "my-project/data-raw"
-#> cache: "/tmp/RtmplHQDVx/cache_1e0cbfb9719"
+#> cache: "/tmp/RtmpgN3JhS/cache_6c3620ffc199"
 
 # --- Real adapter (requires Google Drive auth) ---
 if (FALSE) { # \dontrun{
 adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+# cache_dir omitted: local copy defaults to
+# getOption("gdpins.cache_dir")/<root>/<drive_path>
 board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )
@@ -137,7 +149,6 @@ board <- gdpins_init_board(
 board2 <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )

@@ -4,7 +4,7 @@ network work at init. It records the arguments it was given and connects on
 first use: the online probe, the Drive existence/create check, folder-ID
 resolution, pins board construction, and the on_discrepancy sync check
 all run the first time something reads one of the board's components
-(drive_board, cache_board, local_board).
+(drive_board, local_board).
 The point is scripts that set up several boards but only touch some of them.
 Initialising three Drive boards costs three round-trips plus three sync
 checks; if the script only ever reads one, lazy init pays for one."><meta property="og:description" content="A board created with gdpins_init_board(lazy = TRUE) (the default) does no
@@ -12,7 +12,7 @@ network work at init. It records the arguments it was given and connects on
 first use: the online probe, the Drive existence/create check, folder-ID
 resolution, pins board construction, and the on_discrepancy sync check
 all run the first time something reads one of the board's components
-(drive_board, cache_board, local_board).
+(drive_board, local_board).
 The point is scripts that set up several boards but only touch some of them.
 Initialising three Drive boards costs three round-trips plus three sync
 checks; if the script only ever reads one, lazy init pays for one."></head><body>
@@ -23,7 +23,7 @@ checks; if the script only ever reads one, lazy init pays for one."></head><body
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -59,7 +59,7 @@ network work at init. It records the arguments it was given and connects on
 first use: the online probe, the Drive existence/create check, folder-ID
 resolution, <code>pins</code> board construction, and the <code>on_discrepancy</code> sync check
 all run the first time something reads one of the board's components
-(<code>drive_board</code>, <code>cache_board</code>, <code>local_board</code>).</p>
+(<code>drive_board</code>, <code>local_board</code>).</p>
 <p>The point is scripts that set up several boards but only touch some of them.
 Initialising three Drive boards costs three round-trips plus three sync
 checks; if the script only ever reads one, lazy init pays for one.</p>
@@ -77,7 +77,7 @@ checks; if the script only ever reads one, lazy init pays for one.</p>
 <code><a href="gdpins_board_connect.html">gdpins_board_connect()</a></code>, which exists to force it deliberately.</p>
 <p><code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/base/format.html" class="external-link">format()</a></code>, and <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> do <strong>not</strong> force: they describe the
 board from its declared config. Nor do the plain metadata fields (<code>name</code>,
-<code>config</code>, <code>versioned</code>, <code>drive_path</code>, <code>cache_dir</code>, <code>local_dir</code>, <code>adapter</code>).</p>
+<code>config</code>, <code>versioned</code>, <code>drive_path</code>, <code>cache_dir</code>, <code>adapter</code>).</p>
     </div>
     <div class="section level2">
     <h2 id="consequences">Consequences<a class="anchor" aria-label="anchor" href="#consequences"></a></h2>

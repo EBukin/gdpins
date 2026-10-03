@@ -40,9 +40,8 @@ In listing mode, a `gdpins_pin_listing` tibble instead.
 
 Resolution mirrors
 [`gdpins_pin_read()`](https://ebukin.github.io/gdpins/reference/gdpins_pin_read.md)
-exactly — local board, then cache board, then Drive — and the pin is
-materialised (downloaded into the pins cache) when Drive holds the only
-copy, just as
+exactly — local board, then Drive — and the pin is materialised
+(downloaded into the pins cache) when Drive holds the only copy, just as
 [`gdpins_raw_path()`](https://ebukin.github.io/gdpins/reference/gdpins_raw_path.md)
 downloads on demand.
 
@@ -151,9 +150,9 @@ board <- gdpins_init_board(
   create     = TRUE
 )
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260716T190821Z-c0340'
+#> Creating new version '20261003T231841Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260716T190821Z-c0340'
+#> Creating new version '20261003T231841Z-c0340'
 #> Writing to pin 'cars'
 p <- gdpins_pin_path(board, "cars")
 file.exists(p)

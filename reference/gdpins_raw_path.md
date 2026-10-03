@@ -227,7 +227,7 @@ read.csv(path)      # read directly with base R
 # Non-standard filenames work too
 gdpins_raw_put_object(conn, mtcars, "quarterly report (Q1 2024).csv")
 gdpins_raw_path(conn, "quarterly report (Q1 2024).csv")
-#> [1] "/tmp/RtmplHQDVx/raw_1e0c57ff1156/quarterly report (Q1 2024).csv"
+#> [1] "/tmp/RtmpgN3JhS/raw_6c3661269ed7/quarterly report (Q1 2024).csv"
 
 if (FALSE) { # \dontrun{
 # Drive ID input — real adapter only

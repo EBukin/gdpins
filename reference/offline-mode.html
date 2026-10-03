@@ -17,7 +17,7 @@ purpose) without losing the ability to reconnect and sync afterwards."></head><b
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -97,17 +97,17 @@ resolves to <code>"prompt"</code> interactively or <code>"warn"</code> non-inter
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p><code>gdpins_go_offline(x)</code> strips the Drive-facing components off <code>x</code> and
 returns a <code>"local_only"</code> object backed by whichever local storage <code>x</code>
-already had on disk:</p><ul><li><p><code>"drive_cache_local"</code> boards keep using their standalone <code>local_board</code>
-/ <code>local_dir</code> — the same directory the user was already working in.</p></li>
-<li><p><code>"drive_cache"</code> boards (no standalone local dir) fall back to their
-<code>cache_board</code> / <code>cache_dir</code>, mirroring the automatic offline fallback in
-<code><a href="gdpins_init_board.html">gdpins_init_board()</a></code>.</p></li>
+already had on disk:</p><ul><li><p><code>"drive_cache"</code> boards keep using their one local copy — <code>local_board</code> /
+<code>cache_dir</code> — the same directory Drive reads/writes already fell back to
+when offline.</p></li>
+<li><p><code>"drive_only"</code> boards have no local copy and cannot go offline; see
+below.</p></li>
 <li><p><code>"drive_local"</code> raw connections keep using their existing <code>local_path</code>.</p></li>
 </ul><p>No files are copied, moved, or deleted — the returned object reuses the
 exact same local <code>pins</code> board / directory, so anything already on disk
 stays reachable, and anything written afterwards lands in the same place.
-The original Drive configuration (adapter, drive_path, drive/cache boards)
-is stashed on the returned object as an attribute so
+The original Drive configuration (adapter, drive_path, drive_board) is
+stashed on the returned object as an attribute so
 <code>gdpins_go_online()</code> can restore it later. Calling <code>gdpins_go_offline()</code> on
 an object that is already <code>"local_only"</code> is a no-op.</p>
 <p><code>gdpins_go_online(x)</code> reverses this: it requires <code>x</code> to have been produced
@@ -131,7 +131,6 @@ with Drive.</p>
 <span class="r-in"><span>  name       <span class="op">=</span> <span class="st">"data_raw"</span>,</span></span>
 <span class="r-in"><span>  drive_path <span class="op">=</span> <span class="st">"my-project/data-raw"</span>,</span></span>
 <span class="r-in"><span>  cache_dir  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"cache_"</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  local_dir  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"local_"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span></span>
 <span class="r-in"><span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
@@ -143,16 +142,16 @@ with Drive.</p>
 <span class="r-in"><span><span class="va">board_offline</span><span class="op">$</span><span class="va">config</span>   <span class="co"># "local_only"</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "local_only"</span>
 <span class="r-in"><span><span class="fu"><a href="gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260716T190826Z-c0340'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20261003T231846Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Reconnect and push local changes back up to Drive</span></span></span>
 <span class="r-in"><span><span class="va">board_online</span> <span class="op">&lt;-</span> <span class="fu">gdpins_go_online</span><span class="op">(</span><span class="va">board_offline</span>, on_discrepancy <span class="op">=</span> <span class="st">"sync_to_drive"</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Syncing <span style="color: #0000BB;">"data_raw"</span> to Drive (on_discrepancy = <span style="color: #0000BB;">"sync_to_drive"</span>).</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Board <span style="color: #0000BB;">"data_raw"</span>: synced <span style="color: #0000BB;">"cars"</span> local -&gt; Drive.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Board <span style="color: #0000BB;">"data_raw"</span> reconnected to Drive (<span style="color: #0000BB;">"drive_cache_local"</span>).</span>
-<span class="r-in"><span><span class="va">board_online</span><span class="op">$</span><span class="va">config</span>    <span class="co"># "drive_cache_local"</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "drive_cache_local"</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Board <span style="color: #0000BB;">"data_raw"</span> reconnected to Drive (<span style="color: #0000BB;">"drive_cache"</span>).</span>
+<span class="r-in"><span><span class="va">board_online</span><span class="op">$</span><span class="va">config</span>    <span class="co"># "drive_cache"</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "drive_cache"</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

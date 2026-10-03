@@ -10,10 +10,8 @@ new_gdpins_board(
   config,
   name,
   drive_board = NULL,
-  cache_board = NULL,
   local_board = NULL,
   cache_dir = NULL,
-  local_dir = NULL,
   drive_path = NULL,
   adapter = NULL,
   versioned = TRUE
@@ -25,7 +23,7 @@ new_gdpins_board(
 - config:
 
   Character scalar. One of `"local_only"`, `"drive_cache"`,
-  `"drive_cache_local"`.
+  `"drive_only"`.
 
 - name:
 
@@ -35,21 +33,14 @@ new_gdpins_board(
 
   A `pins` board, or `NULL`.
 
-- cache_board:
-
-  A `pins` `board_folder` over the cache dir, or `NULL`.
-
 - local_board:
 
-  A `pins` `board_folder` for local-only / super config, or `NULL`.
+  A `pins` `board_folder` over `cache_dir` — the one local copy — or
+  `NULL` for `"drive_only"`.
 
 - cache_dir:
 
-  Character scalar path to the cache directory, or `NULL`.
-
-- local_dir:
-
-  Character scalar path to the standalone local board dir, or `NULL`.
+  Character scalar path of the local copy, or `NULL` for `"drive_only"`.
 
 - drive_path:
 
@@ -71,11 +62,13 @@ An object of S3 class `"gdpins_board"`.
 
 Config → components:
 
-- `"local_only"`: `local_board` only;
-  `drive_board`/`cache_board`/`adapter` are `NULL`.
+- `"local_only"`: `local_board` only; `drive_board`/`adapter` are
+  `NULL`.
 
-- `"drive_cache"`: `drive_board` + `cache_board` (+ `adapter`);
-  `local_board` is `NULL`.
+- `"drive_cache"`: `drive_board` + `local_board` (+ `adapter`); the one
+  local copy lives at `cache_dir`, which is also the
+  [`pins::board_gdrive()`](https://pins.rstudio.com/reference/board_gdrive.html)
+  `cache=` path.
 
-- `"drive_cache_local"` (super): `drive_board` + `cache_board` +
-  `local_board` (+ `adapter`).
+- `"drive_only"`: `drive_board` only; `local_board`/`cache_dir` are
+  `NULL`.

@@ -1,10 +1,10 @@
 # Prune old versions of a single pin
 
-Removes old versions of one pin from Drive **and** cache (or local
-board), keeping the `keep` most recent. Drive versions are always
-**trashed** (recoverable via
+Removes old versions of one pin from Drive **and** the local copy
+(whichever are present on `board`), keeping the `keep` most recent.
+Drive versions are always **trashed** (recoverable via
 [`gd_trash()`](https://ebukin.github.io/gdpins/reference/gd_trash.md)),
-never hard-deleted. Cache versions are deleted from the local
+never hard-deleted. Local-copy versions are deleted from the local
 filesystem.
 
 ## Usage

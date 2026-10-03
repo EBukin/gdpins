@@ -1,8 +1,8 @@
 # Resolve the authoritative sub-board for a given config
 
-For `drive_cache` / `drive_cache_local`: Drive board is authoritative
-for reporting the removed version labels. For `local_only`: local board
-is the only board.
+For Drive boards (`drive_cache`, `drive_only`): Drive board is
+authoritative for reporting the removed version labels. For
+`local_only`: the local copy is the only board.
 
 ## Usage
 

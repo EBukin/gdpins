@@ -1,7 +1,7 @@
 # Remove a pin from a gdpins board
 
-Deletes `name` from every non-NULL board component (Drive, cache,
-local). Missing pins are ignored (idempotent no-op).
+Deletes `name` from every non-NULL board component (Drive, local).
+Missing pins are ignored (idempotent no-op).
 
 ## Usage
 
@@ -41,9 +41,9 @@ board <- gdpins_init_board(
   create     = TRUE
 )
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260716T190822Z-c0340'
+#> Creating new version '20261003T231842Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260716T190822Z-c0340'
+#> Creating new version '20261003T231842Z-c0340'
 #> Writing to pin 'cars'
 gdpins_pin_remove(board, "cars")
 ```

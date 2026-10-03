@@ -1,7 +1,7 @@
 # Write a pin to a gdpins board
 
 Serialises `x` and writes it to every non-NULL component of `board`
-(Drive board, cache board, local board). Format auto-detection calls
+(Drive board, local board). Format auto-detection calls
 [`gdpins_detect_format()`](https://ebukin.github.io/gdpins/reference/gdpins_detect_format.md)
 unless `format` is supplied explicitly.
 
@@ -80,9 +80,9 @@ board <- gdpins_init_board(
 )
 
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260716T190822Z-c0340'
+#> Creating new version '20261003T231842Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260716T190822Z-c0340'
+#> Creating new version '20261003T231842Z-c0340'
 #> Writing to pin 'cars'
 
 if (FALSE) { # \dontrun{
@@ -90,7 +90,6 @@ adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
 board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )

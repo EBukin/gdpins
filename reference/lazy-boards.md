@@ -5,7 +5,7 @@ no network work at init. It records the arguments it was given and
 connects on first use: the online probe, the Drive existence/create
 check, folder-ID resolution, `pins` board construction, and the
 `on_discrepancy` sync check all run the first time something reads one
-of the board's components (`drive_board`, `cache_board`, `local_board`).
+of the board's components (`drive_board`, `local_board`).
 
 The point is scripts that set up several boards but only touch some of
 them. Initialising three Drive boards costs three round-trips plus three
@@ -31,7 +31,7 @@ which exists to force it deliberately.
 [`summary()`](https://rdrr.io/r/base/summary.html) do **not** force:
 they describe the board from its declared config. Nor do the plain
 metadata fields (`name`, `config`, `versioned`, `drive_path`,
-`cache_dir`, `local_dir`, `adapter`).
+`cache_dir`, `adapter`).
 
 ## Consequences
 

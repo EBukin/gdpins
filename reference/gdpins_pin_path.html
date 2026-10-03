@@ -13,7 +13,7 @@ know about, or to inspect the stored bytes."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -80,8 +80,8 @@ mode, a <code>gdpins_pin_listing</code> tibble instead.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Resolution mirrors <code><a href="gdpins_pin_read.html">gdpins_pin_read()</a></code> exactly — local board, then cache
-board, then Drive — and the pin is materialised (downloaded into the pins
+    <p>Resolution mirrors <code><a href="gdpins_pin_read.html">gdpins_pin_read()</a></code> exactly — local board, then
+Drive — and the pin is materialised (downloaded into the pins
 cache) when Drive holds the only copy, just as <code><a href="gdpins_raw_path.html">gdpins_raw_path()</a></code> downloads
 on demand.</p>
     </div>
@@ -159,9 +159,9 @@ there <em>is</em> one.</p>
 <span class="r-in"><span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260716T190821Z-c0340'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20261003T231841Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20260716T190821Z-c0340'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Creating new version '20261003T231841Z-c0340'</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Writing to pin 'cars'</span>
 <span class="r-in"><span><span class="va">p</span> <span class="op">&lt;-</span> <span class="fu">gdpins_pin_path</span><span class="op">(</span><span class="va">board</span>, <span class="st">"cars"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">p</span><span class="op">)</span></span></span>

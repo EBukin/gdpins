@@ -2,7 +2,7 @@
 
 Returns a programmatic tibble with one row per pin. Compact output fits
 ≤80 columns. Reads from the board's local-first component (`local_board`
-\> `cache_board` \> `drive_board`).
+if present, else `drive_board`).
 
 ## Usage
 

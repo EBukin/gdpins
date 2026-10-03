@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -66,8 +66,9 @@
     
 <p><code>gdpins</code> is a package that layers <strong>Google Drive +
 pins</strong> for reproducible, offline-capable data management. Drive
-is the source of truth; a local cache mirrors it. Reads are local-first;
-writes fan out; sync and delete are explicit and guarded.</p>
+is the source of truth; each Drive board keeps one local copy. Reads are
+local-first; writes go to Drive, then the local copy; sync and delete
+are explicit and guarded.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -141,10 +142,10 @@ here; see <a href="#lazy-connection">Lazy connection</a> below:</p>
 <code class="sourceCode R"><span><span class="co"># Local only — no Drive, works fully offline (no adapter needed)</span></span>
 <span><span class="va">bd_local</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_init_board.html">gdpins_init_board</a></span><span class="op">(</span></span>
 <span>  name      <span class="op">=</span> <span class="st">"scratch"</span>,</span>
-<span>  local_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"OD_PRIV_ROOT"</span><span class="op">)</span>, <span class="st">"scratch"</span><span class="op">)</span></span>
+<span>  cache_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"OD_PRIV_ROOT"</span><span class="op">)</span>, <span class="st">"scratch"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Drive + cache — standard production configuration</span></span>
+<code class="sourceCode R"><span><span class="co"># Drive + one local copy — standard production configuration</span></span>
 <span><span class="va">bd_raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_init_board.html">gdpins_init_board</a></span><span class="op">(</span></span>
 <span>  name       <span class="op">=</span> <span class="st">"data_raw"</span>,</span>
 <span>  drive_path <span class="op">=</span> <span class="st">"kazLandEconImpact-data/data-raw"</span>,</span>
@@ -156,14 +157,11 @@ here; see <a href="#lazy-connection">Lazy connection</a> below:</p>
 <span>  on_discrepancy <span class="op">=</span> <span class="cn">NULL</span>     <span class="co"># "prompt" interactively / "warn" in scripts</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Drive + cache + standalone local (super config)</span></span>
+<code class="sourceCode R"><span><span class="co"># Drive only — no local copy; Drive downloads go to a session temp dir</span></span>
 <span><span class="va">bd_clean</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_init_board.html">gdpins_init_board</a></span><span class="op">(</span></span>
 <span>  name       <span class="op">=</span> <span class="st">"data_clean"</span>,</span>
 <span>  drive_path <span class="op">=</span> <span class="st">"kazLandEconImpact-data/data-clean"</span>,</span>
-<span>  cache_dir  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"OD_PRIV_ROOT"</span><span class="op">)</span>,</span>
-<span>                         <span class="st">"kazLandEconImpact-data"</span>, <span class="st">"data-clean-cache"</span><span class="op">)</span>,</span>
-<span>  local_dir  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"OD_PRIV_ROOT"</span><span class="op">)</span>,</span>
-<span>                         <span class="st">"kazLandEconImpact-data"</span>, <span class="st">"data-clean-local"</span><span class="op">)</span>,</span>
+<span>  cache_dir  <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span>
 <span>  versioned  <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -421,6 +419,10 @@ frequently-updated reference data where history is unwanted.</p>
 <p>When Drive is unreachable (no internet, VPN down), a board falls back
 automatically as it connects:</p>
 <table class="table">
+<colgroup>
+<col width="30%">
+<col width="69%">
+</colgroup>
 <thead><tr class="header">
 <th>Config</th>
 <th>Offline behaviour</th>
@@ -432,11 +434,12 @@ automatically as it connects:</p>
 </tr>
 <tr class="even">
 <td><code>drive_cache</code></td>
-<td>Falls back to cache directory as local-only board</td>
+<td>Falls back to its one local copy
+(<code>local_board</code>/<code>cache_dir</code>)</td>
 </tr>
 <tr class="odd">
-<td><code>drive_cache_local</code></td>
-<td>Falls back to standalone <code>local_dir</code> board</td>
+<td><code>drive_only</code></td>
+<td>No local copy — reads and writes are blocked offline</td>
 </tr>
 </tbody>
 </table>
@@ -449,7 +452,7 @@ write-protected offline); reads continue from the local copy.</p>
 <span><span class="co"># Board status shows sync state between Drive and local</span></span>
 <span><span class="fu"><a href="../reference/gdpins_board_status.html">gdpins_board_status</a></span><span class="op">(</span><span class="va">bd_raw</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Reads work offline — served from cache or local_dir</span></span>
+<span><span class="co"># Reads work offline — served from the local copy</span></span>
 <span><span class="va">gdp_panel</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">bd_raw</span>, <span class="st">"gdp_panel"</span><span class="op">)</span>  <span class="co"># no network needed</span></span></code></pre></div>
 <p>The fallback above is automatic and happens only when Drive is
 unreachable at init time. To <em>deliberately</em> detach an

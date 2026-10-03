@@ -23,7 +23,7 @@ gdpins_publish_output(
 
   A `gdpins_board` or `NULL`. Source board for output tables. The
   read-authoritative local pins board inside `tables_board` is mirrored
-  to Drive (local-first: local \> cache \> drive board).
+  to Drive (local-first: local \> drive board).
 
 - figures_dir:
 

@@ -1,4 +1,4 @@
-# Remove one version directory from a local board (cache or local_only)
+# Remove one version directory from a local board
 
 Directly unlinks the version subdirectory under
 `board_path/<name>/<version>`.

@@ -35,11 +35,20 @@ unreachable.
 
 - cache_dir:
 
-  Character scalar. Local cache directory path, or `NULL`.
+  Character scalar, `TRUE`, `FALSE`, or `NULL` (default). Path of the
+  board's one local copy. `NULL`/`TRUE` use the default path under
+  `getOption("gdpins.cache_dir")`; `FALSE` means no local copy
+  (`"drive_only"`); a path uses that directory. For boards without
+  `drive_path` (`"local_only"`), `cache_dir` must be a non-empty
+  character path — the local board's directory; `NULL`/`TRUE`/`FALSE`
+  error ("Supply `drive_path`, or `cache_dir` as a path for a local-only
+  board.").
 
 - local_dir:
 
-  Character scalar. Standalone local board directory path, or `NULL`.
+  Character scalar. Deprecated as of 0.0.1.9025; superseded by
+  `cache_dir`. If supplied while `cache_dir` is `NULL`, it is used as
+  `cache_dir`; otherwise it is ignored (with a deprecation warning).
 
 - versioned:
 

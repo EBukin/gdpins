@@ -1,8 +1,7 @@
 # Read a pin from a gdpins board
 
-Reads from the local-first source: local board if present, else cache
-board, else Drive board. Hits the network only if the pin is absent
-locally.
+Reads from the local-first source: local board if present, else Drive
+board. Hits the network only if the pin is absent locally.
 
 ## Usage
 
@@ -133,9 +132,9 @@ board <- gdpins_init_board(
   create     = TRUE
 )
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260716T190821Z-c0340'
+#> Creating new version '20261003T231842Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260716T190821Z-c0340'
+#> Creating new version '20261003T231842Z-c0340'
 #> Writing to pin 'cars'
 gdpins_pin_read(board, "cars")
 #> # A tibble: 32 × 11
@@ -158,7 +157,6 @@ adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
 board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )

@@ -24,7 +24,9 @@
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-collect_figures_work.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-collect_tables_work.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-config_components.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-default_cache_dir.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-drive_rel.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-file_is_readable.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-gdpins_wkt_engine.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-handle_init_sync.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-has_discrepancy.html</loc></url>
@@ -34,6 +36,7 @@
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-prune_is_interactive.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-prune_primary_board.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-prune_readline.html</loc></url>
+<url><loc>https://ebukin.github.io/gdpins/reference/dot-read_first_byte.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-read_from_board.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-real_hits_to_tbl.html</loc></url>
 <url><loc>https://ebukin.github.io/gdpins/reference/dot-real_ls_recursive.html</loc></url>

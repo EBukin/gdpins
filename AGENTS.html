@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -86,6 +86,63 @@
 <div class="section level2">
 <h2 id="id_7-packaging-hygiene">7. Packaging hygiene<a class="anchor" aria-label="anchor" href="#id_7-packaging-hygiene"></a></h2>
 <ul><li>Non-standard top-level files (<code>AGENTS.md</code>, <code>CLAUDE.md</code>, dev scripts) → <code>.Rbuildignore</code> to avoid <code>R CMD check</code> NOTE.</li>
+</ul></div>
+</div>
+<div class="section level1">
+<h1 id="multi-agent-plan-execution-protocol">Multi-agent plan execution protocol<a class="anchor" aria-label="anchor" href="#multi-agent-plan-execution-protocol"></a></h1>
+<p>Applies whenever a task is big enough to plan (&gt;1 module or &gt;1 test file).</p>
+<div class="section level2">
+<h2 id="planning">Planning<a class="anchor" aria-label="anchor" href="#planning"></a></h2>
+<ul><li>Analyse first; write design-as-is doc + plan to <code>tools/&lt;topic&gt;.md</code>. Commit before any code.</li>
+<li>Plan = frozen design (decision tables, exact symbols, field layouts) + phased tasks + tracker table + decisions log. Design questions resolved in plan, never by implementers.</li>
+<li>Phase = set of tasks on <strong>disjoint</strong> R files and disjoint test files → run in parallel. Sequential only where a task needs another’s output.</li>
+<li>Every task lists: goal, design excerpt, files may edit, files/ranges to read (line numbers from fresh <code>grep -n</code>), files must NOT read/edit, tests to write first, edge list, commands.</li>
+</ul></div>
+<div class="section level2">
+<h2 id="roles">Roles<a class="anchor" aria-label="anchor" href="#roles"></a></h2>
+<ul><li>
+<strong>Orchestrator</strong> — Opus-class. Writes <strong>zero code</strong>. Writes briefs, spawns agents, reads reports, runs gates, updates tracker, commits.</li>
+<li>
+<strong>Implementer</strong> — Sonnet. One task. Edits only listed files.</li>
+<li>
+<strong>Verifier</strong> — Sonnet. Never the implementer of the same task. One per completed task.</li>
+<li>Spawn: <code>Agent</code> tool, <code>model: "sonnet"</code>. Parallel tasks launched in <strong>one</strong> message. Re-rounds → same implementer via <code>SendMessage</code> (max 2), then fresh implementer re-briefed.</li>
+</ul></div>
+<div class="section level2">
+<h2 id="token-budget">Token budget<a class="anchor" aria-label="anchor" href="#token-budget"></a></h2>
+<ul><li>Brief self-contained: agent must not explore. Target close at <strong>100–150k</strong> tokens.</li>
+<li>Hard rule: at 100k and not done → stop, write state to report, return. Orchestrator splits.</li>
+</ul></div>
+<div class="section level2">
+<h2 id="tdd-implementer">TDD (implementer)<a class="anchor" aria-label="anchor" href="#tdd-implementer"></a></h2>
+<ol style="list-style-type: decimal"><li>Write/adjust tests first. Run. Paste <strong>RED</strong> output in report.</li>
+<li>Implement. Run task’s test files only. Paste <strong>GREEN</strong> output.</li>
+<li>Report: files changed, RED, GREEN, tests added, deviations, leftovers.</li>
+</ol><ul><li>No RED evidence → rejected before review.</li>
+<li>No full-suite runs inside a parallel phase. Full suite at gates only.</li>
+</ul></div>
+<div class="section level2">
+<h2 id="verification-verifier">Verification (verifier)<a class="anchor" aria-label="anchor" href="#verification-verifier"></a></h2>
+<ol style="list-style-type: decimal"><li>
+<code>git status --short</code> → any file outside brief = FAIL.</li>
+<li>Rerun task’s tests. Paste output.</li>
+<li>Write <strong>≥3 new adversarial tests</strong>: edge list + ≥2 own ideas (NULL/FALSE/““/vector inputs, config combos, offline, lazy vs eager, error text). Run. Passing ones <strong>stay in suite</strong>.</li>
+<li>Verdict PASS/FAIL. FAIL = <a href="file:line" class="uri">file:line</a>, expected vs actual, minimal repro.</li>
+<li>Leftovers outside scope: list, do not fix.</li>
+</ol></div>
+<div class="section level2">
+<h2 id="gates-orchestrator-end-of-each-phase">Gates (orchestrator, end of each phase)<a class="anchor" aria-label="anchor" href="#gates-orchestrator-end-of-each-phase"></a></h2>
+<ul><li>Full <code>test_dir()</code>: 0 fail, 0 warn. Grep for dead symbols named in plan → empty.</li>
+<li>Docs phase: <code>roxygen2::roxygenise()</code> clean; <code>NAMESPACE</code> diff = intended; examples run; vignettes knit. <code>R CMD check</code> before PR.</li>
+<li>Commit per phase, conventional prefix. Update tracker + decisions log, commit with it.</li>
+<li>Report to user only at gates, at a FAIL surviving 2 rounds, or a decision the plan lacks. Questions in prose, one at a time, recommendation first.</li>
+</ul></div>
+<div class="section level2">
+<h2 id="environment">Environment<a class="anchor" aria-label="anchor" href="#environment"></a></h2>
+<ul><li>Bare <code>Rscript</code>. Use MCP R session if avaialbel.</li>
+<li>Tests never spawn processes / file locks (antivirus). Mock a seam.</li>
+<li>
+<code>test-live.R</code>: edit by reading, never run.</li>
 </ul></div>
 </div>
 

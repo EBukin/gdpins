@@ -40,9 +40,9 @@ gdpins_board_is_connected(board)   # FALSE — nothing has touched it
 #> [1] FALSE
 
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20260716T190819Z-c0340'
+#> Creating new version '20261003T231840Z-c0340'
 #> Writing to pin 'cars'
-#> Creating new version '20260716T190819Z-c0340'
+#> Creating new version '20261003T231840Z-c0340'
 #> Writing to pin 'cars'
 gdpins_board_is_connected(board)   # TRUE — the write connected it
 #> [1] TRUE

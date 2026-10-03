@@ -108,7 +108,7 @@ conn <- gdpins_raw_connect(
 gdpins_raw_put_object(conn, mtcars, "cars.csv")
 tbl <- gdpins_raw_ls(conn)
 tbl$local_path   # absolute local path
-#> [1] "/tmp/RtmplHQDVx/raw_1e0c6cf2aa31/cars.csv"
+#> [1] "/tmp/RtmpgN3JhS/raw_6c369bafede/cars.csv"
 tbl$drive_id     # NA for fake adapter; real Drive ID with real adapter
 #> [1] NA
 ```

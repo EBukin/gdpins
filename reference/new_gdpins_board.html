@@ -9,7 +9,7 @@ field names in exactly this order."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,10 +50,8 @@ field names in exactly this order.</p>
 <span>  <span class="va">config</span>,</span>
 <span>  <span class="va">name</span>,</span>
 <span>  drive_board <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  cache_board <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  local_board <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  cache_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  local_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  drive_path <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  adapter <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  versioned <span class="op">=</span> <span class="cn">TRUE</span></span>
@@ -66,7 +64,7 @@ field names in exactly this order.</p>
 
 <dl><dt id="arg-config">config<a class="anchor" aria-label="anchor" href="#arg-config"></a></dt>
 <dd><p>Character scalar. One of <code>"local_only"</code>, <code>"drive_cache"</code>,
-<code>"drive_cache_local"</code>.</p></dd>
+<code>"drive_only"</code>.</p></dd>
 
 
 <dt id="arg-name">name<a class="anchor" aria-label="anchor" href="#arg-name"></a></dt>
@@ -77,22 +75,14 @@ field names in exactly this order.</p>
 <dd><p>A <code>pins</code> board, or <code>NULL</code>.</p></dd>
 
 
-<dt id="arg-cache-board">cache_board<a class="anchor" aria-label="anchor" href="#arg-cache-board"></a></dt>
-<dd><p>A <code>pins</code> <code>board_folder</code> over the cache dir, or <code>NULL</code>.</p></dd>
-
-
 <dt id="arg-local-board">local_board<a class="anchor" aria-label="anchor" href="#arg-local-board"></a></dt>
-<dd><p>A <code>pins</code> <code>board_folder</code> for local-only / super config,
-or <code>NULL</code>.</p></dd>
+<dd><p>A <code>pins</code> <code>board_folder</code> over <code>cache_dir</code> — the one local
+copy — or <code>NULL</code> for <code>"drive_only"</code>.</p></dd>
 
 
 <dt id="arg-cache-dir">cache_dir<a class="anchor" aria-label="anchor" href="#arg-cache-dir"></a></dt>
-<dd><p>Character scalar path to the cache directory, or <code>NULL</code>.</p></dd>
-
-
-<dt id="arg-local-dir">local_dir<a class="anchor" aria-label="anchor" href="#arg-local-dir"></a></dt>
-<dd><p>Character scalar path to the standalone local board dir,
-or <code>NULL</code>.</p></dd>
+<dd><p>Character scalar path of the local copy, or <code>NULL</code> for
+<code>"drive_only"</code>.</p></dd>
 
 
 <dt id="arg-drive-path">drive_path<a class="anchor" aria-label="anchor" href="#arg-drive-path"></a></dt>
@@ -114,12 +104,11 @@ or <code>NULL</code>.</p></dd>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Config → components:</p><ul><li><p><code>"local_only"</code>: <code>local_board</code> only; <code>drive_board</code>/<code>cache_board</code>/<code>adapter</code>
-are <code>NULL</code>.</p></li>
-<li><p><code>"drive_cache"</code>: <code>drive_board</code> + <code>cache_board</code> (+ <code>adapter</code>);
-<code>local_board</code> is <code>NULL</code>.</p></li>
-<li><p><code>"drive_cache_local"</code> (super): <code>drive_board</code> + <code>cache_board</code> +
-<code>local_board</code> (+ <code>adapter</code>).</p></li>
+    <p>Config → components:</p><ul><li><p><code>"local_only"</code>: <code>local_board</code> only; <code>drive_board</code>/<code>adapter</code> are <code>NULL</code>.</p></li>
+<li><p><code>"drive_cache"</code>: <code>drive_board</code> + <code>local_board</code> (+ <code>adapter</code>); the one
+local copy lives at <code>cache_dir</code>, which is also the <code><a href="https://pins.rstudio.com/reference/board_gdrive.html" class="external-link">pins::board_gdrive()</a></code>
+<code>cache=</code> path.</p></li>
+<li><p><code>"drive_only"</code>: <code>drive_board</code> only; <code>local_board</code>/<code>cache_dir</code> are <code>NULL</code>.</p></li>
 </ul></div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

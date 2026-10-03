@@ -55,13 +55,12 @@ An object of the same class as `x`.
 returns a `"local_only"` object backed by whichever local storage `x`
 already had on disk:
 
-- `"drive_cache_local"` boards keep using their standalone `local_board`
-  / `local_dir` — the same directory the user was already working in.
+- `"drive_cache"` boards keep using their one local copy — `local_board`
+  / `cache_dir` — the same directory Drive reads/writes already fell
+  back to when offline.
 
-- `"drive_cache"` boards (no standalone local dir) fall back to their
-  `cache_board` / `cache_dir`, mirroring the automatic offline fallback
-  in
-  [`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md).
+- `"drive_only"` boards have no local copy and cannot go offline; see
+  below.
 
 - `"drive_local"` raw connections keep using their existing
   `local_path`.
@@ -70,7 +69,7 @@ No files are copied, moved, or deleted — the returned object reuses the
 exact same local `pins` board / directory, so anything already on disk
 stays reachable, and anything written afterwards lands in the same
 place. The original Drive configuration (adapter, drive_path,
-drive/cache boards) is stashed on the returned object as an attribute so
+drive_board) is stashed on the returned object as an attribute so
 `gdpins_go_online()` can restore it later. Calling `gdpins_go_offline()`
 on an object that is already `"local_only"` is a no-op.
 
@@ -101,7 +100,6 @@ board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
   cache_dir  = tempfile("cache_"),
-  local_dir  = tempfile("local_"),
   adapter    = adapter,
   create     = TRUE
 )
@@ -113,14 +111,14 @@ board_offline <- gdpins_go_offline(board)
 board_offline$config   # "local_only"
 #> [1] "local_only"
 gdpins_pin_write(board_offline, mtcars, "cars")
-#> Creating new version '20260716T190826Z-c0340'
+#> Creating new version '20261003T231846Z-c0340'
 #> Writing to pin 'cars'
 
 # Reconnect and push local changes back up to Drive
 board_online <- gdpins_go_online(board_offline, on_discrepancy = "sync_to_drive")
 #> Syncing "data_raw" to Drive (on_discrepancy = "sync_to_drive").
 #> ✔ Board "data_raw": synced "cars" local -> Drive.
-#> ✔ Board "data_raw" reconnected to Drive ("drive_cache_local").
-board_online$config    # "drive_cache_local"
-#> [1] "drive_cache_local"
+#> ✔ Board "data_raw" reconnected to Drive ("drive_cache").
+board_online$config    # "drive_cache"
+#> [1] "drive_cache"
 ```

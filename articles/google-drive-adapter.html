@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -213,7 +213,7 @@ offline testing:</p>
 <span><span class="co">#&gt; <span style="color: #00BB00;">versioned</span>: <span style="color: #0000BB;">"TRUE"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">connected</span>: <span style="color: #0000BB;">"FALSE"</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">drive</span>: <span style="color: #0000BB;">"project/data-raw"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpqiDLsK/cache_24cf1e59cb3d"</span></span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmphrGori/cache_733413aae5d6"</span></span></span></code></pre></div>
 <p>The fake adapter mirrors Drive operations on the local filesystem —
 no credentials, no network, fully reproducible.</p>
 <p>Note that <code><a href="../reference/gdpins_fake_drive.html">gdpins_fake_drive()</a></code> is a <strong>test
@@ -243,7 +243,6 @@ files:</p>
 <span>  name       <span class="op">=</span> <span class="st">"data_raw"</span>,</span>
 <span>  drive_path <span class="op">=</span> <span class="st">"project/data-raw"</span>,</span>
 <span>  cache_dir  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"cache_"</span><span class="op">)</span>,</span>
-<span>  local_dir  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"local_"</span><span class="op">)</span>,</span>
 <span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span>
 <span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
@@ -256,7 +255,7 @@ files:</p>
 <span></span>
 <span><span class="co"># Reads and writes stay local -- no network calls, no blocked writes</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_write.html">gdpins_pin_write</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="va">mtcars</span>, <span class="st">"cars"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Creating new version '20260716T190834Z-c0340'</span></span>
+<span><span class="co">#&gt; Creating new version '20261003T231852Z-c0340'</span></span>
 <span><span class="co">#&gt; Writing to pin 'cars'</span></span>
 <span><span class="fu"><a href="../reference/gdpins_pin_read.html">gdpins_pin_read</a></span><span class="op">(</span><span class="va">board_offline</span>, <span class="st">"cars"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 32 × 11</span></span></span>
@@ -273,12 +272,9 @@ files:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span>  22.8     4  141.    95  3.92  3.15  22.9     1     0     4     2</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span>  19.2     6  168.   123  3.92  3.44  18.3     1     0     4     4</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 22 more rows</span></span></span></code></pre></div>
-<p>Under the hood, <code><a href="../reference/offline-mode.html">gdpins_go_offline()</a></code> reuses whichever
-local storage the board already had — the standalone
-<code>local_dir</code>/<code>local_board</code> for a
-<code>"drive_cache_local"</code> board, or the
-<code>cache_dir</code>/<code>cache_board</code> for a
-<code>"drive_cache"</code> board with no standalone local directory
+<p>Under the hood, <code><a href="../reference/offline-mode.html">gdpins_go_offline()</a></code> reuses the board’s
+one local copy — <code>local_board</code>/<code>cache_dir</code> — the
+same directory Drive reads/writes already fell back to when offline
 (mirroring the automatic offline fallback). Nothing is copied or
 deleted; the returned object just stops touching Drive. The original
 Drive configuration travels with the returned object, so
@@ -289,7 +285,7 @@ Drive configuration travels with the returned object, so
 <span>  <span class="va">board_offline</span>,</span>
 <span>  on_discrepancy <span class="op">=</span> <span class="st">"sync_to_drive"</span>   <span class="co"># push what changed while offline</span></span>
 <span><span class="op">)</span></span>
-<span><span class="va">board_online</span><span class="op">$</span><span class="va">config</span>   <span class="co"># back to "drive_cache_local"</span></span></code></pre></div>
+<span><span class="va">board_online</span><span class="op">$</span><span class="va">config</span>   <span class="co"># back to "drive_cache"</span></span></code></pre></div>
 <p><code><a href="../reference/offline-mode.html">gdpins_go_online()</a></code> requires
 <code><a href="../reference/gdpins_is_online.html">gdpins_is_online()</a></code> to be <code>TRUE</code> and errors if
 <code>x</code> was never produced by <code><a href="../reference/offline-mode.html">gdpins_go_offline()</a></code> —

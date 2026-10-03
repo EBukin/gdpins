@@ -9,7 +9,7 @@ combination of arguments supplied:"></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -73,12 +73,19 @@ the adapter root), or <code>NULL</code> for <code>"local_only"</code>.</p></dd>
 
 
 <dt id="arg-cache-dir">cache_dir<a class="anchor" aria-label="anchor" href="#arg-cache-dir"></a></dt>
-<dd><p>Character scalar. Local cache directory path, or <code>NULL</code>.</p></dd>
+<dd><p>Character scalar, <code>TRUE</code>, <code>FALSE</code>, or <code>NULL</code> (default).
+Path of the board's one local copy. <code>NULL</code>/<code>TRUE</code> use the default path
+under <code>getOption("gdpins.cache_dir")</code>; <code>FALSE</code> means no local copy
+(<code>"drive_only"</code>); a path uses that directory. For boards without
+<code>drive_path</code> (<code>"local_only"</code>), <code>cache_dir</code> must be a non-empty character
+path — the local board's directory; <code>NULL</code>/<code>TRUE</code>/<code>FALSE</code> error ("Supply
+<code>drive_path</code>, or <code>cache_dir</code> as a path for a local-only board.").</p></dd>
 
 
 <dt id="arg-local-dir">local_dir<a class="anchor" aria-label="anchor" href="#arg-local-dir"></a></dt>
-<dd><p>Character scalar. Standalone local board directory path, or
-<code>NULL</code>.</p></dd>
+<dd><p>Character scalar. Deprecated as of 0.0.1.9025; superseded
+by <code>cache_dir</code>. If supplied while <code>cache_dir</code> is <code>NULL</code>, it is used as
+<code>cache_dir</code>; otherwise it is ignored (with a deprecation warning).</p></dd>
 
 
 <dt id="arg-versioned">versioned<a class="anchor" aria-label="anchor" href="#arg-versioned"></a></dt>
@@ -116,11 +123,11 @@ See <a href="lazy-boards.html">lazy-boards</a>.</p></dd>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
 
-<ul><li><p><strong><code>"local_only"</code></strong> — <code>local_dir</code> provided, no <code>drive_path</code>/<code>adapter</code>.</p></li>
-<li><p><strong><code>"drive_cache"</code></strong> — <code>drive_path</code> + <code>adapter</code> + <code>cache_dir</code>, no
-<code>local_dir</code>.</p></li>
-<li><p><strong><code>"drive_cache_local"</code></strong> — all three: <code>drive_path</code>, <code>cache_dir</code>, and
-<code>local_dir</code>.</p></li>
+<ul><li><p><strong><code>"local_only"</code></strong> — no <code>drive_path</code>; <code>cache_dir</code> is the local board path.</p></li>
+<li><p><strong><code>"drive_cache"</code></strong> — <code>drive_path</code> + <code>adapter</code>; one local copy at
+<code>cache_dir</code> (default <code>NULL</code>/<code>TRUE</code>: <code>getOption("gdpins.cache_dir")/&lt;root&gt;/&lt;drive_path&gt;</code>).</p></li>
+<li><p><strong><code>"drive_only"</code></strong> — <code>drive_path</code> + <code>adapter</code> + <code>cache_dir = FALSE</code>; no
+local copy, Drive downloads go to a session temp dir.</p></li>
 </ul><p>The board checks for sync discrepancies between Drive and local (governed by
 <code>on_discrepancy</code>). Non-existent Drive boards are never auto-created unless
 <code>create = TRUE</code>.</p>
@@ -155,15 +162,16 @@ to temporarily detach an existing board from Drive and work locally,
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">versioned</span>: <span style="color: #0000BB;">"TRUE"</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">connected</span>: <span style="color: #0000BB;">"FALSE"</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">drive</span>: <span style="color: #0000BB;">"my-project/data-raw"</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmplHQDVx/cache_1e0cbfb9719"</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">cache</span>: <span style="color: #0000BB;">"/tmp/RtmpgN3JhS/cache_6c3620ffc199"</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># --- Real adapter (requires Google Drive auth) ---</span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="va">adapter</span> <span class="op">&lt;-</span> <span class="fu"><a href="gdpins_real_drive.html">gdpins_real_drive</a></span><span class="op">(</span><span class="st">"1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># cache_dir omitted: local copy defaults to</span></span></span>
+<span class="r-in"><span><span class="co"># getOption("gdpins.cache_dir")/&lt;root&gt;/&lt;drive_path&gt;</span></span></span>
 <span class="r-in"><span><span class="va">board</span> <span class="op">&lt;-</span> <span class="fu">gdpins_init_board</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  name       <span class="op">=</span> <span class="st">"data_raw"</span>,</span></span>
 <span class="r-in"><span>  drive_path <span class="op">=</span> <span class="st">"my-project/data-raw"</span>,</span></span>
-<span class="r-in"><span>  cache_dir  <span class="op">=</span> <span class="st">"~/.cache/gdpins/data-raw"</span>,</span></span>
 <span class="r-in"><span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span></span>
 <span class="r-in"><span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
@@ -172,7 +180,6 @@ to temporarily detach an existing board from Drive and work locally,
 <span class="r-in"><span><span class="va">board2</span> <span class="op">&lt;-</span> <span class="fu">gdpins_init_board</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  name       <span class="op">=</span> <span class="st">"data_raw"</span>,</span></span>
 <span class="r-in"><span>  drive_path <span class="op">=</span> <span class="st">"1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"</span>,</span></span>
-<span class="r-in"><span>  cache_dir  <span class="op">=</span> <span class="st">"~/.cache/gdpins/data-raw"</span>,</span></span>
 <span class="r-in"><span>  adapter    <span class="op">=</span> <span class="va">adapter</span>,</span></span>
 <span class="r-in"><span>  create     <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>

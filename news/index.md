@@ -1,5 +1,69 @@
 # Changelog
 
+## gdpins 0.0.1.9025
+
+### Breaking changes
+
+- **A Drive board now keeps at most one local copy.** The old
+  `"drive_cache_local"` configuration — a standalone
+  `local_board`/`local_dir` *and* a separate `cache_board`/`cache_dir`
+  on the same board — is gone. `gdpins_board` objects no longer have
+  `cache_board` or `local_dir` fields; `board$cache_board` and
+  `board$local_dir` now return `NULL`. The legal configs are
+  `"local_only"`, `"drive_cache"` (one local copy), and the new
+  `"drive_only"` (no local copy at all).
+- **`cache_dir` is now the single argument that controls a board’s local
+  copy**, on
+  [`gdpins_init_board()`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md):
+  - `NULL` (the default) or `TRUE` — use the default path,
+    `getOption("gdpins.cache_dir")/<adapter root>/<drive_path>` (option
+    default `~/.gdpins/cache`, via
+    [`fs::path_home()`](https://fs.r-lib.org/reference/path_expand.html)).
+  - A path — use that directory as the local copy.
+  - `FALSE` — no local copy (`"drive_only"`); Drive downloads go to a
+    session temp dir instead, and the board cannot go offline.
+  - For a board without `drive_path` (`"local_only"`), `cache_dir` is
+    the local board’s own path.
+- **`local_dir` is deprecated.** If supplied while `cache_dir` is
+  `NULL`, it is used as `cache_dir` (with a deprecation warning); if
+  `cache_dir` is also supplied, `local_dir` is ignored (with a warning
+  that both were given).
+- **[`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
+  no longer copies local → cache.** With only one local copy per board,
+  there is nothing left to reconcile between a standalone local
+  directory and a cache directory on reconnect.
+
+See
+[`vignette("gdpins-usage")`](https://ebukin.github.io/gdpins/articles/gdpins-usage.md)
+(“Board initialisation”, “Offline behaviour”) and
+[`?gdpins_init_board`](https://ebukin.github.io/gdpins/reference/gdpins_init_board.md)
+for the full config/`cache_dir` reference.
+
+## gdpins 0.0.1.9023
+
+### Bug fixes
+
+- **[`gdpins_sync()`](https://ebukin.github.io/gdpins/reference/gdpins_sync.md)
+  on a raw connection no longer aborts the whole run when one file
+  cannot be read.** A file held open by another program (Word, Excel, a
+  sync client) passes
+  [`file.exists()`](https://rdrr.io/r/base/files.html), so the upload
+  started and only failed once `curl` streamed the bytes — surfacing as
+  an opaque `"read error getting mime data"` from
+  [`curl::curl_fetch_memory()`](https://jeroen.r-universe.dev/curl/reference/curl_fetch.html),
+  with every remaining file left unsynced. Raw sync now checks that each
+  local file can actually be opened *and read* before uploading (a
+  Windows byte-range lock, as held by Office, lets the open succeed but
+  returns no bytes), and isolates per-file failures — uploads and
+  downloads alike — so the rest of the folder still syncs. A single
+  end-of-run warning reports how many files synced and which failed,
+  with each error message; the “close the program” hint appears only for
+  unreadable local files.
+
+- **Raw sync no longer reports a missing local file as synced.** It used
+  to warn and then print “Synced … local -\> Drive” anyway; it is now
+  counted as a failure in the end-of-run summary.
+
 ## gdpins 0.0.1.9022
 
 ### Bug fixes

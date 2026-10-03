@@ -180,7 +180,7 @@ board
 #> versioned: "TRUE"
 #> connected: "FALSE"
 #> drive: "project/data-raw"
-#> cache: "/tmp/RtmpqiDLsK/cache_24cf1e59cb3d"
+#> cache: "/tmp/RtmphrGori/cache_733413aae5d6"
 ```
 
 The fake adapter mirrors Drive operations on the local filesystem — no
@@ -220,7 +220,6 @@ board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "project/data-raw",
   cache_dir  = tempfile("cache_"),
-  local_dir  = tempfile("local_"),
   adapter    = adapter,
   create     = TRUE
 )
@@ -233,7 +232,7 @@ board_offline$config   # "local_only"
 
 # Reads and writes stay local -- no network calls, no blocked writes
 gdpins_pin_write(board_offline, mtcars, "cars")
-#> Creating new version '20260716T190834Z-c0340'
+#> Creating new version '20261003T231852Z-c0340'
 #> Writing to pin 'cars'
 gdpins_pin_read(board_offline, "cars")
 #> # A tibble: 32 × 11
@@ -254,12 +253,11 @@ gdpins_pin_read(board_offline, "cars")
 
 Under the hood,
 [`gdpins_go_offline()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
-reuses whichever local storage the board already had — the standalone
-`local_dir`/`local_board` for a `"drive_cache_local"` board, or the
-`cache_dir`/`cache_board` for a `"drive_cache"` board with no standalone
-local directory (mirroring the automatic offline fallback). Nothing is
-copied or deleted; the returned object just stops touching Drive. The
-original Drive configuration travels with the returned object, so
+reuses the board’s one local copy — `local_board`/`cache_dir` — the same
+directory Drive reads/writes already fell back to when offline
+(mirroring the automatic offline fallback). Nothing is copied or
+deleted; the returned object just stops touching Drive. The original
+Drive configuration travels with the returned object, so
 [`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)
 can restore it later:
 
@@ -270,7 +268,7 @@ board_online <- gdpins_go_online(
   board_offline,
   on_discrepancy = "sync_to_drive"   # push what changed while offline
 )
-board_online$config   # back to "drive_cache_local"
+board_online$config   # back to "drive_cache"
 ```
 
 [`gdpins_go_online()`](https://ebukin.github.io/gdpins/reference/offline-mode.md)

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">gdpins</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9022</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.1.9025</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,36 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.0.1.9025" id="gdpins-0019025">gdpins 0.0.1.9025<a class="anchor" aria-label="anchor" href="#gdpins-0019025"></a></h2>
+<div class="section level3">
+<h3 id="breaking-changes-0-0-1-9025">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-0-1-9025"></a></h3>
+<ul><li>
+<strong>A Drive board now keeps at most one local copy.</strong> The old <code>"drive_cache_local"</code> configuration — a standalone <code>local_board</code>/<code>local_dir</code> <em>and</em> a separate <code>cache_board</code>/<code>cache_dir</code> on the same board — is gone. <code>gdpins_board</code> objects no longer have <code>cache_board</code> or <code>local_dir</code> fields; <code>board$cache_board</code> and <code>board$local_dir</code> now return <code>NULL</code>. The legal configs are <code>"local_only"</code>, <code>"drive_cache"</code> (one local copy), and the new <code>"drive_only"</code> (no local copy at all).</li>
+<li>
+<strong><code>cache_dir</code> is now the single argument that controls a board’s local copy</strong>, on <code><a href="../reference/gdpins_init_board.html">gdpins_init_board()</a></code>:
+<ul><li>
+<code>NULL</code> (the default) or <code>TRUE</code> — use the default path, <code>getOption("gdpins.cache_dir")/&lt;adapter root&gt;/&lt;drive_path&gt;</code> (option default <code>~/.gdpins/cache</code>, via <code><a href="https://fs.r-lib.org/reference/path_expand.html" class="external-link">fs::path_home()</a></code>).</li>
+<li>A path — use that directory as the local copy.</li>
+<li>
+<code>FALSE</code> — no local copy (<code>"drive_only"</code>); Drive downloads go to a session temp dir instead, and the board cannot go offline.</li>
+<li>For a board without <code>drive_path</code> (<code>"local_only"</code>), <code>cache_dir</code> is the local board’s own path.</li>
+</ul></li>
+<li>
+<strong><code>local_dir</code> is deprecated.</strong> If supplied while <code>cache_dir</code> is <code>NULL</code>, it is used as <code>cache_dir</code> (with a deprecation warning); if <code>cache_dir</code> is also supplied, <code>local_dir</code> is ignored (with a warning that both were given).</li>
+<li>
+<strong><code><a href="../reference/offline-mode.html">gdpins_go_online()</a></code> no longer copies local → cache.</strong> With only one local copy per board, there is nothing left to reconcile between a standalone local directory and a cache directory on reconnect.</li>
+</ul><p>See <code><a href="../articles/gdpins-usage.html">vignette("gdpins-usage")</a></code> (“Board initialisation”, “Offline behaviour”) and <code><a href="../reference/gdpins_init_board.html">?gdpins_init_board</a></code> for the full config/<code>cache_dir</code> reference.</p>
+</div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.0.1.9023" id="gdpins-0019023">gdpins 0.0.1.9023<a class="anchor" aria-label="anchor" href="#gdpins-0019023"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-0-0-1-9023">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-0-1-9023"></a></h3>
+<ul><li><p><strong><code><a href="../reference/gdpins_sync.html">gdpins_sync()</a></code> on a raw connection no longer aborts the whole run when one file cannot be read.</strong> A file held open by another program (Word, Excel, a sync client) passes <code><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists()</a></code>, so the upload started and only failed once <code>curl</code> streamed the bytes — surfacing as an opaque <code>"read error getting mime data"</code> from <code><a href="https://jeroen.r-universe.dev/curl/reference/curl_fetch.html" class="external-link">curl::curl_fetch_memory()</a></code>, with every remaining file left unsynced. Raw sync now checks that each local file can actually be opened <em>and read</em> before uploading (a Windows byte-range lock, as held by Office, lets the open succeed but returns no bytes), and isolates per-file failures — uploads and downloads alike — so the rest of the folder still syncs. A single end-of-run warning reports how many files synced and which failed, with each error message; the “close the program” hint appears only for unreadable local files.</p></li>
+<li><p><strong>Raw sync no longer reports a missing local file as synced.</strong> It used to warn and then print “Synced … local -&gt; Drive” anyway; it is now counted as a failure in the end-of-run summary.</p></li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.0.1.9022" id="gdpins-0019022">gdpins 0.0.1.9022<a class="anchor" aria-label="anchor" href="#gdpins-0019022"></a></h2>
 <div class="section level3">

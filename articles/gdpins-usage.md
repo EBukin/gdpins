@@ -2,8 +2,9 @@
 
 `gdpins` is a package that layers **Google Drive + pins** for
 reproducible, offline-capable data management. Drive is the source of
-truth; a local cache mirrors it. Reads are local-first; writes fan out;
-sync and delete are explicit and guarded.
+truth; each Drive board keeps one local copy. Reads are local-first;
+writes go to Drive, then the local copy; sync and delete are explicit
+and guarded.
 
 ## Installation
 
@@ -97,13 +98,13 @@ A board wraps a layer of the data pipeline. Three configurations:
 # Local only — no Drive, works fully offline (no adapter needed)
 bd_local <- gdpins_init_board(
   name      = "scratch",
-  local_dir = file.path(Sys.getenv("OD_PRIV_ROOT"), "scratch")
+  cache_dir = file.path(Sys.getenv("OD_PRIV_ROOT"), "scratch")
 )
 ```
 
 ``` r
 
-# Drive + cache — standard production configuration
+# Drive + one local copy — standard production configuration
 bd_raw <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "kazLandEconImpact-data/data-raw",
@@ -118,14 +119,11 @@ bd_raw <- gdpins_init_board(
 
 ``` r
 
-# Drive + cache + standalone local (super config)
+# Drive only — no local copy; Drive downloads go to a session temp dir
 bd_clean <- gdpins_init_board(
   name       = "data_clean",
   drive_path = "kazLandEconImpact-data/data-clean",
-  cache_dir  = file.path(Sys.getenv("OD_PRIV_ROOT"),
-                         "kazLandEconImpact-data", "data-clean-cache"),
-  local_dir  = file.path(Sys.getenv("OD_PRIV_ROOT"),
-                         "kazLandEconImpact-data", "data-clean-local"),
+  cache_dir  = FALSE,
   adapter    = adapter,
   versioned  = TRUE
 )
@@ -406,11 +404,11 @@ gdpins_prune_pin_versions(bd_raw, "gdp_panel", keep = 3, dry_run = FALSE)
 When Drive is unreachable (no internet, VPN down), a board falls back
 automatically as it connects:
 
-| Config              | Offline behaviour                                 |
-|---------------------|---------------------------------------------------|
-| `local_only`        | Fully offline — no change                         |
-| `drive_cache`       | Falls back to cache directory as local-only board |
-| `drive_cache_local` | Falls back to standalone `local_dir` board        |
+| Config | Offline behaviour |
+|----|----|
+| `local_only` | Fully offline — no change |
+| `drive_cache` | Falls back to its one local copy (`local_board`/`cache_dir`) |
+| `drive_only` | No local copy — reads and writes are blocked offline |
 
 A warning is emitted; writes are blocked (Drive boards are
 write-protected offline); reads continue from the local copy.
@@ -423,7 +421,7 @@ gdpins_is_online()   # TRUE / FALSE
 # Board status shows sync state between Drive and local
 gdpins_board_status(bd_raw)
 
-# Reads work offline — served from cache or local_dir
+# Reads work offline — served from the local copy
 gdp_panel <- gdpins_pin_read(bd_raw, "gdp_panel")  # no network needed
 ```
 
