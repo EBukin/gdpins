@@ -1,6 +1,6 @@
 # Plan: single local copy per board (drop `cache_board`, deprecate `local_dir`)
 
-Status: PLANNED, not started. Target version 0.0.1.9024. Branch `feat/single-local-copy` off `main`.
+Status: PLANNED, not started. Target version 0.0.1.9024. Branch `feat/single-local-copy` off `main`; `fix/raw-sync-locked-files` (0.0.1.9023) merged in at 184a935.
 Companion: `tools/design-local-cache.md` (how it works today). Tracker section at bottom.
 
 ---
@@ -228,7 +228,7 @@ sections only (`gdpins_board_status dispatch` … `Versioned/Unversioned board c
 `Empty boards`, `Offline board status with no local pins`, `drive_ahead via newer timestamp`,
 board tests inside `Additional coverage`). **Do not touch** raw sections or
 `Unreadable / locked local files`.
-Read: `R/sync.R` lines 1–350 and 530–700; listed test sections. Do not read raw-sync code.
+Read: `R/sync.R` lines 1–346 and 537–730 (post-merge; re-grep at brief time); listed test sections. Do not read raw-sync code.
 Edge list for V4: `gdpins_board_status(drive_only)` returns 0-row tibble with the exact schema
 of `.empty_board_status_tbl()` and informs once; `gdpins_sync(drive_only)` is a no-op and
 returns `x` invisibly; `.handle_init_sync(drive_only)` never warns; `drive_cache` with empty
@@ -345,7 +345,7 @@ Leftovers / risks:          <list>
 
 | Task | Agent | State | Verifier | State | Notes |
 |---|---|---|---|---|---|
-| P0 | orchestrator | todo | – | – | branch, commit plan |
+| P0 | orchestrator | in progress | – | – | branch + plan committed; raw-sync fix merged (184a935); briefs todo |
 | T1 | | todo | V1 | todo | |
 | T2 | | todo | V2 | todo | after V1 PASS |
 | T3 | | todo | V3 | todo | Phase 2 |
@@ -361,3 +361,5 @@ Decisions log
 - 2026-10-03: `local_dir` deprecated via lifecycle; `cache_dir` wins when both given (user).
 - 2026-10-03: `cache_board` + `local_dir` fields removed outright; configs = `local_only`,
   `drive_cache`, `drive_only` (orchestrator, accepted).
+- 2026-10-03: merged `fix/raw-sync-locked-files` into this branch before Phase 1; T4 must leave
+  raw-sync code and `Unreadable / locked local files` tests untouched (user).
