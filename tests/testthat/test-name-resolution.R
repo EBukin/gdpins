@@ -15,7 +15,7 @@ fx_ladder_conn <- function() {
 }
 
 fx_ladder_board <- function() {
-  board <- new_fake_board(config = "drive_cache_local", name = "probe")
+  board <- new_fake_board(config = "drive_cache", name = "probe")
   suppressMessages(gdpins_pin_write(board, mtcars, "cars", format = "rds"))
   suppressMessages(gdpins_pin_write(board, iris, "flowers", format = "rds"))
   board
@@ -268,7 +268,7 @@ test_that("pin_path returns a real path while pin_read returns the object", {
 })
 
 test_that("pin_path materialises a pin that exists only on Drive", {
-  board <- new_fake_board(config = "drive_cache_local", name = "driveonly")
+  board <- new_fake_board(config = "drive_cache", name = "driveonly")
   suppressMessages(
     pins::pin_write(board$drive_board, mtcars, "only_on_drive", type = "rds")
   )

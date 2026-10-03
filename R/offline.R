@@ -86,30 +86,26 @@ gdpins_go_offline.gdpins_board <- function(x, ...) {
     return(x)
   }
 
+  if (identical(x$config, "drive_only")) {
+    cli::cli_abort(c(
+      "Board {.val {x$name}} has no local copy ({.code cache_dir = FALSE}); cannot go offline.",
+      i = "Re-initialise it with a {.arg cache_dir} path to work offline."
+    ))
+  }
+
   offline_state <- list(
     config      = x$config,
     drive_board = x$drive_board,
-    cache_board = x$cache_board,
     cache_dir   = x$cache_dir,
-    local_dir   = x$local_dir,
     drive_path  = x$drive_path,
     adapter     = x$adapter
   )
 
-  if (identical(x$config, "drive_cache_local")) {
-    local_board <- x$local_board
-    local_dir   <- x$local_dir
-  } else {
-    # "drive_cache": no standalone local dir -- the cache *is* the local copy
-    local_board <- x$cache_board
-    local_dir   <- x$cache_dir
-  }
-
   board <- new_gdpins_board(
     config      = "local_only",
     name        = x$name,
-    local_board = local_board,
-    local_dir   = local_dir,
+    local_board = x$local_board,
+    cache_dir   = x$cache_dir,
     versioned   = x$versioned
   )
   attr(board, .GDPINS_OFFLINE_STATE_ATTR) <- offline_state
@@ -206,30 +202,12 @@ gdpins_go_online.gdpins_board <- function(x, adapter = NULL, on_discrepancy = NU
   on_discrepancy <- .resolve_on_discrepancy(on_discrepancy)
   drive_adapter  <- if (!is.null(adapter)) adapter else state$adapter
 
-  is_super <- identical(state$config, "drive_cache_local")
-  local_board <- if (is_super) x$local_board else NULL
-  local_dir   <- if (is_super) state$local_dir else NULL
-
-  # Offline writes for "drive_cache_local" landed on local_board only (the
-  # cache_board was frozen while offline). The status/sync engine always
-  # compares cache_board (not local_board) when both are present, so catch
-  # the cache up first or offline-only writes would look "in sync" and never
-  # reach Drive.
-  if (is_super && !is.null(state$cache_board)) {
-    local_pins <- tryCatch(pins::pin_list(x$local_board), error = function(e) character())
-    for (pin_name in local_pins) {
-      .copy_pin_to_board(x$local_board, state$cache_board, pin_name)
-    }
-  }
-
   board <- new_gdpins_board(
     config      = state$config,
     name        = x$name,
     drive_board = state$drive_board,
-    cache_board = state$cache_board,
-    local_board = local_board,
+    local_board = x$local_board,
     cache_dir   = state$cache_dir,
-    local_dir   = local_dir,
     drive_path  = state$drive_path,
     adapter     = drive_adapter,
     versioned   = x$versioned

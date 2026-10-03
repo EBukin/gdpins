@@ -350,12 +350,12 @@ Leftovers / risks:          <list>
 | P0 | orchestrator | done | – | – | branch + plan committed; raw-sync fix merged (184a935); briefs in `tools/briefs/` |
 | T1 | sonnet | done | V1 | PASS | 6 [V1] tests; test-board.R non-§8 RED until T2 (expected) |
 | T2 | sonnet | done | V2 | PASS | 4 [V2] tests; T2 ~199k tokens (over budget) |
-| T3 | | todo | V3 | todo | Phase 2 |
-| T4 | | todo | V4 | todo | Phase 2 |
-| T5 | | todo | V5 | todo | Phase 2 |
-| T6 | | todo | V6 | todo | Phase 2 |
-| T7 | | todo | V7 | todo | Phase 3, after all V3–V6 PASS |
-| T8 | | todo | V8 | todo | Phase 3 |
+| T3 | sonnet | done | V3 | PASS (3 [V3]) | no behavioural RED (dead-code removal); V3 checks test teeth |
+| T4 | sonnet | done | V4 | PASS (6 [V4]) | 2 locked-files tests use `b$cache_board` (off-limits) → T7 |
+| T5 | sonnet | done | V5 | PASS | 4 [V5] tests |
+| T6 | sonnet | done | V6 | PASS (5 [V6]) | vector `name` gives raw R error (pre-existing; hardening idea) |
+| T7 | sonnet | in progress | V7 | todo | Phase 3 |
+| T8 | sonnet | in progress | V8 | todo | Phase 3 |
 | Gate | orchestrator | todo | – | – | |
 
 Decisions log
@@ -378,3 +378,8 @@ Decisions log
   env; 5 errors, rest passed). Full-suite command now blanks the env var (orchestrator; reported to user).
 - 2026-10-03: Phase 1 gate: test-board/lazy/classes/helpers green; 119 expected failures in Phase 2/3
   files (discovery, integration, name-resolution, offline, output, pipeline, prune, sync, verbs) + live.
+- 2026-10-03: T3 accepted without behavioural RED: after Phase 1 `$cache_board` is always NULL, so its
+  R edits only remove dead code. RED = stale tests failing (match.arg / unused arg). V3 told to prove
+  read-order / fan-out / remove assertions would catch regressions (orchestrator).
+- 2026-10-03: Phase 2 gate: 735 tests, 24 failures (integration 13, pipeline 9, sync locked-files 2 —
+  all T7 scope), 0 warnings. No `cache_board`/`drive_cache_local` in R code (orchestrator).

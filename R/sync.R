@@ -199,6 +199,14 @@ gdpins_sync.default <- function(
     return(.empty_board_status_tbl())
   }
 
+  # drive_only boards have no local copy -- nothing to compare
+  if (is.null(x$local_board)) {
+    cli::cli_inform(c(
+      "i" = "Board {.val {x$name}} has no local copy; nothing to compare."
+    ))
+    return(.empty_board_status_tbl())
+  }
+
   # Offline guard
   if (!gdpins_is_online()) {
     cli::cli_warn(c(
@@ -292,10 +300,7 @@ gdpins_sync.default <- function(
 
 #' @keywords internal
 .board_local_side <- function(x) {
-  # Preference: cache_board, then local_board
-  if (!is.null(x$cache_board)) return(x$cache_board)
-  if (!is.null(x$local_board)) return(x$local_board)
-  NULL
+  x$local_board
 }
 
 #' @keywords internal
@@ -541,6 +546,14 @@ gdpins_sync.default <- function(
     return(invisible(x))
   }
 
+  # drive_only boards -- no local copy, nothing to sync
+  if (is.null(x$local_board)) {
+    cli::cli_inform(c(
+      "i" = "Board {.val {x$name}} has no local copy ({.code cache_dir = FALSE}). Nothing to sync."
+    ))
+    return(invisible(x))
+  }
+
   # Offline guard -- blocks all writes
   if (!gdpins_is_online()) {
     cli::cli_abort(c(
@@ -564,7 +577,7 @@ gdpins_sync.default <- function(
   if (length(local_pins) == 0L && any(status$state == "drive_ahead")) {
     n_drive <- sum(status$state == "drive_ahead")
     cli::cli_inform(c(
-      "i" = "New-computer setup detected: local cache is empty.",
+      "i" = "New-computer setup detected: local copy is empty.",
       "v" = "Pulling {n_drive} pin{?s} from Drive -> local."
     ))
   }
