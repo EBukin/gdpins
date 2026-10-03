@@ -220,8 +220,12 @@ The rules, in order:
 |----|----|----|
 | Not a data frame (list, model, …) | `"rds"` | [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) |
 | Data frame with list-columns (non-sf) | `"rds"` | [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) |
-| Plain tibble / data frame | `"parquet"` | Parquet via `nanoparquet` |
+| Plain tibble / data frame | `"parquet"` | Parquet via `arrow` (default) |
 | `sf` object (all list-cols are `sfc`) | `"parquet"` | Parquet (geometry WKT-encoded) |
+
+Parquet is read and written with `arrow` by default. Switch engines with
+`options(gdpins.parquet_engine = "nanoparquet")`; see
+[`?"io-formats"`](https://ebukin.github.io/gdpins/reference/io-formats.md).
 
 ``` r
 

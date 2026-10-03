@@ -132,10 +132,6 @@ board <- gdpins_init_board(
   create     = TRUE
 )
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20261003T231842Z-c0340'
-#> Writing to pin 'cars'
-#> Creating new version '20261003T231842Z-c0340'
-#> Writing to pin 'cars'
 gdpins_pin_read(board, "cars")
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb

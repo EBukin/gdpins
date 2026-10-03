@@ -80,10 +80,6 @@ board <- gdpins_init_board(
 )
 
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20261003T231842Z-c0340'
-#> Writing to pin 'cars'
-#> Creating new version '20261003T231842Z-c0340'
-#> Writing to pin 'cars'
 
 if (FALSE) { # \dontrun{
 adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")

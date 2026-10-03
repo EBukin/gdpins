@@ -65,8 +65,25 @@ figures), which silently rounds projected coordinates (e.g. UTM metres) by up
 to ~0.5 m. gdpins always pins <code>digits = 15</code> for the <code>"sf"</code> engine to avoid
 this; the <code>"wk"</code> engine is full-precision by construction.</p>
     </div>
+    <div class="section level2">
+    <h2 id="parquet-engine">Parquet engine<a class="anchor" aria-label="anchor" href="#parquet-engine"></a></h2>
 
-  </main></div>
+
+<p>The parquet files behind pins are read and written by one of two engines,
+controlled package-wide by the <code>gdpins.parquet_engine</code> option:</p><ul><li><p><code>"arrow"</code> (default) — uses <code><a href="https://arrow.apache.org/docs/r/reference/read_parquet.html" class="external-link">arrow::read_parquet()</a></code> / <code><a href="https://arrow.apache.org/docs/r/reference/write_parquet.html" class="external-link">arrow::write_parquet()</a></code>.</p></li>
+<li><p><code>"nanoparquet"</code> — uses <code><a href="https://nanoparquet.r-lib.org/reference/read_parquet.html" class="external-link">nanoparquet::read_parquet()</a></code> /
+<code><a href="https://nanoparquet.r-lib.org/reference/write_parquet.html" class="external-link">nanoparquet::write_parquet()</a></code>.</p></li>
+</ul><p>arrow is the default because nanoparquet's reader can allocate tens of
+gigabytes and crash the session on files that hold a few large (multi-MB)
+string cells — for example a WKT geometry column with one row per region.
+arrow reads the identical bytes in bounded memory. Both engines write
+standard parquet that either can read, so the choice is transparent apart
+from the memory behaviour. Switch with
+<code>options(gdpins.parquet_engine = "nanoparquet")</code>.</p>
+    </div>
+
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

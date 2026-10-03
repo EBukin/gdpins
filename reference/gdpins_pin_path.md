@@ -150,10 +150,6 @@ board <- gdpins_init_board(
   create     = TRUE
 )
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20261003T231841Z-c0340'
-#> Writing to pin 'cars'
-#> Creating new version '20261003T231841Z-c0340'
-#> Writing to pin 'cars'
 p <- gdpins_pin_path(board, "cars")
 file.exists(p)
 #> [1] TRUE

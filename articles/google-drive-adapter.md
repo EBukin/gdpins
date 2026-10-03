@@ -180,7 +180,7 @@ board
 #> versioned: "TRUE"
 #> connected: "FALSE"
 #> drive: "project/data-raw"
-#> cache: "/tmp/RtmphrGori/cache_733413aae5d6"
+#> cache: "/tmp/Rtmprc88kY/cache_74324f5b0a9a"
 ```
 
 The fake adapter mirrors Drive operations on the local filesystem — no
@@ -232,8 +232,6 @@ board_offline$config   # "local_only"
 
 # Reads and writes stay local -- no network calls, no blocked writes
 gdpins_pin_write(board_offline, mtcars, "cars")
-#> Creating new version '20261003T231852Z-c0340'
-#> Writing to pin 'cars'
 gdpins_pin_read(board_offline, "cars")
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb

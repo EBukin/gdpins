@@ -41,9 +41,5 @@ board <- gdpins_init_board(
   create     = TRUE
 )
 gdpins_pin_write(board, mtcars, "cars")
-#> Creating new version '20261003T231842Z-c0340'
-#> Writing to pin 'cars'
-#> Creating new version '20261003T231842Z-c0340'
-#> Writing to pin 'cars'
 gdpins_pin_remove(board, "cars")
 ```
