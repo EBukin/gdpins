@@ -10,8 +10,8 @@ test_that("new_gdpins_board() returns an object of class gdpins_board", {
 test_that("new_gdpins_board() has exact frozen field names", {
   board      <- new_gdpins_board(config = "local_only", name = "data_raw")
   expected   <- c(
-    "config", "name", "drive_board", "cache_board", "local_board",
-    "cache_dir", "local_dir", "drive_path", "adapter", "versioned"
+    "config", "name", "drive_board", "local_board",
+    "cache_dir", "drive_path", "adapter", "versioned"
   )
   expect_named(board, expected)
 })
@@ -25,13 +25,13 @@ test_that("new_gdpins_board() stores config and name correctly", {
 test_that("new_gdpins_board() defaults: NULLs and versioned = TRUE", {
   board <- new_gdpins_board(config = "local_only", name = "test")
   expect_null(board$drive_board)
-  expect_null(board$cache_board)
   expect_null(board$local_board)
   expect_null(board$cache_dir)
-  expect_null(board$local_dir)
   expect_null(board$drive_path)
   expect_null(board$adapter)
   expect_true(board$versioned)
+  expect_null(board$cache_board)
+  expect_null(board$local_dir)
 })
 
 test_that("new_gdpins_board() accepts versioned = FALSE", {
@@ -40,7 +40,7 @@ test_that("new_gdpins_board() accepts versioned = FALSE", {
 })
 
 test_that("new_gdpins_board() accepts all three legal configs", {
-  for (cfg in c("local_only", "drive_cache", "drive_cache_local")) {
+  for (cfg in c("local_only", "drive_cache", "drive_only")) {
     board <- new_gdpins_board(config = cfg, name = "x")
     expect_equal(board$config, cfg)
   }
@@ -48,6 +48,10 @@ test_that("new_gdpins_board() accepts all three legal configs", {
 
 test_that("new_gdpins_board() errors on illegal config", {
   expect_error(new_gdpins_board(config = "invalid", name = "test"))
+})
+
+test_that("new_gdpins_board(config = 'drive_cache_local') errors (config removed)", {
+  expect_error(new_gdpins_board(config = "drive_cache_local", name = "x"))
 })
 
 test_that("new_gdpins_board() errors on empty name", {
@@ -67,6 +71,21 @@ test_that("new_gdpins_board() stores optional fields when supplied", {
   expect_equal(board$drive_path, "kazLandEconImpact-data/data-raw")
   expect_false(is.null(board$adapter))
   expect_s3_class(board$adapter, "gdpins_drive_adapter")
+})
+
+test_that(".onLoad() does not overwrite an already-set gdpins.cache_dir", {
+  withr::local_options(gdpins.cache_dir = "keep")
+  gdpins:::.onLoad(NULL, NULL)
+  expect_equal(getOption("gdpins.cache_dir"), "keep")
+})
+
+test_that(".onLoad() sets gdpins.cache_dir default under fs::path_home() when unset", {
+  withr::local_options(gdpins.cache_dir = NULL)
+  gdpins:::.onLoad(NULL, NULL)
+  expect_equal(
+    getOption("gdpins.cache_dir"),
+    as.character(fs::path_home(".gdpins", "cache"))
+  )
 })
 
 # ── new_gdpins_raw_conn ───────────────────────────────────────────────────────

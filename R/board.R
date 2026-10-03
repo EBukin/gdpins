@@ -27,11 +27,38 @@ NULL
 #' @keywords internal
 .config_components <- function(config) {
   switch(config,
-    local_only        = "local_board",
-    drive_cache       = c("drive_board", "cache_board"),
-    drive_cache_local = c("drive_board", "cache_board", "local_board"),
+    local_only  = "local_board",
+    drive_cache = c("drive_board", "local_board"),
+    drive_only  = "drive_board",
     character()
   )
+}
+
+#' Default local-copy cache directory for a Drive board
+#'
+#' Pure path computation — no filesystem calls. The default local copy lives
+#' under `getOption("gdpins.cache_dir")`, namespaced by the Drive root (so
+#' different Drive accounts/shared drives don't collide) and by a sanitised
+#' version of `drive_path`.
+#'
+#' @param adapter A `gdpins_drive_adapter`.
+#' @param drive_path Character scalar Drive path relative to the adapter root.
+#' @return Character scalar path.
+#' @keywords internal
+.default_cache_dir <- function(adapter, drive_path) {
+  root <- getOption("gdpins.cache_dir")
+  key <- if (identical(adapter$kind, "real")) {
+    adapter$root_id
+  } else {
+    basename(adapter$root)
+  }
+
+  components <- strsplit(drive_path, "/")[[1]]
+  components <- gsub("[^A-Za-z0-9._-]+", "_", components)
+  components <- components[nzchar(components)]
+  components[components %in% c(".", "..")] <- "_"
+
+  as.character(do.call(file.path, c(list(root, key), as.list(components))))
 }
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -317,50 +344,67 @@ gdpins_init_board <- function(
   # ── Validate on_discrepancy ──────────────────────────────────────────────────
   on_discrepancy <- .resolve_on_discrepancy(on_discrepancy)
 
-  # ── Determine config ─────────────────────────────────────────────────────────
+  # ── local_dir (deprecated 0.0.1.9024) → cache_dir ────────────────────────────
+  if (!is.null(local_dir)) {
+    if (is.null(cache_dir)) {
+      cache_dir <- local_dir
+      details <- NULL
+    } else {
+      details <- "Both `local_dir` and `cache_dir` were supplied; `local_dir` is ignored."
+    }
+    lifecycle::deprecate_warn(
+      when    = "0.0.1.9024",
+      what    = "gdpins_init_board(local_dir)",
+      with    = "gdpins_init_board(cache_dir)",
+      details = details
+    )
+  }
+
+  # ── Validate cache_dir ───────────────────────────────────────────────────────
+  cache_dir_ok <-
+    is.null(cache_dir) ||
+    identical(cache_dir, TRUE) ||
+    identical(cache_dir, FALSE) ||
+    (is.character(cache_dir) && length(cache_dir) == 1L && !is.na(cache_dir) && nzchar(cache_dir))
+  if (!cache_dir_ok) {
+    cli::cli_abort(
+      "{.arg cache_dir} must be {.code NULL}, {.code TRUE}, {.code FALSE}, or a non-empty path."
+    )
+  }
+
+  # ── Determine config + effective cache_dir ───────────────────────────────────
   has_drive <- !is.null(drive_path)
-  has_cache <- !is.null(cache_dir)
-  has_local <- !is.null(local_dir)
-  has_adapter <- !is.null(adapter)
 
-  if (!has_drive && !has_local) {
-    cli::cli_abort(c(
-      "Cannot determine board configuration.",
-      x = "At least one of {.arg drive_path} or {.arg local_dir} must be supplied.",
-      i = paste0(
-        "Use {.arg local_dir} alone for local-only, or supply ",
-        "{.arg drive_path} + {.arg cache_dir} + {.arg adapter} for Drive."
+  if (!has_drive) {
+    if (is.character(cache_dir)) {
+      config <- "local_only"
+    } else {
+      cli::cli_abort(
+        "Supply {.arg drive_path}, or {.arg cache_dir} as a path for a local-only board."
       )
-    ))
-  }
-
-  if (has_drive && !has_adapter) {
-    cli::cli_abort(c(
-      "{.arg adapter} is required when {.arg drive_path} is supplied.",
-      i = "Pass a {.cls gdpins_drive_adapter} created by {.fn gdpins_fake_drive} or {.fn gdpins_real_drive}."
-    ))
-  }
-
-  if (has_drive && !has_cache) {
-    cli::cli_abort(c(
-      "{.arg cache_dir} is required when {.arg drive_path} is supplied.",
-      i = "Provide a local directory path for the Drive cache."
-    ))
-  }
-
-  config <- if (!has_drive && has_local) {
-    "local_only"
-  } else if (has_drive && !has_local) {
-    "drive_cache"
+    }
   } else {
-    "drive_cache_local"
+    if (is.null(adapter)) {
+      cli::cli_abort(c(
+        "{.arg adapter} is required when {.arg drive_path} is supplied.",
+        i = "Pass a {.cls gdpins_drive_adapter} created by {.fn gdpins_fake_drive} or {.fn gdpins_real_drive}."
+      ))
+    }
+    if (identical(cache_dir, FALSE)) {
+      config     <- "drive_only"
+      cache_dir  <- NULL
+    } else if (is.null(cache_dir) || identical(cache_dir, TRUE)) {
+      config     <- "drive_cache"
+      cache_dir  <- .default_cache_dir(adapter, drive_path)
+    } else {
+      config <- "drive_cache"
+    }
   }
 
   list(
     name           = name,
     drive_path     = drive_path,
     cache_dir      = cache_dir,
-    local_dir      = local_dir,
     versioned      = versioned,
     create         = create,
     on_discrepancy = on_discrepancy,

@@ -347,8 +347,8 @@ Leftovers / risks:          <list>
 | Task | Agent | State | Verifier | State | Notes |
 |---|---|---|---|---|---|
 | P0 | orchestrator | done | – | – | branch + plan committed; raw-sync fix merged (184a935); briefs in `tools/briefs/` |
-| T1 | sonnet | in progress | V1 | todo | |
-| T2 | | todo | V2 | todo | after V1 PASS |
+| T1 | sonnet | done | V1 | PASS | 6 [V1] tests; test-board.R non-§8 RED until T2 (expected) |
+| T2 | sonnet | in progress | V2 | todo | |
 | T3 | | todo | V3 | todo | Phase 2 |
 | T4 | | todo | V4 | todo | Phase 2 |
 | T5 | | todo | V5 | todo | Phase 2 |

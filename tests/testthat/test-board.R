@@ -470,15 +470,29 @@ test_that("new_fake_board drive_cache_local has all three components", {
 
 test_that("empty name errors", {
   expect_error(
-    gdpins_init_board(name = "", local_dir = withr::local_tempdir()),
+    gdpins_init_board(name = "", cache_dir = withr::local_tempdir()),
     "non-empty character scalar"
   )
 })
 
-test_that("no drive_path and no local_dir -> error", {
+test_that("no drive_path and no cache_dir -> error", {
   expect_error(
-    gdpins_init_board(name = "x"),
-    "drive_path.*local_dir"
+    .board_spec(name = "x"),
+    "drive_path.*cache_dir"
+  )
+})
+
+test_that("no drive_path and cache_dir = TRUE -> error", {
+  expect_error(
+    .board_spec(name = "x", cache_dir = TRUE),
+    "drive_path.*cache_dir"
+  )
+})
+
+test_that("no drive_path and cache_dir = FALSE -> error", {
+  expect_error(
+    .board_spec(name = "x", cache_dir = FALSE),
+    "drive_path.*cache_dir"
   )
 })
 
@@ -493,20 +507,186 @@ test_that("drive_path without adapter -> error", {
   )
 })
 
-test_that("drive_path without cache_dir -> error", {
-  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
-  testthat::local_mocked_bindings(
-    gdpins_is_online = function() TRUE,
-    .package = "gdpins"
-  )
+test_that("drive_path without adapter -> error, even with cache_dir = FALSE", {
   expect_error(
-    gdpins_init_board(
-      name = "x",
-      drive_path = "some/path",
-      adapter = adapter
-    ),
-    "cache_dir.*required"
+    .board_spec(name = "x", drive_path = "some/path", cache_dir = FALSE),
+    "adapter.*required"
   )
+})
+
+test_that("drive_path with cache_dir = NULL and adapter -> drive_cache, default cache_dir", {
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  spec <- .board_spec(name = "x", drive_path = "some/path", adapter = adapter)
+  expect_equal(spec$config, "drive_cache")
+  expect_equal(spec$cache_dir, .default_cache_dir(adapter, "some/path"))
+})
+
+test_that("drive_path with cache_dir = TRUE and adapter -> drive_cache, default cache_dir", {
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  spec <- .board_spec(name = "x", drive_path = "some/path", cache_dir = TRUE, adapter = adapter)
+  expect_equal(spec$config, "drive_cache")
+  expect_equal(spec$cache_dir, .default_cache_dir(adapter, "some/path"))
+})
+
+test_that("drive_path with cache_dir = FALSE and adapter -> drive_only, cache_dir NULL", {
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  spec <- .board_spec(name = "x", drive_path = "some/path", cache_dir = FALSE, adapter = adapter)
+  expect_equal(spec$config, "drive_only")
+  expect_null(spec$cache_dir)
+})
+
+test_that("drive_path with cache_dir = path and adapter -> drive_cache, that path", {
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  spec <- .board_spec(
+    name = "x", drive_path = "some/path", cache_dir = "x/y", adapter = adapter
+  )
+  expect_equal(spec$config, "drive_cache")
+  expect_equal(spec$cache_dir, "x/y")
+})
+
+test_that("no drive_path and cache_dir = path -> local_only", {
+  spec <- .board_spec(name = "x", cache_dir = "x")
+  expect_equal(spec$config, "local_only")
+  expect_equal(spec$cache_dir, "x")
+})
+
+test_that("cache_dir validation: '', NA, NA_character_, c('a','b'), 1 -> error", {
+  bad <- list("", NA, NA_character_, c("a", "b"), 1, logical(0))
+  for (b in bad) {
+    expect_error(
+      .board_spec(name = "x", cache_dir = b),
+      "cache_dir.*non-empty path"
+    )
+  }
+})
+
+test_that(".board_spec() return names are exact", {
+  spec <- .board_spec(name = "x", cache_dir = "x")
+  expect_named(
+    spec,
+    c("name", "drive_path", "cache_dir", "versioned", "create", "on_discrepancy", "adapter", "config")
+  )
+})
+
+test_that("local_dir only -> deprecation warning, config local_only, cache_dir = local_dir", {
+  withr::local_options(lifecycle_verbosity = "warning")
+  spec <- NULL
+  expect_warning(
+    spec <- .board_spec(name = "x", local_dir = "some/local/dir"),
+    class = "lifecycle_warning_deprecated"
+  )
+  expect_equal(spec$config, "local_only")
+  expect_equal(spec$cache_dir, "some/local/dir")
+})
+
+test_that("local_dir + cache_dir both -> warning names both args; cache_dir wins", {
+  withr::local_options(lifecycle_verbosity = "warning")
+  w <- tryCatch(
+    {
+      .board_spec(name = "x", local_dir = "some/local/dir", cache_dir = "the/cache/dir")
+      NULL
+    },
+    lifecycle_warning_deprecated = function(cnd) cnd
+  )
+  expect_false(is.null(w))
+  expect_match(conditionMessage(w), "local_dir")
+  expect_match(conditionMessage(w), "cache_dir")
+
+  withr::local_options(lifecycle_verbosity = "quiet")
+  spec <- .board_spec(name = "x", local_dir = "some/local/dir", cache_dir = "the/cache/dir")
+  expect_equal(spec$cache_dir, "the/cache/dir")
+})
+
+test_that(".default_cache_dir() honours a changed gdpins.cache_dir option", {
+  withr::local_options(gdpins.cache_dir = "R00T")
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  result <- .default_cache_dir(adapter, "some/path")
+  expect_match(result, "^R00T")
+})
+
+test_that(".default_cache_dir() uses basename(adapter$root) as key for a fake adapter", {
+  withr::local_options(gdpins.cache_dir = "R00T")
+  fake_root <- withr::local_tempdir()
+  adapter <- gdpins_fake_drive(root = fake_root)
+  result <- .default_cache_dir(adapter, "some/path")
+  expect_equal(result, file.path("R00T", basename(fake_root), "some", "path"))
+})
+
+test_that(".default_cache_dir() uses adapter$root_id as key for a real adapter", {
+  withr::local_options(gdpins.cache_dir = "R00T")
+  adapter <- structure(
+    list(kind = "real", root_id = "ID123"),
+    class = "gdpins_drive_adapter"
+  )
+  result <- .default_cache_dir(adapter, "some/path")
+  expect_equal(result, file.path("R00T", "ID123", "some", "path"))
+})
+
+test_that(".default_cache_dir() sanitises spaces and path traversal, does no FS calls", {
+  withr::local_options(gdpins.cache_dir = "R00T")
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  result <- .default_cache_dir(adapter, "my proj/../data raw")
+  expect_equal(
+    result,
+    file.path("R00T", basename(adapter$root), "my_proj", "_", "data_raw")
+  )
+  expect_false(fs::dir_exists(result))
+})
+
+# ── [V1] adversarial tests ───────────────────────────────────────────────────
+
+test_that("[V1] cache_dir = character(0) -> error 'cache_dir.*non-empty path'", {
+  expect_error(
+    .board_spec(name = "x", cache_dir = character(0)),
+    "cache_dir.*non-empty path"
+  )
+})
+
+test_that("[V1] invalid cache_dir errors before the missing-adapter check", {
+  # cache_dir validation (step 2) runs before the has_drive/adapter branch
+  # (step 3), even when drive_path is supplied and adapter is NULL.
+  expect_error(
+    .board_spec(name = "x", drive_path = "some/path", cache_dir = "", adapter = NULL),
+    "cache_dir.*non-empty path"
+  )
+})
+
+test_that("[V1] cache_dir = 'TRUE' (character, not logical) is a literal path, not the TRUE branch", {
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  spec <- .board_spec(
+    name = "x", drive_path = "some/path", cache_dir = "TRUE", adapter = adapter
+  )
+  expect_equal(spec$config, "drive_cache")
+  expect_equal(spec$cache_dir, "TRUE")
+  expect_false(identical(spec$cache_dir, .default_cache_dir(adapter, "some/path")))
+})
+
+test_that("[V1] local_dir + cache_dir + drive_path + adapter -> drive_cache, cache_dir wins", {
+  withr::local_options(lifecycle_verbosity = "quiet")
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  spec <- .board_spec(
+    name       = "x",
+    drive_path = "some/path",
+    local_dir  = "some/local/dir",
+    cache_dir  = "the/cache/dir",
+    adapter    = adapter
+  )
+  expect_equal(spec$config, "drive_cache")
+  expect_equal(spec$cache_dir, "the/cache/dir")
+})
+
+test_that("[V1] local_dir alone (no drive_path) -> config is local_only, not drive_cache", {
+  withr::local_options(lifecycle_verbosity = "quiet")
+  spec <- .board_spec(name = "x", local_dir = "some/local/dir")
+  expect_equal(spec$config, "local_only")
+  expect_equal(spec$cache_dir, "some/local/dir")
+})
+
+test_that("[V1] .default_cache_dir() collapses doubled slashes without stray empty components", {
+  withr::local_options(gdpins.cache_dir = "R00T")
+  adapter <- gdpins_fake_drive(root = withr::local_tempdir())
+  result <- .default_cache_dir(adapter, "a//b/")
+  expect_equal(result, file.path("R00T", basename(adapter$root), "a", "b"))
 })
 
 # ── 9. S3 print / format / summary ───────────────────────────────────────────

@@ -1,3 +1,7 @@
+# gdpins 0.0.1.9024
+
+- Development in progress: single local copy per board (see T8).
+
 # gdpins 0.0.1.9023
 
 ## Bug fixes

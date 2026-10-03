@@ -88,8 +88,9 @@ test_that("new_fake_board('drive_cache') returns a valid gdpins_board", {
   expect_equal(board$config, "drive_cache")
   expect_false(is.null(board$adapter))
   expect_false(is.null(board$drive_board))
-  expect_false(is.null(board$cache_board))
-  expect_null(board$local_board)
+  expect_false(is.null(board$local_board))
+  expect_s3_class(board$local_board, "pins_board")
+  expect_equal(fs::path(board$local_board$path), fs::path(board$cache_dir))
 })
 
 test_that("new_fake_board('local_only') returns a valid gdpins_board", {
@@ -98,24 +99,23 @@ test_that("new_fake_board('local_only') returns a valid gdpins_board", {
   expect_equal(board$config, "local_only")
   expect_false(is.null(board$local_board))
   expect_null(board$drive_board)
-  expect_null(board$cache_board)
   expect_null(board$adapter)
 })
 
-test_that("new_fake_board('drive_cache_local') returns a valid gdpins_board", {
-  board <- new_fake_board("drive_cache_local")
+test_that("new_fake_board('drive_only') returns a valid gdpins_board", {
+  board <- new_fake_board("drive_only")
   expect_s3_class(board, "gdpins_board")
-  expect_equal(board$config, "drive_cache_local")
+  expect_equal(board$config, "drive_only")
   expect_false(is.null(board$adapter))
   expect_false(is.null(board$drive_board))
-  expect_false(is.null(board$cache_board))
-  expect_false(is.null(board$local_board))
+  expect_null(board$local_board)
+  expect_null(board$cache_dir)
 })
 
 test_that("new_fake_board() boards are backed by real tempdir pins boards", {
   board <- new_fake_board("drive_cache")
   expect_s3_class(board$drive_board, "pins_board")
-  expect_s3_class(board$cache_board, "pins_board")
+  expect_s3_class(board$local_board, "pins_board")
 })
 
 test_that("new_fake_board() each call returns a fresh board with distinct dirs", {
