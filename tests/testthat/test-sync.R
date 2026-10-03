@@ -773,12 +773,15 @@ test_that("unversioned board on_conflict=prompt with 's' skips (no change)", {
   expect_equal(obj_l$x, 20L)
 })
 
-# Cover .raw_copy_to_drive when local file doesn't exist (warn path)
-test_that(".raw_copy_to_drive warns when local file missing", {
+# Cover .raw_copy_to_drive when local file doesn't exist (abort path).
+# Regression: this used to cli_warn() and return success, which made the
+# caller (wrapped in attempt(), see gdpins_sync.default) record the file as
+# synced even though nothing was copied -- see tests below.
+test_that(".raw_copy_to_drive errors when local file missing", {
   conn <- new_fake_raw_conn("drive_local")
-  expect_warning(
+  expect_error(
     gdpins:::.raw_copy_to_drive(conn, "nonexistent.csv"),
-    class = "rlang_warning"
+    "Local file not found"
   )
 })
 
@@ -797,6 +800,54 @@ test_that(".file_is_readable() distinguishes readable from unopenable paths", {
   d <- withr::local_tempdir()
   expect_false(gdpins:::.file_is_readable(d))
   expect_false(gdpins:::.file_is_readable(file.path(d, "nope.csv")))
+})
+
+# Regression guard for the read-probe fix below: an empty file reads 0 bytes
+# for a perfectly ordinary reason (there's nothing in it), not because it's
+# locked, so it must stay "readable".
+test_that(".file_is_readable() treats an empty file as readable", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  file.create(tmp)
+  expect_equal(file.size(tmp), 0)
+  expect_true(gdpins:::.file_is_readable(tmp))
+})
+
+# Regression: on Windows, a byte-range lock held by another process (as
+# Microsoft Office does) lets file(path, "rb") open successfully while
+# readBin() silently returns 0 bytes -- the old open-only check reported the
+# file as readable. This can't be reproduced with a real OS-level lock
+# portably (and a same-process lock wouldn't trigger it -- byte-range locks
+# are per-handle), so .read_first_byte() is mocked to return raw(0) instead,
+# standing in for what a byte-range lock does to readBin().
+test_that(".file_is_readable() is FALSE when a non-empty file yields no bytes (byte-range lock)", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  writeLines(strrep("a", 100), tmp)
+
+  local_mocked_bindings(.read_first_byte = function(path) raw(0), .package = "gdpins")
+
+  expect_false(gdpins:::.file_is_readable(tmp))
+})
+
+test_that(".file_is_readable() is TRUE when an empty file yields no bytes", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  file.create(tmp)
+  expect_equal(file.size(tmp), 0)
+
+  local_mocked_bindings(.read_first_byte = function(path) raw(0), .package = "gdpins")
+
+  expect_true(gdpins:::.file_is_readable(tmp))
+})
+
+test_that(".file_is_readable() is FALSE when the read probe errors", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  writeLines(strrep("a", 100), tmp)
+
+  local_mocked_bindings(
+    .read_first_byte = function(path) stop("simulated read failure"),
+    .package = "gdpins"
+  )
+
+  expect_false(gdpins:::.file_is_readable(tmp))
 })
 
 test_that(".raw_copy_to_drive aborts with an actionable error on unreadable file", {
@@ -905,6 +956,86 @@ test_that("raw sync omits the 'close the program' hint for non-lock failures", {
   )
   expect_false(is.null(w))
   expect_false(grepl("Close any program", conditionMessage(w), fixed = TRUE))
+})
+
+# Regression: a status row can say a file is local-ahead (needs uploading)
+# while the file itself is missing from disk -- e.g. deleted after
+# gdpins_board_status() ran. .raw_copy_to_drive() used to cli_warn() and
+# return success for this, so gdpins_sync() printed "Synced ... local ->
+# Drive" for a file that was never touched. It must be counted as a failure
+# instead, and the other file must still sync normally.
+test_that("raw sync counts a missing local file as a failure, not a success", {
+  conn <- new_fake_raw_conn("drive_local")
+  write.csv(data.frame(x = 1:3), file.path(conn$local_path, "real.csv"), row.names = FALSE)
+
+  local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) {
+      tibble::tibble(
+        name  = c("ghost.csv", "real.csv"),
+        state = c("local_ahead", "local_ahead")
+      )
+    },
+    .package = "gdpins"
+  )
+
+  msgs <- character()
+  expect_warning(
+    withCallingHandlers(
+      gdpins_sync(conn, direction = "auto"),
+      message = function(m) {
+        msgs <<- c(msgs, conditionMessage(m))
+        invokeRestart("muffleMessage")
+      }
+    ),
+    "1 failed"
+  )
+
+  # The real file synced and said so; the missing one did not.
+  expect_true(any(grepl("real.csv", msgs, fixed = TRUE) & grepl("Synced", msgs, fixed = TRUE)))
+  expect_false(any(grepl("ghost.csv", msgs, fixed = TRUE) & grepl("Synced", msgs, fixed = TRUE)))
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/real.csv")))
+  expect_false(gd_exists(conn$adapter, paste0(conn$drive_path, "/ghost.csv")))
+})
+
+# A download failure must be isolated exactly like an upload failure: other
+# files still land locally, the failed one is listed in the warning summary,
+# and the "close the program" hint (which only applies to unreadable/locked
+# local files) is absent since this is a download-side failure.
+test_that("raw sync isolates a download failure from Drive, and reports it", {
+  conn <- new_fake_raw_conn("drive_local")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  for (nm in c("aaa.csv", "bbb.csv", "ccc.csv")) {
+    write.csv(data.frame(x = 1:3), tmp, row.names = FALSE)
+    gd_upload(conn$adapter, tmp, paste0(conn$drive_path, "/", nm))
+  }
+
+  real_copy <- gdpins:::.raw_copy_to_local
+  local_mocked_bindings(
+    .raw_copy_to_local = function(conn, rel_name) {
+      if (rel_name == "bbb.csv") stop("download failed")
+      real_copy(conn, rel_name)
+    },
+    .package = "gdpins"
+  )
+
+  w <- tryCatch(
+    {
+      suppressMessages(gdpins_sync(conn, direction = "from_drive"))
+      NULL
+    },
+    warning = function(w) w
+  )
+  expect_false(is.null(w))
+  expect_match(conditionMessage(w), "2 files synced, 1 failed")
+  expect_false(grepl("Close any program", conditionMessage(w), fixed = TRUE))
+
+  # The files either side of the failure made it to local disk.
+  expect_true(file.exists(file.path(conn$local_path, "aaa.csv")))
+  expect_true(file.exists(file.path(conn$local_path, "ccc.csv")))
+  expect_false(file.exists(file.path(conn$local_path, "bbb.csv")))
 })
 
 # Cover .effective_direction skip fallthrough for offline state

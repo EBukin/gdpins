@@ -882,18 +882,38 @@ gdpins_sync.default <- function(
 #' fine. Uploads hand libcurl a *path*, and curl only opens it mid-request --
 #' at which point the failure surfaces as an opaque
 #' `"read error getting mime data"`. Opening the file up front turns that into
-#' an actionable, per-file error.
+#' an actionable, per-file error -- but on Windows a byte-range lock (as held
+#' by Microsoft Office) lets the open succeed while `readBin()` silently
+#' returns 0 bytes, so a 1-byte read probe is needed to actually catch it.
 #'
 #' @param path Character scalar. Path to a local file.
 #'
-#' @return `TRUE` if the file could be opened for binary reading.
+#' @return `TRUE` if the file could be opened and read from.
 #' @keywords internal
 .file_is_readable <- function(path) {
   tryCatch({
-    con <- file(path, "rb")
-    on.exit(close(con), add = TRUE)
+    probe <- .read_first_byte(path)
+    if (length(probe) == 0L && isTRUE(file.size(path) > 0)) {
+      return(FALSE)
+    }
     TRUE
   }, error = function(e) FALSE, warning = function(w) FALSE)
+}
+
+#' Read the first byte of a file
+#'
+#' Isolated as its own function so tests can mock the byte-range-lock failure
+#' mode (a read that silently returns 0 bytes) without needing a real
+#' cross-process OS-level lock.
+#'
+#' @param path Character scalar. Path to a local file.
+#'
+#' @return A raw vector of length 0 or 1.
+#' @keywords internal
+.read_first_byte <- function(path) {
+  con <- file(path, "rb")
+  on.exit(close(con), add = TRUE)
+  readBin(con, "raw", 1L)
 }
 
 #' @keywords internal
@@ -904,8 +924,7 @@ gdpins_sync.default <- function(
   )
   drive_path <- paste0(conn$drive_path, "/", rel_name)
   if (!file.exists(local_file)) {
-    cli::cli_warn("Local file not found: {.path {local_file}}")
-    return(invisible(NULL))
+    cli::cli_abort("Local file not found: {.path {local_file}}")
   }
   if (!.file_is_readable(local_file)) {
     cli::cli_abort(
