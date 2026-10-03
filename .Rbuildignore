@@ -11,3 +11,4 @@
 ^\.githooks$
 ^test\.R$
 ^nanotest\.R$
+^\.renvignore$
