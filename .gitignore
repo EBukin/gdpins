@@ -24,3 +24,4 @@ __pycache__/
 
 # Claude Code: per-user settings stay out of the repo
 .claude/settings.local.json
+man/
