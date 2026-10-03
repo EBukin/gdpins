@@ -35,30 +35,31 @@ new_counting_adapter <- function(root = NULL) {
   adapter
 }
 
-#' A lazy drive_cache board over a counting adapter
+#' A lazy drive_cache (or drive_only) board over a counting adapter
 #'
 #' `on_discrepancy` defaults to `"ignore"`: an empty board has nothing to
 #' reconcile, and the default ("warn" non-interactively) would fire a sync
 #' warning at connect that is noise in every test here except the one that
 #' asserts on it.
+#'
+#' `config = "drive_only"` passes `cache_dir = FALSE` (no local copy);
+#' otherwise a fresh tempdir path is used for the one local copy.
 #' @keywords internal
 new_lazy_board <- function(name = "lazytest", config = "drive_cache",
                            on_discrepancy = "ignore", ...) {
   adapter   <- new_counting_adapter()
-  cache_dir <- tempfile("gdpins_cache_")
-  local_dir <- if (config == "drive_cache_local") tempfile("gdpins_local_") else NULL
+  cache_dir <- if (config == "drive_only") FALSE else tempfile("gdpins_cache_")
   board <- gdpins_init_board(
     name           = name,
     drive_path     = paste0("gdpins-fake/", name),
     cache_dir      = cache_dir,
-    local_dir      = local_dir,
     adapter        = adapter,
     create         = TRUE,
     on_discrepancy = on_discrepancy,
     lazy           = TRUE,
     ...
   )
-  list(board = board, adapter = adapter, cache_dir = cache_dir, local_dir = local_dir)
+  list(board = board, adapter = adapter, cache_dir = cache_dir)
 }
 
 # ── 1. Init does no work ─────────────────────────────────────────────────────
@@ -71,19 +72,38 @@ test_that("lazy init touches neither Drive nor the filesystem", {
   expect_false(gdpins_board_is_connected(fx$board))
 })
 
-test_that("lazy init of a local_only board does not create local_dir", {
-  local_dir <- tempfile("gdpins_local_")
+test_that("lazy init of a local_only board does not create cache_dir", {
+  cache_dir <- tempfile("gdpins_local_")
   board <- gdpins_init_board(
     name      = "loc",
-    local_dir = local_dir,
+    cache_dir = cache_dir,
     lazy      = TRUE
   )
 
-  expect_false(dir.exists(local_dir))
+  expect_false(dir.exists(cache_dir))
   expect_false(gdpins_board_is_connected(board))
 
   gdpins_board_connect(board, on_discrepancy = "ignore")
-  expect_true(dir.exists(local_dir))
+  expect_true(dir.exists(cache_dir))
+})
+
+test_that("lazy drive_cache with cache_dir = NULL reports the default cache_dir before connecting", {
+  adapter <- new_counting_adapter()
+  board <- gdpins_init_board(
+    name           = "defaulted",
+    drive_path     = "gdpins-fake/defaulted",
+    adapter        = adapter,
+    create         = TRUE,
+    on_discrepancy = "ignore",
+    lazy           = TRUE
+  )
+
+  expect_identical(
+    board$cache_dir,
+    .default_cache_dir(adapter, "gdpins-fake/defaulted")
+  )
+  expect_false(gdpins_board_is_connected(board))
+  expect_identical(adapter$calls$n, 0L)
 })
 
 test_that("eager init does the work during the call", {
@@ -140,7 +160,7 @@ test_that("format component indicator is derived from config", {
   expect_match(format(new_fake_board(config = "local_only")), "--L", fixed = TRUE)
   expect_match(format(new_fake_board(config = "drive_cache")), "DC-", fixed = TRUE)
   expect_match(
-    format(new_fake_board(config = "drive_cache_local")), "DCL",
+    format(new_fake_board(config = "drive_only")), "D--",
     fixed = TRUE
   )
 })
@@ -148,7 +168,7 @@ test_that("format component indicator is derived from config", {
 # ── 3. Component reads force ─────────────────────────────────────────────────
 
 test_that("reading each component field connects the board", {
-  for (field in c("drive_board", "cache_board")) {
+  for (field in c("drive_board", "local_board")) {
     fx <- new_lazy_board(name = "force")
     expect_false(gdpins_board_is_connected(fx$board))
 
@@ -159,10 +179,33 @@ test_that("reading each component field connects the board", {
   }
 })
 
-test_that("a lazy drive_cache board has no local_board after connecting", {
+test_that("a lazy drive_cache board has a local_board after connecting", {
   fx <- new_lazy_board()
-  expect_null(fx$board$local_board)
+  expect_false(is.null(fx$board$local_board))
+  expect_null(fx$board$cache_board)
   expect_true(gdpins_board_is_connected(fx$board))
+})
+
+test_that("$cache_board returns NULL and does not force (not in .LAZY_FIELDS)", {
+  fx <- new_lazy_board()
+  expect_false(gdpins_board_is_connected(fx$board))
+
+  expect_null(fx$board$cache_board)
+
+  expect_false(gdpins_board_is_connected(fx$board))
+  expect_identical(fx$adapter$calls$n, 0L)
+})
+
+test_that("[V2] $local_dir returns NULL and does not force (not in .LAZY_FIELDS)", {
+  # Own test: local_dir is a removed field, like cache_board, but it was not
+  # explicitly exercised on a lazy (unresolved) board anywhere in this file.
+  fx <- new_lazy_board()
+  expect_false(gdpins_board_is_connected(fx$board))
+
+  expect_null(fx$board$local_dir)
+
+  expect_false(gdpins_board_is_connected(fx$board))
+  expect_identical(fx$adapter$calls$n, 0L)
 })
 
 test_that("connecting happens once, not per access", {
@@ -173,7 +216,6 @@ test_that("connecting happens once, not per access", {
   expect_gt(n_after_first, 0L)
 
   invisible(fx$board$drive_board)
-  invisible(fx$board$cache_board)
   invisible(fx$board$local_board)
 
   expect_identical(fx$adapter$calls$n, n_after_first)
@@ -213,7 +255,7 @@ test_that("copies share one connection", {
 
 test_that("connecting inside a function is visible to the caller", {
   fx <- new_lazy_board()
-  touch <- function(b) invisible(b$cache_board)
+  touch <- function(b) invisible(b$local_board)
 
   touch(fx$board)
 
@@ -317,6 +359,68 @@ test_that("a failed connection leaves the board retryable", {
   expect_true(gdpins_board_is_connected(board))
 })
 
+test_that("offline fallback on lazy drive_cache resolves to local_only with the same cache_dir", {
+  adapter   <- new_counting_adapter()
+  cache_dir <- tempfile("gdpins_cache_")
+
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() FALSE,
+    gdpins_board_status = function(x) mock_status_ok(),
+    .package = "gdpins"
+  )
+
+  board <- gdpins_init_board(
+    name           = "offline_lazy",
+    drive_path     = "gdpins-fake/offline_lazy",
+    cache_dir      = cache_dir,
+    adapter        = adapter,
+    create         = TRUE,
+    on_discrepancy = "ignore",
+    lazy           = TRUE
+  )
+
+  expect_warning(gdpins_board_connect(board), "No internet connection")
+
+  expect_equal(board$config, "local_only")
+  expect_equal(board$cache_dir, cache_dir)
+  expect_false(is.null(board$local_board))
+  expect_null(board$drive_board)
+  expect_true(gdpins_board_is_connected(board))
+})
+
+test_that("lazy drive_only offline errors at first access and retries once online", {
+  adapter <- new_counting_adapter()
+
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() FALSE,
+    .package = "gdpins"
+  )
+
+  board <- gdpins_init_board(
+    name           = "driveonly_lazy",
+    drive_path     = "gdpins-fake/driveonly_lazy",
+    cache_dir      = FALSE,
+    adapter        = adapter,
+    create         = TRUE,
+    on_discrepancy = "ignore",
+    lazy           = TRUE
+  )
+
+  expect_no_warning(
+    expect_error(board$drive_board, "cache_dir = FALSE")
+  )
+  expect_false(gdpins_board_is_connected(board))
+
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
+    .package = "gdpins"
+  )
+
+  expect_s3_class(board$drive_board, "pins_board")
+  expect_true(gdpins_board_is_connected(board))
+})
+
 # ── 7. lazy resolution ───────────────────────────────────────────────────────
 
 test_that("lazy defaults to TRUE", {
@@ -368,11 +472,11 @@ test_that("an explicit lazy argument beats the option", {
 
 test_that("lazy must be a non-NA logical scalar", {
   expect_error(
-    gdpins_init_board(name = "x", local_dir = tempfile(), lazy = NA),
+    gdpins_init_board(name = "x", cache_dir = tempfile(), lazy = NA),
     "non-NA logical scalar"
   )
   expect_error(
-    gdpins_init_board(name = "x", local_dir = tempfile(), lazy = "yes"),
+    gdpins_init_board(name = "x", cache_dir = tempfile(), lazy = "yes"),
     "non-NA logical scalar"
   )
 })
@@ -381,17 +485,17 @@ test_that("argument validation still fires eagerly", {
   # Cheap checks must not be deferred — a lazy board with bad arguments would
   # be a worse error than no board at all.
   expect_error(gdpins_init_board(name = ""), "non-empty character")
-  expect_error(gdpins_init_board(name = "x"), "At least one of")
+  expect_error(gdpins_init_board(name = "x"), "drive_path.*cache_dir")
   expect_error(
     gdpins_init_board(name = "x", drive_path = "p", cache_dir = "c"),
     "adapter.*required"
   )
   expect_error(
-    gdpins_init_board(name = "x", drive_path = "p", adapter = gdpins_fake_drive()),
-    "cache_dir.*required"
+    gdpins_init_board(name = "x", drive_path = "p", cache_dir = 123, adapter = gdpins_fake_drive()),
+    "cache_dir.*non-empty path"
   )
   expect_error(
-    gdpins_init_board(name = "x", local_dir = tempfile(), versioned = NA),
+    gdpins_init_board(name = "x", cache_dir = tempfile(), versioned = NA),
     "non-NA logical scalar"
   )
 })

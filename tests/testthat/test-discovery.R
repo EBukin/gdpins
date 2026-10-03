@@ -77,7 +77,7 @@ test_that("gdpins_list_pins errors on non-board input", {
 
 test_that("gdpins_list_pins reads from local_board in drive_cache config", {
   b   <- new_fake_board("drive_cache")
-  src <- b$cache_board  # local-first for drive_cache is cache_board
+  src <- b$local_board  # local-first for drive_cache is local_board
 
   pins::pin_write(src, fx_plain_tbl(), "cache_pin", type = "parquet")
 
@@ -85,18 +85,16 @@ test_that("gdpins_list_pins reads from local_board in drive_cache config", {
   expect_equal(result$name, "cache_pin")
 })
 
-test_that("gdpins_list_pins reads from local_board in drive_cache_local config", {
-  b   <- new_fake_board("drive_cache_local")
-  src <- b$local_board  # local-first is local_board
+test_that("[T3] gdpins_list_pins() on drive_only lists Drive pins", {
+  b <- new_fake_board("drive_only")
 
-  pins::pin_write(src, fx_plain_tbl(), "local_pin", type = "parquet")
-  # Drive + cache are empty; should only see local_pin
+  pins::pin_write(b$drive_board, fx_plain_tbl(), "drive_pin", type = "parquet")
   result <- gdpins_list_pins(b)
-  expect_equal(result$name, "local_pin")
+  expect_equal(result$name, "drive_pin")
 })
 
-test_that("gdpins_list_pins falls back to drive_board when local and cache are NULL", {
-  # Construct a board with only drive_board present (local_board = cache_board = NULL)
+test_that("gdpins_list_pins falls back to drive_board when local_board is NULL", {
+  # Construct a board with only drive_board present (local_board = NULL)
   fake_root    <- tempfile("gdpins_drive_only_")
   fs::dir_create(fake_root)
   adapter      <- gdpins_fake_drive(root = fake_root)
@@ -104,10 +102,9 @@ test_that("gdpins_list_pins falls back to drive_board when local and cache are N
   fs::dir_create(drive_dir)
   drive_board  <- pins::board_folder(drive_dir, versioned = TRUE)
   b <- new_gdpins_board(
-    config      = "drive_cache",
+    config      = "drive_only",
     name        = "drive_only",
     drive_board = drive_board,
-    cache_board = NULL,
     drive_path  = "test",
     adapter     = adapter,
     versioned   = TRUE
@@ -116,6 +113,14 @@ test_that("gdpins_list_pins falls back to drive_board when local and cache are N
 
   result <- gdpins_list_pins(b)
   expect_equal(result$name, "drive_pin")
+})
+
+test_that("[T3] .read_source: local_board for drive_cache, drive_board for drive_only", {
+  board_dc <- new_fake_board("drive_cache")
+  expect_identical(gdpins:::.read_source(board_dc), board_dc$local_board)
+
+  board_do <- new_fake_board("drive_only")
+  expect_identical(gdpins:::.read_source(board_do), board_do$drive_board)
 })
 
 # ── gdpins_pin_info ───────────────────────────────────────────────────────────

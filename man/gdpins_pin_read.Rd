@@ -25,8 +25,8 @@ geometry is restored: \code{"wk"} (default) or \code{"sf"} decode to an \code{sf
 The pinned R object.
 }
 \description{
-Reads from the local-first source: local board if present, else cache board,
-else Drive board. Hits the network only if the pin is absent locally.
+Reads from the local-first source: local board if present, else Drive
+board. Hits the network only if the pin is absent locally.
 }
 \details{
 If the stored object contains \verb{__<epsg>__}-suffixed geometry columns (WKT
@@ -100,7 +100,6 @@ adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
 board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )

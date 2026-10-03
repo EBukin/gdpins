@@ -3,7 +3,7 @@
 
 # ── 1. Fan-out write ──────────────────────────────────────────────────────────
 
-test_that("write to drive_cache lands on both drive and cache boards", {
+test_that("write to drive_cache lands on exactly drive and local boards", {
   board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
@@ -13,11 +13,11 @@ test_that("write to drive_cache lands on both drive and cache boards", {
   gdpins_pin_write(board, fx_plain_tbl(), name = "plain")
 
   expect_true(pins::pin_exists(board$drive_board, "plain"))
-  expect_true(pins::pin_exists(board$cache_board, "plain"))
+  expect_true(pins::pin_exists(board$local_board, "plain"))
 })
 
-test_that("write to drive_cache_local lands on all three boards", {
-  board <- new_fake_board(config = "drive_cache_local")
+test_that("write to drive_only lands on Drive only", {
+  board <- new_fake_board(config = "drive_only")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
@@ -26,23 +26,21 @@ test_that("write to drive_cache_local lands on all three boards", {
   gdpins_pin_write(board, fx_plain_tbl(), name = "fanout")
 
   expect_true(pins::pin_exists(board$drive_board, "fanout"))
-  expect_true(pins::pin_exists(board$cache_board, "fanout"))
-  expect_true(pins::pin_exists(board$local_board, "fanout"))
+  expect_null(board$local_board)
 })
 
 test_that("write to local_only lands only on local board", {
   board <- new_fake_board(config = "local_only")
   gdpins_pin_write(board, fx_plain_tbl(), name = "local_only_pin")
   expect_true(pins::pin_exists(board$local_board, "local_only_pin"))
-  # drive/cache are NULL — just verify board has correct structure
+  # drive is NULL — just verify board has correct structure
   expect_null(board$drive_board)
-  expect_null(board$cache_board)
 })
 
 # ── 2. Local-first read ───────────────────────────────────────────────────────
 
-test_that("read is local-first: prefers local_board over cache and drive", {
-  board <- new_fake_board(config = "drive_cache_local")
+test_that("read is local-first: prefers local_board over drive", {
+  board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
@@ -50,37 +48,17 @@ test_that("read is local-first: prefers local_board over cache and drive", {
 
   # Write different data to each board component directly
   local_tbl  <- tibble::tibble(src = "local")
-  cache_tbl  <- tibble::tibble(src = "cache")
   drive_tbl  <- tibble::tibble(src = "drive")
 
   pins::pin_write(board$local_board, local_tbl, name = "src_test", type = "rds")
-  pins::pin_write(board$cache_board, cache_tbl, name = "src_test", type = "rds")
   pins::pin_write(board$drive_board, drive_tbl, name = "src_test", type = "rds")
 
   result <- gdpins_pin_read(board, "src_test")
   expect_equal(result$src, "local")
 })
 
-test_that("read falls back to cache if not in local", {
-  board <- new_fake_board(config = "drive_cache_local")
-  testthat::local_mocked_bindings(
-    gdpins_is_online = function() TRUE,
-    .package = "gdpins"
-  )
-
-  cache_tbl <- tibble::tibble(src = "cache")
-  drive_tbl <- tibble::tibble(src = "drive")
-
-  # Only write to cache and drive, not local
-  pins::pin_write(board$cache_board, cache_tbl, name = "fallback_test", type = "rds")
-  pins::pin_write(board$drive_board, drive_tbl, name = "fallback_test", type = "rds")
-
-  result <- gdpins_pin_read(board, "fallback_test")
-  expect_equal(result$src, "cache")
-})
-
-test_that("read falls back to drive if not in local or cache", {
-  board <- new_fake_board(config = "drive_cache_local")
+test_that("read falls back to drive if not in local", {
+  board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
@@ -93,20 +71,18 @@ test_that("read falls back to drive if not in local or cache", {
   expect_equal(result$src, "drive")
 })
 
-test_that("read from drive_cache board (no local) reads from cache first", {
+test_that("drive_cache read when pin only on Drive returns Drive data", {
   board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
   )
 
-  cache_tbl <- tibble::tibble(src = "cache")
   drive_tbl <- tibble::tibble(src = "drive")
-  pins::pin_write(board$cache_board, cache_tbl, name = "pref_test", type = "rds")
   pins::pin_write(board$drive_board, drive_tbl, name = "pref_test", type = "rds")
 
   result <- gdpins_pin_read(board, "pref_test")
-  expect_equal(result$src, "cache")
+  expect_equal(result$src, "drive")
 })
 
 # ── 3. Offline write blocked ──────────────────────────────────────────────────
@@ -134,13 +110,13 @@ test_that("write to local_only board is allowed offline (no online check)", {
 
 # ── 4. Offline read fallback ──────────────────────────────────────────────────
 
-test_that("read from drive_cache offline and pin in cache: returns cache value", {
+test_that("read from drive_cache offline and pin in local: returns local value", {
   board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
   )
-  pins::pin_write(board$cache_board, tibble::tibble(x = 1), name = "offline_pin", type = "rds")
+  pins::pin_write(board$local_board, tibble::tibble(x = 1), name = "offline_pin", type = "rds")
 
   # Now go offline
   testthat::local_mocked_bindings(
@@ -152,13 +128,13 @@ test_that("read from drive_cache offline and pin in cache: returns cache value",
   expect_equal(result$x, 1L)
 })
 
-test_that("read from drive only when offline warns and returns NULL", {
-  board <- new_fake_board(config = "drive_cache_local")
+test_that("[T3] drive_only read offline warns and returns NULL", {
+  board <- new_fake_board(config = "drive_only")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
   )
-  # Only write to drive
+  # Only write to drive — there is no local copy on a drive_only board
   pins::pin_write(board$drive_board, tibble::tibble(x = 99), name = "drive_pin", type = "rds")
 
   testthat::local_mocked_bindings(
@@ -289,8 +265,8 @@ test_that("fx_sf_multi_crs round-trips: both geometry columns restored with corr
 
 # ── 7. sf fan-out write lands on all components ───────────────────────────────
 
-test_that("sf write fans out to all components and read restores sf", {
-  board <- new_fake_board(config = "drive_cache_local")
+test_that("sf write fans out to drive and local, and read restores sf", {
+  board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
@@ -300,7 +276,6 @@ test_that("sf write fans out to all components and read restores sf", {
   gdpins_pin_write(board, orig, name = "sf_fanout")
 
   expect_true(pins::pin_exists(board$drive_board, "sf_fanout"))
-  expect_true(pins::pin_exists(board$cache_board, "sf_fanout"))
   expect_true(pins::pin_exists(board$local_board, "sf_fanout"))
 
   result <- gdpins_pin_read(board, "sf_fanout")
@@ -340,8 +315,8 @@ test_that("pin_read errors when pin not found in any component", {
   )
 })
 
-test_that("pin_remove deletes across drive_cache_local board components", {
-  board <- new_fake_board(config = "drive_cache_local")
+test_that("pin_remove deletes across drive_cache board components", {
+  board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
@@ -349,13 +324,11 @@ test_that("pin_remove deletes across drive_cache_local board components", {
 
   gdpins_pin_write(board, fx_plain_tbl(), name = "to_remove")
   expect_true(pins::pin_exists(board$drive_board, "to_remove"))
-  expect_true(pins::pin_exists(board$cache_board, "to_remove"))
   expect_true(pins::pin_exists(board$local_board, "to_remove"))
 
   gdpins_pin_remove(board, "to_remove")
 
   expect_false(pins::pin_exists(board$drive_board, "to_remove"))
-  expect_false(pins::pin_exists(board$cache_board, "to_remove"))
   expect_false(pins::pin_exists(board$local_board, "to_remove"))
 })
 
@@ -366,6 +339,20 @@ test_that("pin_remove deletes local-only pin", {
   expect_true(pins::pin_exists(board$local_board, "local_pin"))
   gdpins_pin_remove(board, "local_pin")
   expect_false(pins::pin_exists(board$local_board, "local_pin"))
+})
+
+test_that("[T3] pin_remove with pin only on local_board removes it, no error", {
+  board <- new_fake_board(config = "drive_cache")
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    .package = "gdpins"
+  )
+  # Write directly to local_board only — Drive never had this pin
+  pins::pin_write(board$local_board, fx_plain_tbl(), name = "local_only_remove", type = "rds")
+
+  expect_true(pins::pin_exists(board$local_board, "local_only_remove"))
+  expect_no_error(gdpins_pin_remove(board, "local_only_remove"))
+  expect_false(pins::pin_exists(board$local_board, "local_only_remove"))
 })
 
 test_that("pin_remove ignores missing pin (idempotent no-op)", {
@@ -442,22 +429,18 @@ test_that(".is_sf_like: plain tibble returns FALSE", {
   expect_false(gdpins:::.is_sf_like(fx_plain_tbl()))
 })
 
-test_that("pin_read: read error is warned and next source tried", {
-  board <- new_fake_board(config = "drive_cache_local")
+test_that("pin_read: falls back to drive when local is absent", {
+  board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
   )
 
-  # Write to cache and drive (not local)
-  pins::pin_write(board$cache_board, tibble::tibble(x = 42L), name = "fallback_err", type = "rds")
+  # Write to drive only (not local)
   pins::pin_write(board$drive_board, tibble::tibble(x = 99L), name = "fallback_err", type = "rds")
 
-  # Corrupt local: inject it into local_board with a bad pin so pin_exists=TRUE
-  # but pin_read fails. Easier: write to local then manually break it.
-  # Actually easier to test via cache fallback (local absent, cache present):
   result <- gdpins_pin_read(board, "fallback_err")
-  expect_equal(result$x, 42L)
+  expect_equal(result$x, 99L)
 })
 
 test_that("pin_read with version parameter works for versioned board", {
@@ -486,25 +469,25 @@ test_that("pin_read errors on empty name", {
 test_that("pin_read: read tryCatch error handler warns and tries next source", {
   # Test the tryCatch error handler: pin_exists returns TRUE for local,
   # but .read_from_board fails. We mock .read_from_board to throw once.
-  board <- new_fake_board(config = "drive_cache_local")
+  board <- new_fake_board(config = "drive_cache")
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
   )
 
-  # Write to local and cache with different data
+  # Write to local and drive with different data
   pins::pin_write(
     board$local_board,
     tibble::tibble(x = "local"),
     name = "err_test", type = "rds"
   )
   pins::pin_write(
-    board$cache_board,
-    tibble::tibble(x = "cache"),
+    board$drive_board,
+    tibble::tibble(x = "drive"),
     name = "err_test", type = "rds"
   )
 
-  # Mock .read_from_board to fail on first call (local), succeed on second (cache)
+  # Mock .read_from_board to fail on first call (local), succeed on second (drive)
   call_count <- 0L
   testthat::local_mocked_bindings(
     .read_from_board = function(pins_board, name, version) {
@@ -519,5 +502,74 @@ test_that("pin_read: read tryCatch error handler warns and tries next source", {
     result <- gdpins_pin_read(board, "err_test"),
     "Failed to read pin"
   )
-  expect_equal(result$x, "cache")
+  expect_equal(result$x, "drive")
+})
+
+# ── 11. T3: drive-only / glob dedupe coverage ────────────────────────────────
+
+test_that("[T3] gdpins_pin_path() on drive_only returns an existing file path", {
+  board <- new_fake_board(config = "drive_only")
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    .package = "gdpins"
+  )
+  gdpins_pin_write(board, fx_plain_tbl(), name = "drive_only_path")
+
+  p <- gdpins_pin_path(board, "drive_only_path")
+  expect_type(p, "character")
+  expect_true(all(file.exists(p)))
+})
+
+test_that("[T3] glob listing on drive_cache dedupes a pin present on both sides", {
+  board <- new_fake_board(config = "drive_cache")
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    .package = "gdpins"
+  )
+  gdpins_pin_write(board, fx_plain_tbl(), name = "dup_pin")
+
+  out <- gdpins_pin_read(board, "*")
+  expect_equal(sum(out$name == "dup_pin"), 1L)
+})
+
+# ── 12. V3: verifier adversarial coverage ────────────────────────────────────
+
+test_that("[V3] write to drive_only board is blocked offline (no local fallback)", {
+  board <- new_fake_board(config = "drive_only")
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() FALSE,
+    .package = "gdpins"
+  )
+
+  expect_error(
+    gdpins_pin_write(board, fx_plain_tbl(), name = "blocked_drive_only"),
+    "no internet connection"
+  )
+})
+
+test_that("[V3] pin_remove on drive_only deletes the Drive-only pin, no error", {
+  board <- new_fake_board(config = "drive_only")
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    .package = "gdpins"
+  )
+  gdpins_pin_write(board, fx_plain_tbl(), name = "drive_only_remove")
+  expect_true(pins::pin_exists(board$drive_board, "drive_only_remove"))
+
+  expect_no_error(gdpins_pin_remove(board, "drive_only_remove"))
+
+  expect_false(pins::pin_exists(board$drive_board, "drive_only_remove"))
+})
+
+test_that("[V3] .pin_sources() orders/filters components correctly across all configs", {
+  dc <- new_fake_board(config = "drive_cache")
+  expect_identical(names(gdpins:::.pin_sources(dc)), c("local", "drive"))
+
+  do <- new_fake_board(config = "drive_only")
+  expect_identical(names(gdpins:::.pin_sources(do)), "drive")
+  expect_identical(gdpins:::.pin_sources(do)[["drive"]], do$drive_board)
+
+  lo <- new_fake_board(config = "local_only")
+  expect_identical(names(gdpins:::.pin_sources(lo)), "local")
+  expect_identical(gdpins:::.pin_sources(lo)[["local"]], lo$local_board)
 })

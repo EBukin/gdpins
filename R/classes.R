@@ -10,7 +10,7 @@ NULL
 
 # ── Legal configuration sets ─────────────────────────────────────────────────
 
-.BOARD_CONFIGS <- c("local_only", "drive_cache", "drive_cache_local")
+.BOARD_CONFIGS <- c("local_only", "drive_cache", "drive_only")
 .RAW_CONN_CONFIGS <- c("drive_local", "local_only")
 
 # ── gdpins_board ─────────────────────────────────────────────────────────────
@@ -21,23 +21,20 @@ NULL
 #' field names in exactly this order.
 #'
 #' Config → components:
-#' - `"local_only"`: `local_board` only; `drive_board`/`cache_board`/`adapter`
-#'   are `NULL`.
-#' - `"drive_cache"`: `drive_board` + `cache_board` (+ `adapter`);
-#'   `local_board` is `NULL`.
-#' - `"drive_cache_local"` (super): `drive_board` + `cache_board` +
-#'   `local_board` (+ `adapter`).
+#' - `"local_only"`: `local_board` only; `drive_board`/`adapter` are `NULL`.
+#' - `"drive_cache"`: `drive_board` + `local_board` (+ `adapter`); the one
+#'   local copy lives at `cache_dir`, which is also the `pins::board_gdrive()`
+#'   `cache=` path.
+#' - `"drive_only"`: `drive_board` only; `local_board`/`cache_dir` are `NULL`.
 #'
 #' @param config Character scalar. One of `"local_only"`, `"drive_cache"`,
-#'   `"drive_cache_local"`.
+#'   `"drive_only"`.
 #' @param name Character scalar. Board/layer label (e.g. `"data_raw"`).
 #' @param drive_board A `pins` board, or `NULL`.
-#' @param cache_board A `pins` `board_folder` over the cache dir, or `NULL`.
-#' @param local_board A `pins` `board_folder` for local-only / super config,
-#'   or `NULL`.
-#' @param cache_dir Character scalar path to the cache directory, or `NULL`.
-#' @param local_dir Character scalar path to the standalone local board dir,
-#'   or `NULL`.
+#' @param local_board A `pins` `board_folder` over `cache_dir` — the one local
+#'   copy — or `NULL` for `"drive_only"`.
+#' @param cache_dir Character scalar path of the local copy, or `NULL` for
+#'   `"drive_only"`.
 #' @param drive_path Character scalar Drive path relative to the adapter root,
 #'   or `NULL`.
 #' @param adapter A `gdpins_drive_adapter`, or `NULL` for `"local_only"`.
@@ -49,10 +46,8 @@ new_gdpins_board <- function(
     config,
     name,
     drive_board  = NULL,
-    cache_board  = NULL,
     local_board  = NULL,
     cache_dir    = NULL,
-    local_dir    = NULL,
     drive_path   = NULL,
     adapter      = NULL,
     versioned    = TRUE
@@ -75,10 +70,8 @@ new_gdpins_board <- function(
       config      = config,
       name        = name,
       drive_board = drive_board,
-      cache_board = cache_board,
       local_board = local_board,
       cache_dir   = cache_dir,
-      local_dir   = local_dir,
       drive_path  = drive_path,
       adapter     = adapter,
       versioned   = versioned

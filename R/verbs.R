@@ -1,8 +1,8 @@
 #' Read/write verbs for gdpins boards
 #'
 #' Core verbs for writing R objects to a board and reading them back. Writes
-#' fan out to all non-NULL board components (Drive, cache, local). Reads are
-#' local-first: local → cache → Drive.
+#' fan out to all non-NULL board components (Drive, local). Reads are
+#' local-first: local → Drive.
 #'
 #' @name verbs
 NULL
@@ -54,7 +54,7 @@ NULL
 #' Write a pin to a gdpins board
 #'
 #' Serialises `x` and writes it to every non-NULL component of `board`
-#' (Drive board, cache board, local board). Format auto-detection calls
+#' (Drive board, local board). Format auto-detection calls
 #' [gdpins_detect_format()] unless `format` is supplied explicitly.
 #'
 #' If `x` is an `sf` object, it is encoded with [gdpins_sf_to_parquet()]
@@ -91,7 +91,6 @@ NULL
 #' board <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )
@@ -147,7 +146,6 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
   # Fan-out write to every non-NULL component
   boards_to_write <- list(
     drive = board$drive_board,
-    cache = board$cache_board,
     local = board$local_board
   )
 
@@ -181,7 +179,6 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
 .pin_sources <- function(board) {
   srcs <- list(
     local = board$local_board,
-    cache = board$cache_board,
     drive = board$drive_board
   )
   srcs[!vapply(srcs, is.null, logical(1L))]
@@ -277,8 +274,8 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
 #' the object inside them. Use it to hand a pin to a reader gdpins does not
 #' know about, or to inspect the stored bytes.
 #'
-#' Resolution mirrors [gdpins_pin_read()] exactly — local board, then cache
-#' board, then Drive — and the pin is materialised (downloaded into the pins
+#' Resolution mirrors [gdpins_pin_read()] exactly — local board, then
+#' Drive — and the pin is materialised (downloaded into the pins
 #' cache) when Drive holds the only copy, just as [gdpins_raw_path()] downloads
 #' on demand.
 #'
@@ -343,8 +340,8 @@ gdpins_pin_path <- function(board, name, version = NULL) {
 
 #' Read a pin from a gdpins board
 #'
-#' Reads from the local-first source: local board if present, else cache board,
-#' else Drive board. Hits the network only if the pin is absent locally.
+#' Reads from the local-first source: local board if present, else Drive
+#' board. Hits the network only if the pin is absent locally.
 #'
 #' If the stored object contains `__<epsg>__`-suffixed geometry columns (WKT
 #' encoding), the geometry is automatically restored via [gdpins_parquet_to_sf()].
@@ -380,7 +377,6 @@ gdpins_pin_path <- function(board, name, version = NULL) {
 #' board <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )
@@ -415,10 +411,9 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
     ))
   }
 
-  # Local-first read order: local → cache → drive
+  # Local-first read order: local → drive
   read_sources <- list(
     local = board$local_board,
-    cache = board$cache_board,
     drive = board$drive_board
   )
 
@@ -503,7 +498,7 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
 
 #' Remove a pin from a gdpins board
 #'
-#' Deletes `name` from every non-NULL board component (Drive, cache, local).
+#' Deletes `name` from every non-NULL board component (Drive, local).
 #' Missing pins are ignored (idempotent no-op).
 #'
 #' @param board A `gdpins_board` object.
@@ -536,7 +531,6 @@ gdpins_pin_remove <- function(board, name) {
 
   boards_to_remove <- list(
     drive = board$drive_board,
-    cache = board$cache_board,
     local = board$local_board
   )
 

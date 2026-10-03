@@ -22,10 +22,17 @@ gdpins_init_board(
 \item{drive_path}{Character scalar. Drive path for the board (relative to
 the adapter root), or \code{NULL} for \code{"local_only"}.}
 
-\item{cache_dir}{Character scalar. Local cache directory path, or \code{NULL}.}
+\item{cache_dir}{Character scalar, \code{TRUE}, \code{FALSE}, or \code{NULL} (default).
+Path of the board's one local copy. \code{NULL}/\code{TRUE} use the default path
+under \code{getOption("gdpins.cache_dir")}; \code{FALSE} means no local copy
+(\code{"drive_only"}); a path uses that directory. For boards without
+\code{drive_path} (\code{"local_only"}), \code{cache_dir} must be a non-empty character
+path — the local board's directory; \code{NULL}/\code{TRUE}/\code{FALSE} error ("Supply
+\code{drive_path}, or \code{cache_dir} as a path for a local-only board.").}
 
-\item{local_dir}{Character scalar. Standalone local board directory path, or
-\code{NULL}.}
+\item{local_dir}{Character scalar. Deprecated as of 0.0.1.9025; superseded
+by \code{cache_dir}. If supplied while \code{cache_dir} is \code{NULL}, it is used as
+\code{cache_dir}; otherwise it is ignored (with a deprecation warning).}
 
 \item{versioned}{Logical. Whether the board stores pin versions. Default
 \code{TRUE}.}
@@ -54,11 +61,11 @@ combination of arguments supplied:
 }
 \details{
 \itemize{
-\item \strong{\code{"local_only"}} — \code{local_dir} provided, no \code{drive_path}/\code{adapter}.
-\item \strong{\code{"drive_cache"}} — \code{drive_path} + \code{adapter} + \code{cache_dir}, no
-\code{local_dir}.
-\item \strong{\code{"drive_cache_local"}} — all three: \code{drive_path}, \code{cache_dir}, and
-\code{local_dir}.
+\item \strong{\code{"local_only"}} — no \code{drive_path}; \code{cache_dir} is the local board path.
+\item \strong{\code{"drive_cache"}} — \code{drive_path} + \code{adapter}; one local copy at
+\code{cache_dir} (default \code{NULL}/\code{TRUE}: \verb{getOption("gdpins.cache_dir")/<root>/<drive_path>}).
+\item \strong{\code{"drive_only"}} — \code{drive_path} + \code{adapter} + \code{cache_dir = FALSE}; no
+local copy, Drive downloads go to a session temp dir.
 }
 
 The board checks for sync discrepancies between Drive and local (governed by
@@ -86,10 +93,11 @@ board
 # --- Real adapter (requires Google Drive auth) ---
 \dontrun{
 adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+# cache_dir omitted: local copy defaults to
+# getOption("gdpins.cache_dir")/<root>/<drive_path>
 board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )
@@ -98,7 +106,6 @@ board <- gdpins_init_board(
 board2 <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )

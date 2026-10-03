@@ -19,7 +19,7 @@ Character vector of version labels to remove (may be empty).
 \description{
 \code{pins::pin_versions()} returns rows sorted ascending by \code{created} (oldest
 first, newest last). We keep the last \code{keep} rows and remove the rest.
-Each sub-board (drive, cache, local) may have slightly different timestamp
+Each sub-board (drive, local) may have slightly different timestamp
 prefixes in version labels even for the same logical version, so each board
 must compute its own removal list independently.
 }

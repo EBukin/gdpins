@@ -8,10 +8,9 @@ NULL
 
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
-# Resolve the local-first read source: local_board > cache_board > drive_board
+# Resolve the local-first read source: local_board > drive_board
 .read_source <- function(board) {
   if (!is.null(board$local_board)) return(board$local_board)
-  if (!is.null(board$cache_board)) return(board$cache_board)
   board$drive_board
 }
 
@@ -61,7 +60,7 @@ print.gdpins_pin_listing <- function(x, ...) {
 #'
 #' Returns a programmatic tibble with one row per pin. Compact output fits
 #' ≤80 columns. Reads from the board's local-first component
-#' (`local_board` > `cache_board` > `drive_board`).
+#' (`local_board` if present, else `drive_board`).
 #'
 #' @param board A `gdpins_board` object.
 #'

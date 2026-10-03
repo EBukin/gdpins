@@ -175,7 +175,6 @@ board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "project/data-raw",
   cache_dir  = tempfile("cache_"),
-  local_dir  = tempfile("local_"),
   adapter    = adapter,
   create     = TRUE
 )
@@ -188,7 +187,12 @@ gdpins_pin_write(board_offline, mtcars, "cars")
 gdpins_pin_read(board_offline, "cars")
 ```
 
-Under the hood, `gdpins_go_offline()` reuses whichever local storage the board already had — the standalone `local_dir`/`local_board` for a `"drive_cache_local"` board, or the `cache_dir`/`cache_board` for a `"drive_cache"` board with no standalone local directory (mirroring the automatic offline fallback). Nothing is copied or deleted; the returned object just stops touching Drive. The original Drive configuration travels with the returned object, so `gdpins_go_online()` can restore it later:
+Under the hood, `gdpins_go_offline()` reuses the board's one local copy —
+`local_board`/`cache_dir` — the same directory Drive reads/writes already
+fell back to when offline (mirroring the automatic offline fallback). Nothing
+is copied or deleted; the returned object just stops touching Drive. The
+original Drive configuration travels with the returned object, so
+`gdpins_go_online()` can restore it later:
 
 ```{r online-mode, eval=FALSE}
 # Later, once Drive is reachable again:
@@ -196,7 +200,7 @@ board_online <- gdpins_go_online(
   board_offline,
   on_discrepancy = "sync_to_drive"   # push what changed while offline
 )
-board_online$config   # back to "drive_cache_local"
+board_online$config   # back to "drive_cache"
 ```
 
 `gdpins_go_online()` requires `gdpins_is_online()` to be `TRUE` and errors if `x` was never produced by `gdpins_go_offline()` — it restores a *specific* prior connection rather than guessing at one. `on_discrepancy` takes the same values as `gdpins_init_board()`/`gdpins_raw_connect()` (`"prompt"`, `"warn"`, `"sync_from_drive"`, `"sync_to_drive"`, `"ignore"`), so you control exactly how offline changes get reconciled with Drive. If your Drive credentials expired while offline, pass a freshly authenticated adapter: `gdpins_go_online(board_offline, adapter = gdpins_real_drive("folder-id"))`.

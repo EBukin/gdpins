@@ -8,19 +8,22 @@
 #' and a `gdpins_fake_drive()` adapter. No network. Fresh tempdirs each call.
 #'
 #' All three configurations are supported:
-#' - `"drive_cache"`: fake drive root + `board_folder` over `<fake_root>/<drive_path>` + cache tempdir.
-#' - `"local_only"`: plain `board_folder` over a fresh tempdir.
-#' - `"drive_cache_local"` (super): drive + cache + local, all fresh tempdirs.
+#' - `"drive_cache"`: fake drive root + `board_folder` over `<fake_root>/<drive_path>`,
+#'   plus a `local_board` (the one local copy) over a fresh `cache_dir` tempdir.
+#' - `"local_only"`: plain `board_folder` over a fresh tempdir (`local_board`,
+#'   `cache_dir` both point at it); no drive.
+#' - `"drive_only"`: fake drive root + drive board only; no local copy
+#'   (`local_board` and `cache_dir` are `NULL`).
 #'
 #' @param config Character scalar. One of `c("drive_cache", "local_only",
-#'   "drive_cache_local")`. Default `"drive_cache"`.
+#'   "drive_only")`. Default `"drive_cache"`.
 #' @param versioned Logical. Whether the board is versioned. Default `TRUE`.
 #' @param name Character scalar. Board label. Default `"test"`.
 #'
 #' @return A `gdpins_board` object.
 #' @keywords internal
 new_fake_board <- function(
-    config    = c("drive_cache", "local_only", "drive_cache_local"),
+    config    = c("drive_cache", "local_only", "drive_only"),
     versioned = TRUE,
     name      = "test"
 ) {
@@ -28,14 +31,14 @@ new_fake_board <- function(
   drive_path <- paste0("gdpins-fake/", name)
 
   if (config == "local_only") {
-    local_dir <- tempfile("gdpins_local_")
-    fs::dir_create(local_dir)
-    local_board <- pins::board_folder(local_dir, versioned = versioned)
+    cache_dir <- tempfile("gdpins_local_")
+    fs::dir_create(cache_dir)
+    local_board <- pins::board_folder(cache_dir, versioned = versioned)
     return(new_gdpins_board(
       config      = "local_only",
       name        = name,
       local_board = local_board,
-      local_dir   = local_dir,
+      cache_dir   = cache_dir,
       versioned   = versioned
     ))
   }
@@ -50,37 +53,30 @@ new_fake_board <- function(
   fs::dir_create(drive_board_dir)
   drive_board <- pins::board_folder(drive_board_dir, versioned = versioned)
 
-  # Cache board: separate tempdir
-  cache_dir <- tempfile("gdpins_cache_")
-  fs::dir_create(cache_dir)
-  cache_board <- pins::board_folder(cache_dir, versioned = versioned)
-
-  if (config == "drive_cache") {
+  if (config == "drive_only") {
     return(new_gdpins_board(
-      config      = "drive_cache",
+      config      = "drive_only",
       name        = name,
       drive_board = drive_board,
-      cache_board = cache_board,
-      cache_dir   = cache_dir,
+      local_board = NULL,
+      cache_dir   = NULL,
       drive_path  = drive_path,
       adapter     = adapter,
       versioned   = versioned
     ))
   }
 
-  # drive_cache_local (super): also has a standalone local board
-  local_dir <- tempfile("gdpins_local_")
-  fs::dir_create(local_dir)
-  local_board <- pins::board_folder(local_dir, versioned = versioned)
+  # drive_cache: drive board + the one local copy, over a fresh tempdir
+  cache_dir <- tempfile("gdpins_cache_")
+  fs::dir_create(cache_dir)
+  local_board <- pins::board_folder(cache_dir, versioned = versioned)
 
   new_gdpins_board(
-    config      = "drive_cache_local",
+    config      = "drive_cache",
     name        = name,
     drive_board = drive_board,
-    cache_board = cache_board,
     local_board = local_board,
     cache_dir   = cache_dir,
-    local_dir   = local_dir,
     drive_path  = drive_path,
     adapter     = adapter,
     versioned   = versioned

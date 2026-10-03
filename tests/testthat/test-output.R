@@ -99,7 +99,7 @@ test_that("publish: Drive is empty before publish is called (local-first)", {
   board   <- new_fake_board("drive_cache")
   adapter <- board$adapter
 
-  src_board <- board$cache_board
+  src_board <- board$local_board
   pins::pin_write(src_board, fx_output_table(), "almaty_summary", type = "rds")
 
   # Drive destination should NOT exist before publish
@@ -112,7 +112,7 @@ test_that("publish: tables mirror to fake Drive after publish", {
   board   <- new_fake_board("drive_cache")
   adapter <- board$adapter
 
-  src_board <- board$cache_board
+  src_board <- board$local_board
   pins::pin_write(src_board, fx_output_table(), "almaty_summary", type = "rds")
 
   gdpins_publish_output(
@@ -150,7 +150,7 @@ test_that("publish: dry_run changes nothing on Drive", {
   adapter  <- board$adapter
   figs_dir <- withr::local_tempdir()
 
-  src_board <- board$cache_board
+  src_board <- board$local_board
   pins::pin_write(src_board, fx_output_table(), "summary", type = "rds")
   gdpins_save_figure(fx_ggplot(), "fig_a", figs_dir, dpi = 72)
 
@@ -175,7 +175,7 @@ test_that("publish: dry_run reports table and figure counts", {
   adapter  <- board$adapter
   figs_dir <- withr::local_tempdir()
 
-  src_board <- board$cache_board
+  src_board <- board$local_board
   pins::pin_write(src_board, fx_output_table(), "kaz_summary", type = "rds")
   gdpins_save_figure(fx_ggplot(), "fig_kaz", figs_dir, dpi = 72)
 
@@ -217,7 +217,7 @@ test_that("publish: no adapter → cli_abort", {
 test_that("publish: adapter taken from tables_board when not supplied", {
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
   board     <- new_fake_board("drive_cache")
-  src_board <- board$cache_board
+  src_board <- board$local_board
   pins::pin_write(src_board, fx_output_table(), "tbl_a", type = "rds")
 
   gdpins_publish_output(tables_board = board)
@@ -225,10 +225,10 @@ test_that("publish: adapter taken from tables_board when not supplied", {
   expect_true(gd_exists(board$adapter, "output-tables/tbl_a.rds"))
 })
 
-test_that("publish: local-first — local_board used over cache_board", {
+test_that("publish: local-first — local_board used for drive_cache", {
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
-  board <- new_fake_board("drive_cache_local")
-  # Write ONLY to local_board (not cache_board)
+  board <- new_fake_board("drive_cache")
+  # Write ONLY to local_board — publish must source from it, not Drive
   pins::pin_write(board$local_board, fx_output_table(), "local_only_pin", type = "rds")
 
   gdpins_publish_output(tables_board = board)
@@ -249,7 +249,7 @@ test_that("publish: figures_dir NULL publishes nothing to figures drive folder",
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
   board     <- new_fake_board("drive_cache")
   adapter   <- board$adapter
-  src_board <- board$cache_board
+  src_board <- board$local_board
   pins::pin_write(src_board, fx_output_table(), "tbl_x", type = "rds")
 
   gdpins_publish_output(
@@ -291,28 +291,27 @@ test_that("publish: returns invisibly NULL", {
 # ── .resolve_read_board ───────────────────────────────────────────────────────
 
 test_that(".resolve_read_board: local_board takes priority", {
-  board  <- new_fake_board("drive_cache_local")
+  board  <- new_fake_board("drive_cache")
   result <- gdpins:::.resolve_read_board(board)
   expect_identical(result, board$local_board)
 })
 
-test_that(".resolve_read_board: cache_board when no local_board", {
-  board  <- new_fake_board("drive_cache")
+test_that("[T3] .resolve_read_board: drive_board when local_board is NULL (drive_only)", {
+  board  <- new_fake_board("drive_only")
   result <- gdpins:::.resolve_read_board(board)
-  expect_identical(result, board$cache_board)
+  expect_identical(result, board$drive_board)
 })
 
-test_that(".resolve_read_board: drive_board as last resort", {
+test_that(".resolve_read_board: drive_board as last resort (manually constructed board)", {
   fake_root   <- withr::local_tempdir()
   adapter     <- gdpins_fake_drive(root = fake_root)
   drive_dir   <- file.path(fake_root, "only_drive")
   fs::dir_create(drive_dir)
   drive_board <- pins::board_folder(drive_dir)
   board <- new_gdpins_board(
-    config      = "drive_cache",
+    config      = "drive_only",
     name        = "test_drive_only",
     drive_board = drive_board,
-    cache_board = NULL,
     adapter     = adapter,
     versioned   = TRUE
   )

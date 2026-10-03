@@ -1,9 +1,9 @@
 #' Version pruning with delete guards
 #'
 #' Functions for pruning old pin versions from boards. All Drive removals use
-#' `gd_trash()` (recoverable; never hard-deletes). Cache removals delete local
-#' directory trees. Raw files are **never** auto-deleted by any function --
-#' removal is manual outside R.
+#' `gd_trash()` (recoverable; never hard-deletes). Local-copy removals delete
+#' local directory trees. Raw files are **never** auto-deleted by any function
+#' -- removal is manual outside R.
 #'
 #' @name prune
 NULL
@@ -12,9 +12,9 @@ NULL
 
 #' Resolve the authoritative sub-board for a given config
 #'
-#' For `drive_cache` / `drive_cache_local`: Drive board is authoritative for
-#' reporting the removed version labels. For `local_only`: local board is the
-#' only board.
+#' For Drive boards (`drive_cache`, `drive_only`): Drive board is authoritative
+#' for reporting the removed version labels. For `local_only`: the local copy
+#' is the only board.
 #'
 #' @param board A `gdpins_board` object.
 #' @return A `pins` board object.
@@ -27,7 +27,7 @@ NULL
 #'
 #' `pins::pin_versions()` returns rows sorted ascending by `created` (oldest
 #' first, newest last). We keep the last `keep` rows and remove the rest.
-#' Each sub-board (drive, cache, local) may have slightly different timestamp
+#' Each sub-board (drive, local) may have slightly different timestamp
 #' prefixes in version labels even for the same logical version, so each board
 #' must compute its own removal list independently.
 #'
@@ -58,7 +58,7 @@ NULL
   gd_trash(adapter, rel_path)
 }
 
-#' Remove one version directory from a local board (cache or local_only)
+#' Remove one version directory from a local board
 #'
 #' Directly unlinks the version subdirectory under `board_path/<name>/<version>`.
 #'
@@ -127,10 +127,10 @@ NULL
 
 #' Prune old versions of a single pin
 #'
-#' Removes old versions of one pin from Drive **and** cache (or local board),
-#' keeping the `keep` most recent. Drive versions are always **trashed**
-#' (recoverable via `gd_trash()`), never hard-deleted. Cache versions are
-#' deleted from the local filesystem.
+#' Removes old versions of one pin from Drive **and** the local copy (whichever
+#' are present on `board`), keeping the `keep` most recent. Drive versions are
+#' always **trashed** (recoverable via `gd_trash()`), never hard-deleted.
+#' Local-copy versions are deleted from the local filesystem.
 #'
 #' Defaults to `dry_run = TRUE` for safety: the plan is shown but nothing is
 #' removed.
@@ -225,29 +225,16 @@ gdpins_prune_pin_versions <- function(
   # Each sub-board independently determines which of its versions are "old"
   # (i.e., all but the newest `keep`). This is necessary because pins generates
   # version labels from timestamp + content hash, and the timestamp may differ
-  # by a second between drive_board and cache_board writes.
-  config <- board$config
-
-  if (config %in% c("drive_cache", "drive_cache_local")) {
+  # by a second between drive_board and local_board writes.
+  if (!is.null(board$drive_board)) {
     # Trash old versions from Drive (recoverable -- NEVER hard-delete)
     drive_old <- .versions_to_remove(board$drive_board, name, keep)
     for (v in drive_old) {
       .trash_drive_version(board$adapter, board$drive_path, name, v)
     }
-    # Remove old versions from cache (local filesystem)
-    cache_old <- .versions_to_remove(board$cache_board, name, keep)
-    for (v in cache_old) {
-      .remove_local_version(board$cache_board$path, name, v)
-    }
   }
-  if (config == "drive_cache_local") {
-    # Also remove from standalone local board
-    local_old <- .versions_to_remove(board$local_board, name, keep)
-    for (v in local_old) {
-      .remove_local_version(board$local_board$path, name, v)
-    }
-  }
-  if (config == "local_only") {
+  if (!is.null(board$local_board)) {
+    # Remove old versions from the local copy (local filesystem)
     local_old <- .versions_to_remove(board$local_board, name, keep)
     for (v in local_old) {
       .remove_local_version(board$local_board$path, name, v)

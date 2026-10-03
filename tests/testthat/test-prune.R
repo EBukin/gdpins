@@ -1,20 +1,17 @@
 # test-prune.R — TDD tests for R/prune.R (WS6)
 # Uses new_fake_board(versioned=TRUE); seeds versions directly via
-# repeated pins::pin_write() calls on drive_board and cache_board.
+# repeated pins::pin_write() calls on drive_board and local_board.
 # No network. No dependency on WS3 verbs.
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-# Seed n versions of `name` into both drive_board and cache_board of `board`.
+# Seed n versions of `name` into whichever of drive_board / local_board exist.
 seed_versions <- function(board, name, n) {
   for (i in seq_len(n)) {
     if (!is.null(board$drive_board)) {
       pins::pin_write(board$drive_board, data.frame(v = i), name)
     }
-    if (!is.null(board$cache_board)) {
-      pins::pin_write(board$cache_board, data.frame(v = i), name)
-    }
-    if (!is.null(board$local_board) && is.null(board$drive_board)) {
+    if (!is.null(board$local_board)) {
       pins::pin_write(board$local_board, data.frame(v = i), name)
     }
   }
@@ -40,7 +37,7 @@ test_that("dry_run shows plan and changes nothing", {
 
   # Nothing was actually removed — still 3 on both boards
   expect_equal(count_versions(board$drive_board, "mypin"), 3L)
-  expect_equal(count_versions(board$cache_board, "mypin"), 3L)
+  expect_equal(count_versions(board$local_board, "mypin"), 3L)
 })
 
 test_that("dry_run=TRUE is the default", {
@@ -51,7 +48,7 @@ test_that("dry_run=TRUE is the default", {
   gdpins_prune_pin_versions(board, "mypin", keep = 1)
 
   expect_equal(count_versions(board$drive_board, "mypin"), 2L)
-  expect_equal(count_versions(board$cache_board, "mypin"), 2L)
+  expect_equal(count_versions(board$local_board, "mypin"), 2L)
 })
 
 test_that("dry_run=FALSE with nothing to prune returns empty character vector", {
@@ -78,7 +75,7 @@ test_that("removes old versions from Drive and cache", {
   expect_length(result, 2L)
   # Drive and cache each now have 2 versions
   expect_equal(count_versions(board$drive_board, "mypin"), 2L)
-  expect_equal(count_versions(board$cache_board, "mypin"), 2L)
+  expect_equal(count_versions(board$local_board, "mypin"), 2L)
 })
 
 test_that("returns the removed version labels", {
@@ -176,7 +173,7 @@ test_that("removes old versions from cache dir", {
   gdpins_prune_pin_versions(board, "mypin", keep = 1, dry_run = FALSE)
 
   # Cache should now have only 1 version
-  expect_equal(count_versions(board$cache_board, "mypin"), 1L)
+  expect_equal(count_versions(board$local_board, "mypin"), 1L)
 })
 
 # ── threshold guard ───────────────────────────────────────────────────────────
@@ -236,7 +233,7 @@ test_that("threshold abort leaves Drive and cache unchanged", {
 
   # Both boards still untouched
   expect_equal(count_versions(board$drive_board, "mypin"), 15L)
-  expect_equal(count_versions(board$cache_board, "mypin"), 15L)
+  expect_equal(count_versions(board$local_board, "mypin"), 15L)
 })
 
 # ── dry_run + threshold interaction ──────────────────────────────────────────
@@ -274,8 +271,8 @@ test_that("gdpins_prune_board_versions prunes all pins in the board", {
 
   expect_equal(count_versions(board$drive_board, "pin_a"), 1L)
   expect_equal(count_versions(board$drive_board, "pin_b"), 1L)
-  expect_equal(count_versions(board$cache_board, "pin_a"), 1L)
-  expect_equal(count_versions(board$cache_board, "pin_b"), 1L)
+  expect_equal(count_versions(board$local_board, "pin_a"), 1L)
+  expect_equal(count_versions(board$local_board, "pin_b"), 1L)
 })
 
 test_that("gdpins_prune_board_versions dry_run shows plan and changes nothing", {
@@ -414,37 +411,157 @@ test_that("gdpins_prune_board_versions errors when keep < 1", {
   )
 })
 
-# ── drive_cache_local config ──────────────────────────────────────────────────
+# ── drive_only config ──────────────────────────────────────────────────────────
 
-test_that("gdpins_prune_pin_versions removes from all three boards in drive_cache_local", {
-  board <- new_fake_board(config = "drive_cache_local", versioned = TRUE)
-  # Seed into drive, cache, and local
-  for (i in 1:3) {
-    pins::pin_write(board$drive_board, data.frame(v = i), "mypin")
-    pins::pin_write(board$cache_board, data.frame(v = i), "mypin")
-    pins::pin_write(board$local_board, data.frame(v = i), "mypin")
-  }
+test_that("gdpins_prune_pin_versions on drive_only trashes Drive versions, no local board", {
+  board <- new_fake_board(config = "drive_only", versioned = TRUE)
+  expect_null(board$local_board)
+  seed_versions(board, "mypin", 3)
 
-  gdpins_prune_pin_versions(board, "mypin", keep = 1, dry_run = FALSE)
+  result <- gdpins_prune_pin_versions(board, "mypin", keep = 1, dry_run = FALSE)
 
+  expect_length(result, 2L)
   expect_equal(count_versions(board$drive_board, "mypin"), 1L)
-  expect_equal(count_versions(board$cache_board,  "mypin"), 1L)
-  expect_equal(count_versions(board$local_board,  "mypin"), 1L)
-})
-
-test_that("gdpins_prune_pin_versions drive_cache_local trashes from Drive", {
-  board <- new_fake_board(config = "drive_cache_local", versioned = TRUE)
-  for (i in 1:3) {
-    pins::pin_write(board$drive_board, data.frame(v = i), "mypin")
-    pins::pin_write(board$cache_board, data.frame(v = i), "mypin")
-    pins::pin_write(board$local_board, data.frame(v = i), "mypin")
-  }
-
-  gdpins_prune_pin_versions(board, "mypin", keep = 1, dry_run = FALSE)
 
   # Two old versions must appear in the adapter's trash store
   trash_keys <- names(board$adapter$state$trash)
   expect_true(length(trash_keys) >= 2L)
+})
+
+test_that("gdpins_prune_pin_versions on drive_only does not error with no local board", {
+  board <- new_fake_board(config = "drive_only", versioned = TRUE)
+  seed_versions(board, "mypin", 2)
+
+  expect_no_error(
+    gdpins_prune_pin_versions(board, "mypin", keep = 1, dry_run = FALSE)
+  )
+})
+
+test_that("gdpins_prune_pin_versions threshold guard enforced on drive_only", {
+  board <- new_fake_board(config = "drive_only", versioned = TRUE)
+  seed_versions(board, "mypin", 15)  # 14 removals > threshold=10
+
+  expect_error(
+    gdpins_prune_pin_versions(
+      board, "mypin", keep = 1, dry_run = FALSE,
+      threshold = 10, force = FALSE
+    ),
+    regexp = "force"
+  )
+
+  expect_equal(count_versions(board$drive_board, "mypin"), 15L)
+})
+
+test_that("gdpins_prune_pin_versions force=TRUE bypasses threshold on drive_only", {
+  board <- new_fake_board(config = "drive_only", versioned = TRUE)
+  seed_versions(board, "mypin", 15)
+
+  result <- gdpins_prune_pin_versions(
+    board, "mypin", keep = 1, dry_run = FALSE,
+    threshold = 10, force = TRUE
+  )
+
+  expect_length(result, 14L)
+  expect_equal(count_versions(board$drive_board, "mypin"), 1L)
+})
+
+# ── version-label skew between Drive and local ──────────────────────────────────
+
+test_that("prune keeps newest `keep` per board when Drive/local version labels differ", {
+  board <- new_fake_board(config = "drive_cache", versioned = TRUE)
+
+  # Write Drive then local with a timestamp gap so the same logical version
+  # gets different version labels on each board.
+  pins::pin_write(board$drive_board, data.frame(v = 1), "mypin")
+  Sys.sleep(1.1)
+  pins::pin_write(board$local_board, data.frame(v = 1), "mypin")
+  pins::pin_write(board$drive_board, data.frame(v = 2), "mypin")
+  pins::pin_write(board$local_board, data.frame(v = 2), "mypin")
+
+  drive_v_before <- pins::pin_versions(board$drive_board, "mypin")$version
+  local_v_before  <- pins::pin_versions(board$local_board,  "mypin")$version
+  expect_false(identical(sort(drive_v_before), sort(local_v_before)))
+
+  gdpins_prune_pin_versions(board, "mypin", keep = 1, dry_run = FALSE)
+
+  # Each board independently kept its own newest version label.
+  expect_equal(count_versions(board$drive_board, "mypin"), 1L)
+  expect_equal(count_versions(board$local_board,  "mypin"), 1L)
+  expect_equal(
+    pins::pin_versions(board$drive_board, "mypin")$version,
+    tail(sort(drive_v_before), 1L)
+  )
+  expect_equal(
+    pins::pin_versions(board$local_board, "mypin")$version,
+    tail(sort(local_v_before), 1L)
+  )
+})
+
+# ── [V6] verifier additions ───────────────────────────────────────────────────
+
+test_that("[V6] explicit drive_cache config removes old versions from BOTH Drive and local_board", {
+  board <- new_fake_board(config = "drive_cache", versioned = TRUE)
+  seed_versions(board, "mypin", 4)
+
+  result <- gdpins_prune_pin_versions(board, "mypin", keep = 2, dry_run = FALSE)
+
+  expect_length(result, 2L)
+  expect_equal(count_versions(board$drive_board, "mypin"), 2L)
+  expect_equal(count_versions(board$local_board, "mypin"), 2L)
+})
+
+test_that("[V6] gdpins_prune_board_versions works on drive_only board (no local_board)", {
+  board <- new_fake_board(config = "drive_only", versioned = TRUE)
+  expect_null(board$local_board)
+  for (i in 1:3) pins::pin_write(board$drive_board, data.frame(v = i), "p1")
+  for (i in 1:2) pins::pin_write(board$drive_board, data.frame(v = i), "p2")
+
+  result <- gdpins_prune_board_versions(board, keep = 1, dry_run = FALSE)
+
+  expect_named(result, c("p1", "p2"), ignore.order = TRUE)
+  expect_length(result[["p1"]], 2L)
+  expect_length(result[["p2"]], 1L)
+  expect_equal(count_versions(board$drive_board, "p1"), 1L)
+  expect_equal(count_versions(board$drive_board, "p2"), 1L)
+})
+
+test_that("[V6] keep given as a non-coercible string errors with the keep message", {
+  board <- new_fake_board(versioned = TRUE)
+  seed_versions(board, "mypin", 2)
+
+  expect_error(
+    suppressWarnings(
+      gdpins_prune_pin_versions(board, "mypin", keep = "abc", dry_run = FALSE)
+    ),
+    regexp = "keep"
+  )
+
+  # Nothing removed
+  expect_equal(count_versions(board$drive_board, "mypin"), 2L)
+  expect_equal(count_versions(board$local_board, "mypin"), 2L)
+})
+
+test_that("[V6] pruning a nonexistent pin name errors instead of silently no-op", {
+  board <- new_fake_board(versioned = TRUE)
+  seed_versions(board, "mypin", 2)
+
+  expect_error(
+    gdpins_prune_pin_versions(board, "doesnotexist", keep = 1, dry_run = FALSE)
+  )
+})
+
+test_that("[V6] a vector `name` input errors rather than silently pruning only one", {
+  board <- new_fake_board(versioned = TRUE)
+  seed_versions(board, "a", 2)
+  seed_versions(board, "b", 2)
+
+  expect_error(
+    gdpins_prune_pin_versions(board, c("a", "b"), keep = 1, dry_run = FALSE)
+  )
+
+  # Neither pin was touched since the call errored before any removal
+  expect_equal(count_versions(board$drive_board, "a"), 2L)
+  expect_equal(count_versions(board$drive_board, "b"), 2L)
 })
 
 # ── empty board ───────────────────────────────────────────────────────────────
