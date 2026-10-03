@@ -23,7 +23,7 @@ Binding rules (from the plan, §1):
 - Parallelism: Phase 1 sequential (T1->V1->T2->V2). Phase 2 = T3,T4,T5,T6 in parallel,
   each with its own verifier; disjoint files; NO full-suite runs in Phase 2. Phase 3 =
   T7 and T8 in parallel. Then the Gate (§3). Launch parallel agents in ONE message.
-- R binary is "/c/Program Files/R/R-4.5.3/bin/x64/Rscript" (full path, quoted). Bare
+- R binary is "/c/Program Files/R/R-4.5.3/bin/x64/Rscript" (full path, quoted), always with --no-init-file (.Rprofile activates renv, which lacks pkgload). Bare
   Rscript is R 4.6.1 with an empty library. Never use the MCP R session.
 - Tests must never spawn background processes or file-lock helpers (antivirus). Mock seams.
 - test-live.R: edit by reading only, never run.

@@ -45,14 +45,15 @@ Companion: `tools/design-local-cache.md` (how it works today). Tracker section a
 
 ### Environment
 - R binary: `"/c/Program Files/R/R-4.5.3/bin/x64/Rscript"`. Bare `Rscript` is R 4.6.1 with an
-  empty library — never use it.
+  empty library — never use it. Always pass `--no-init-file`: `.Rprofile` activates renv, whose
+  library lacks `pkgload`/`testthat` (`there is no package called 'pkgload'`).
 - Test one file:
   ```
-  "/c/Program Files/R/R-4.5.3/bin/x64/Rscript" -e 'pkgload::load_all("."); testthat::test_file("tests/testthat/test-board.R")'
+  "/c/Program Files/R/R-4.5.3/bin/x64/Rscript" --no-init-file -e 'pkgload::load_all("."); testthat::test_file("tests/testthat/test-board.R")'
   ```
 - Full suite (gates only):
   ```
-  "/c/Program Files/R/R-4.5.3/bin/x64/Rscript" -e 'pkgload::load_all("."); testthat::test_dir("tests/testthat")'
+  "/c/Program Files/R/R-4.5.3/bin/x64/Rscript" --no-init-file -e 'pkgload::load_all("."); testthat::test_dir("tests/testthat")'
   ```
 - Never spawn background processes or file-lock helpers in tests (antivirus trips). Mock a seam.
 - `test-live.R` needs real Drive; skipped by default. Edit by reading only; never run.
