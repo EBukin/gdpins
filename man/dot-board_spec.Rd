@@ -29,7 +29,7 @@ under \code{getOption("gdpins.cache_dir")}; \code{FALSE} means no local copy
 path — the local board's directory; \code{NULL}/\code{TRUE}/\code{FALSE} error ("Supply
 \code{drive_path}, or \code{cache_dir} as a path for a local-only board.").}
 
-\item{local_dir}{Character scalar. Deprecated as of 0.0.1.9024; superseded
+\item{local_dir}{Character scalar. Deprecated as of 0.0.1.9025; superseded
 by \code{cache_dir}. If supplied while \code{cache_dir} is \code{NULL}, it is used as
 \code{cache_dir}; otherwise it is ignored (with a deprecation warning).}
 

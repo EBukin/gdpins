@@ -226,7 +226,7 @@ NULL
 #'   `drive_path` (`"local_only"`), `cache_dir` must be a non-empty character
 #'   path — the local board's directory; `NULL`/`TRUE`/`FALSE` error ("Supply
 #'   `drive_path`, or `cache_dir` as a path for a local-only board.").
-#' @param local_dir Character scalar. Deprecated as of 0.0.1.9024; superseded
+#' @param local_dir Character scalar. Deprecated as of 0.0.1.9025; superseded
 #'   by `cache_dir`. If supplied while `cache_dir` is `NULL`, it is used as
 #'   `cache_dir`; otherwise it is ignored (with a deprecation warning).
 #' @param versioned Logical. Whether the board stores pin versions. Default
@@ -351,7 +351,7 @@ gdpins_init_board <- function(
   # ── Validate on_discrepancy ──────────────────────────────────────────────────
   on_discrepancy <- .resolve_on_discrepancy(on_discrepancy)
 
-  # ── local_dir (deprecated 0.0.1.9024) → cache_dir ────────────────────────────
+  # ── local_dir (deprecated 0.0.1.9025) → cache_dir ────────────────────────────
   if (!is.null(local_dir)) {
     if (is.null(cache_dir)) {
       cache_dir <- local_dir
@@ -360,7 +360,7 @@ gdpins_init_board <- function(
       details <- "Both `local_dir` and `cache_dir` were supplied; `local_dir` is ignored."
     }
     lifecycle::deprecate_warn(
-      when    = "0.0.1.9024",
+      when    = "0.0.1.9025",
       what    = "gdpins_init_board(local_dir)",
       with    = "gdpins_init_board(cache_dir)",
       details = details
