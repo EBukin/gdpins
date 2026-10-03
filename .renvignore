@@ -1,0 +1,5 @@
+# renv uses this file instead of .gitignore for dependency discovery.
+# Dev scratch scripts: not package dependencies.
+/nanotest.R
+/test.R
+/docs/

@@ -14,6 +14,12 @@
 \item{version}{Character scalar or \code{NULL}.}
 }
 \description{
-Read from a single pins board
+Parquet pins are read through the configured parquet engine
+(\code{.gdpins_parquet_engine()}, default arrow) instead of \code{pins::pin_read()},
+which is hardwired to nanoparquet and can exhaust memory on large-string
+columns. This covers both native \code{"parquet"} pins (legacy, nanoparquet-
+authored) and the \code{"file"} pins gdpins now writes (an arrow-authored
+\code{.parquet} uploaded with \code{\link[pins:pin_download]{pins::pin_upload()}}). All other pin types keep the
+pins-native reader.
 }
 \keyword{internal}
