@@ -498,11 +498,12 @@ test_that("[V7] drive_cache: write, go_offline, read, offline write, go_online(s
     gdpins_go_online(offline, on_discrepancy = "sync_to_drive")
   )
   expect_equal(online$config, "drive_cache")
-  # pins type "parquet" round-trips as a plain data frame, not a tibble
-  # (see "multiple offline writes produce readable pins after sync" above) --
+  # Read via .read_from_board(): arrow-written parquet pins are pins type
+  # "file", which raw pins::pin_read() cannot read. Result may be a plain
+  # data frame rather than a tibble --
   # compare via tibble::as_tibble() rather than expect_equal() against v2.
   expect_equal(
-    tibble::as_tibble(pins::pin_read(online$drive_board, "shared_pin")),
+    tibble::as_tibble(.read_from_board(online$drive_board, "shared_pin", NULL)),
     tibble::as_tibble(v2)
   )
   expect_equal(nrow(pins::pin_versions(online$drive_board, "shared_pin")), 2L)
@@ -514,11 +515,11 @@ test_that("[V7] drive_cache: write, go_offline, read, offline write, go_online(s
   expect_equal(nrow(pins::pin_versions(online$drive_board, "shared_pin")), 1L)
   expect_equal(nrow(pins::pin_versions(online$local_board, "shared_pin")), 1L)
   expect_equal(
-    tibble::as_tibble(pins::pin_read(online$drive_board, "shared_pin")),
+    tibble::as_tibble(.read_from_board(online$drive_board, "shared_pin", NULL)),
     tibble::as_tibble(v2)
   )
   expect_equal(
-    tibble::as_tibble(pins::pin_read(online$local_board, "shared_pin")),
+    tibble::as_tibble(.read_from_board(online$local_board, "shared_pin", NULL)),
     tibble::as_tibble(v2)
   )
 })
