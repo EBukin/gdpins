@@ -17,5 +17,5 @@ Returns a zero-row tibble for an empty board.
 \description{
 Returns a programmatic tibble with one row per pin. Compact output fits
 ≤80 columns. Reads from the board's local-first component
-(\code{local_board} > \code{cache_board} > \code{drive_board}).
+(\code{local_board} if present, else \code{drive_board}).
 }

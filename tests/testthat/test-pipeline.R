@@ -57,12 +57,12 @@ new_fake_board_custom <- function(name, drive_path, cache_dir, adapter) {
   )
   fs::dir_create(drive_board_dir)
   drive_board <- pins::board_folder(drive_board_dir, versioned = TRUE)
-  cache_board <- pins::board_folder(cache_dir,       versioned = TRUE)
+  local_board <- pins::board_folder(cache_dir,       versioned = TRUE)
   new_gdpins_board(
     config      = "drive_cache",
     name        = name,
     drive_board = drive_board,
-    cache_board = cache_board,
+    local_board = local_board,
     cache_dir   = cache_dir,
     drive_path  = drive_path,
     adapter     = adapter,
@@ -103,9 +103,9 @@ test_that("plain tibble flows raw → data_raw → data_interm → data_clean", 
   suppressMessages(gdpins_pin_write(env$bd_clean, clean_data, concept))
 
   # Verify: concept name preserved across all layers
-  expect_true(pins::pin_exists(env$bd_raw$cache_board,   concept))
-  expect_true(pins::pin_exists(env$bd_interm$cache_board, concept))
-  expect_true(pins::pin_exists(env$bd_clean$cache_board,  concept))
+  expect_true(pins::pin_exists(env$bd_raw$local_board,   concept))
+  expect_true(pins::pin_exists(env$bd_interm$local_board, concept))
+  expect_true(pins::pin_exists(env$bd_clean$local_board,  concept))
 
   # Verify data integrity at the clean layer
   final <- gdpins_pin_read(env$bd_clean, concept)
@@ -125,9 +125,9 @@ test_that("plain tibble concept name is identical across all board layers", {
   suppressMessages(gdpins_pin_write(env$bd_interm, fx_plain_tbl(), concept))
   suppressMessages(gdpins_pin_write(env$bd_clean,  fx_plain_tbl(), concept))
 
-  raw_pins   <- pins::pin_list(env$bd_raw$cache_board)
-  interm_pins <- pins::pin_list(env$bd_interm$cache_board)
-  clean_pins  <- pins::pin_list(env$bd_clean$cache_board)
+  raw_pins   <- pins::pin_list(env$bd_raw$local_board)
+  interm_pins <- pins::pin_list(env$bd_interm$local_board)
+  clean_pins  <- pins::pin_list(env$bd_clean$local_board)
 
   expect_true(concept %in% raw_pins)
   expect_true(concept %in% interm_pins)
@@ -226,7 +226,7 @@ test_that("output table written to output board and published to Drive", {
   output <- fx_output_table()
 
   suppressMessages(gdpins_pin_write(env$bd_output, output, "summary_table"))
-  expect_true(pins::pin_exists(env$bd_output$cache_board, "summary_table"))
+  expect_true(pins::pin_exists(env$bd_output$local_board, "summary_table"))
 
   # Publish to Drive (using the adapter from output board)
   suppressMessages(
@@ -349,9 +349,9 @@ test_that("complete pipeline: raw → interm → clean → output → publish (t
   )
 
   # Assertions: concept name preserved across layers
-  expect_true(pins::pin_exists(env$bd_raw$cache_board,    concept))
-  expect_true(pins::pin_exists(env$bd_interm$cache_board, concept))
-  expect_true(pins::pin_exists(env$bd_clean$cache_board,  concept))
+  expect_true(pins::pin_exists(env$bd_raw$local_board,    concept))
+  expect_true(pins::pin_exists(env$bd_interm$local_board, concept))
+  expect_true(pins::pin_exists(env$bd_clean$local_board,  concept))
 
   # sf CRS preserved at data_clean
   final_sf <- gdpins_pin_read(env$bd_clean, concept)

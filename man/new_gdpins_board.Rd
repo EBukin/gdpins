@@ -8,10 +8,8 @@ new_gdpins_board(
   config,
   name,
   drive_board = NULL,
-  cache_board = NULL,
   local_board = NULL,
   cache_dir = NULL,
-  local_dir = NULL,
   drive_path = NULL,
   adapter = NULL,
   versioned = TRUE
@@ -19,21 +17,17 @@ new_gdpins_board(
 }
 \arguments{
 \item{config}{Character scalar. One of \code{"local_only"}, \code{"drive_cache"},
-\code{"drive_cache_local"}.}
+\code{"drive_only"}.}
 
 \item{name}{Character scalar. Board/layer label (e.g. \code{"data_raw"}).}
 
 \item{drive_board}{A \code{pins} board, or \code{NULL}.}
 
-\item{cache_board}{A \code{pins} \code{board_folder} over the cache dir, or \code{NULL}.}
+\item{local_board}{A \code{pins} \code{board_folder} over \code{cache_dir} — the one local
+copy — or \code{NULL} for \code{"drive_only"}.}
 
-\item{local_board}{A \code{pins} \code{board_folder} for local-only / super config,
-or \code{NULL}.}
-
-\item{cache_dir}{Character scalar path to the cache directory, or \code{NULL}.}
-
-\item{local_dir}{Character scalar path to the standalone local board dir,
-or \code{NULL}.}
+\item{cache_dir}{Character scalar path of the local copy, or \code{NULL} for
+\code{"drive_only"}.}
 
 \item{drive_path}{Character scalar Drive path relative to the adapter root,
 or \code{NULL}.}
@@ -52,12 +46,11 @@ field names in exactly this order.
 \details{
 Config → components:
 \itemize{
-\item \code{"local_only"}: \code{local_board} only; \code{drive_board}/\code{cache_board}/\code{adapter}
-are \code{NULL}.
-\item \code{"drive_cache"}: \code{drive_board} + \code{cache_board} (+ \code{adapter});
-\code{local_board} is \code{NULL}.
-\item \code{"drive_cache_local"} (super): \code{drive_board} + \code{cache_board} +
-\code{local_board} (+ \code{adapter}).
+\item \code{"local_only"}: \code{local_board} only; \code{drive_board}/\code{adapter} are \code{NULL}.
+\item \code{"drive_cache"}: \code{drive_board} + \code{local_board} (+ \code{adapter}); the one
+local copy lives at \code{cache_dir}, which is also the \code{pins::board_gdrive()}
+\verb{cache=} path.
+\item \code{"drive_only"}: \code{drive_board} only; \code{local_board}/\code{cache_dir} are \code{NULL}.
 }
 }
 \keyword{internal}

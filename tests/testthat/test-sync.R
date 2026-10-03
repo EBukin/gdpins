@@ -83,12 +83,13 @@ test_that("local_only raw_conn returns empty status tibble", {
 
 test_that("board status returns all offline state when not online", {
   b <- new_fake_board("drive_cache")
-  .write_pin(b$cache_board, data.frame(x = 1), "p1")
+  .write_pin(b$local_board, data.frame(x = 1), "p1")
+  .write_pin(b$local_board, data.frame(x = 2), "p2")
   local_mocked_bindings(gdpins_is_online = function() FALSE, .package = "gdpins")
   # cli_warn emits a condition — we just capture it
   st <- suppressWarnings(gdpins_board_status(b))
   expect_true(all(st$state == "offline"))
-  expect_equal(nrow(st), 1L)
+  expect_equal(nrow(st), 2L)
 })
 
 test_that("raw_conn status returns all offline state when not online", {
@@ -120,7 +121,7 @@ test_that("board status detects in_sync (same hash on both sides)", {
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
   # Write identical content to both
   .write_pin(b$drive_board, data.frame(x = 1), "p_sync")
-  .write_pin(b$cache_board, data.frame(x = 1), "p_sync")
+  .write_pin(b$local_board, data.frame(x = 1), "p_sync")
   st <- gdpins_board_status(b)
   expect_equal(st$state[st$name == "p_sync"], "in_sync")
 })
@@ -141,7 +142,7 @@ test_that("raw_conn status detects in_sync (same bytes on both sides)", {
 test_that("board status detects local_ahead (pin only in local/cache)", {
   b <- new_fake_board("drive_cache")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
-  .write_pin(b$cache_board, data.frame(x = 1), "p_local_only")
+  .write_pin(b$local_board, data.frame(x = 1), "p_local_only")
   st <- gdpins_board_status(b)
   expect_equal(st$state[st$name == "p_local_only"], "local_ahead")
 })
@@ -212,11 +213,11 @@ test_that("raw_conn status detects conflict (same mtime, different md5)", {
 test_that(".compare_board_pin returns correct structure", {
   b <- new_fake_board("drive_cache")
   .write_pin(b$drive_board, data.frame(x = 1), "p1")
-  .write_pin(b$cache_board, data.frame(x = 1), "p1")
+  .write_pin(b$local_board, data.frame(x = 1), "p1")
   result <- gdpins:::.compare_board_pin(
     pin_name    = "p1",
     drive_board = b$drive_board,
-    local_board = b$cache_board,
+    local_board = b$local_board,
     in_drive    = TRUE,
     in_local    = TRUE
   )
@@ -231,7 +232,7 @@ test_that(".compare_board_pin returns correct structure", {
 test_that("sync to_drive copies local_ahead pin to drive", {
   b <- new_fake_board("drive_cache")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
-  .write_pin(b$cache_board, data.frame(x = 42), "p_to_drive")
+  .write_pin(b$local_board, data.frame(x = 42), "p_to_drive")
   expect_false("p_to_drive" %in% pins::pin_list(b$drive_board))
   suppressMessages(gdpins_sync(b, direction = "to_drive"))
   expect_true("p_to_drive" %in% pins::pin_list(b$drive_board))
@@ -241,9 +242,9 @@ test_that("sync to_drive does not copy drive_ahead pin to local", {
   b <- new_fake_board("drive_cache")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
   .write_pin(b$drive_board, data.frame(x = 99), "p_drive_only")
-  expect_false("p_drive_only" %in% pins::pin_list(b$cache_board))
+  expect_false("p_drive_only" %in% pins::pin_list(b$local_board))
   suppressMessages(gdpins_sync(b, direction = "to_drive"))
-  expect_false("p_drive_only" %in% pins::pin_list(b$cache_board))
+  expect_false("p_drive_only" %in% pins::pin_list(b$local_board))
 })
 
 # ── Direction: from_drive ─────────────────────────────────────────────────────
@@ -252,17 +253,17 @@ test_that("sync from_drive copies drive_ahead pin to local", {
   b <- new_fake_board("drive_cache")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
   .write_pin(b$drive_board, data.frame(x = 77), "p_from_drive")
-  expect_false("p_from_drive" %in% pins::pin_list(b$cache_board))
+  expect_false("p_from_drive" %in% pins::pin_list(b$local_board))
   suppressMessages(gdpins_sync(b, direction = "from_drive"))
-  expect_true("p_from_drive" %in% pins::pin_list(b$cache_board))
-  obj <- pins::pin_read(b$cache_board, "p_from_drive")
+  expect_true("p_from_drive" %in% pins::pin_list(b$local_board))
+  obj <- pins::pin_read(b$local_board, "p_from_drive")
   expect_equal(obj$x, 77L)
 })
 
 test_that("sync from_drive does not push local_ahead to drive", {
   b <- new_fake_board("drive_cache")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
-  .write_pin(b$cache_board, data.frame(x = 55), "p_local_only")
+  .write_pin(b$local_board, data.frame(x = 55), "p_local_only")
   expect_false("p_local_only" %in% pins::pin_list(b$drive_board))
   suppressMessages(gdpins_sync(b, direction = "from_drive"))
   expect_false("p_local_only" %in% pins::pin_list(b$drive_board))
@@ -273,11 +274,11 @@ test_that("sync from_drive does not push local_ahead to drive", {
 test_that("sync auto routes local_ahead to drive and drive_ahead to local", {
   b <- new_fake_board("drive_cache")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
-  .write_pin(b$cache_board, data.frame(x = 1), "p_local")
+  .write_pin(b$local_board, data.frame(x = 1), "p_local")
   .write_pin(b$drive_board, data.frame(x = 2), "p_drive")
   suppressMessages(gdpins_sync(b, direction = "auto"))
   expect_true("p_local" %in% pins::pin_list(b$drive_board))
-  expect_true("p_drive" %in% pins::pin_list(b$cache_board))
+  expect_true("p_drive" %in% pins::pin_list(b$local_board))
 })
 
 # ── Versioned board conflict: both become versions ────────────────────────────
@@ -290,18 +291,18 @@ test_that("versioned board conflict: version count grows (no loss)", {
     .package = "gdpins"
   )
   .write_pin(b$drive_board, data.frame(x = 10), "p_vc")
-  .write_pin(b$cache_board, data.frame(x = 20), "p_vc")
+  .write_pin(b$local_board, data.frame(x = 20), "p_vc")
 
   drive_v_before <- nrow(pins::pin_versions(b$drive_board, "p_vc"))
-  cache_v_before <- nrow(pins::pin_versions(b$cache_board, "p_vc"))
+  cache_v_before <- nrow(pins::pin_versions(b$local_board, "p_vc"))
 
   suppressMessages(gdpins_sync(b, direction = "auto", on_conflict = "version"))
 
   drive_v_after <- nrow(pins::pin_versions(b$drive_board, "p_vc"))
-  cache_v_after <- nrow(pins::pin_versions(b$cache_board, "p_vc"))
+  cache_v_after <- nrow(pins::pin_versions(b$local_board, "p_vc"))
 
   expect_true("p_vc" %in% pins::pin_list(b$drive_board))
-  expect_true("p_vc" %in% pins::pin_list(b$cache_board))
+  expect_true("p_vc" %in% pins::pin_list(b$local_board))
   expect_gte(drive_v_after, drive_v_before)
   expect_gte(cache_v_after, cache_v_before)
 })
@@ -311,10 +312,10 @@ test_that("versioned board conflict: version count grows (no loss)", {
 test_that("unversioned board conflict with on_conflict=stop aborts + changes nothing", {
   b <- new_fake_board("drive_cache", versioned = FALSE)
   .write_pin(b$drive_board, data.frame(x = 111), "p_conflict_stop")
-  .write_pin(b$cache_board, data.frame(x = 222), "p_conflict_stop")
+  .write_pin(b$local_board, data.frame(x = 222), "p_conflict_stop")
 
   drv_obj_before <- pins::pin_read(b$drive_board, "p_conflict_stop")
-  loc_obj_before <- pins::pin_read(b$cache_board, "p_conflict_stop")
+  loc_obj_before <- pins::pin_read(b$local_board, "p_conflict_stop")
 
   local_mocked_bindings(
     gdpins_is_online    = function() TRUE,
@@ -328,7 +329,7 @@ test_that("unversioned board conflict with on_conflict=stop aborts + changes not
 
   # Assert nothing changed
   drv_obj_after <- pins::pin_read(b$drive_board, "p_conflict_stop")
-  loc_obj_after <- pins::pin_read(b$cache_board, "p_conflict_stop")
+  loc_obj_after <- pins::pin_read(b$local_board, "p_conflict_stop")
   expect_equal(drv_obj_after$x, drv_obj_before$x)
   expect_equal(loc_obj_after$x, loc_obj_before$x)
 })
@@ -336,7 +337,7 @@ test_that("unversioned board conflict with on_conflict=stop aborts + changes not
 test_that("unversioned board on_conflict=stop error message reports conflicting pins", {
   b <- new_fake_board("drive_cache", versioned = FALSE)
   .write_pin(b$drive_board, data.frame(x = 1), "cp")
-  .write_pin(b$cache_board, data.frame(x = 2), "cp")
+  .write_pin(b$local_board, data.frame(x = 2), "cp")
   local_mocked_bindings(
     gdpins_is_online    = function() TRUE,
     gdpins_board_status = function(x) .fake_board_status_conflict("cp"),
@@ -503,10 +504,16 @@ test_that("board new-computer: empty local + populated drive pulls all pins", {
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
   .write_pin(b$drive_board, data.frame(x = 1), "nc1")
   .write_pin(b$drive_board, data.frame(x = 2), "nc2")
-  expect_equal(length(pins::pin_list(b$cache_board)), 0L)
-  suppressMessages(gdpins_sync(b, direction = "from_drive"))
-  expect_true("nc1" %in% pins::pin_list(b$cache_board))
-  expect_true("nc2" %in% pins::pin_list(b$cache_board))
+  .write_pin(b$drive_board, data.frame(x = 3), "nc3")
+  expect_equal(length(pins::pin_list(b$local_board)), 0L)
+  msgs <- capture.output(
+    gdpins_sync(b, direction = "from_drive"),
+    type = "message"
+  )
+  expect_true(any(grepl("local copy is empty", msgs)))
+  expect_true("nc1" %in% pins::pin_list(b$local_board))
+  expect_true("nc2" %in% pins::pin_list(b$local_board))
+  expect_true("nc3" %in% pins::pin_list(b$local_board))
 })
 
 test_that("board new-computer: auto direction also pulls drive-only pins", {
@@ -517,7 +524,17 @@ test_that("board new-computer: auto direction also pulls drive-only pins", {
     suppressMessages(gdpins_sync(b, direction = "auto")),
     type = "message"
   )
-  expect_true("nc_auto" %in% pins::pin_list(b$cache_board))
+  expect_true("nc_auto" %in% pins::pin_list(b$local_board))
+})
+
+test_that("sync from_drive preserves a parquet pin's type", {
+  b <- new_fake_board("drive_cache")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+  suppressMessages(
+    pins::pin_write(b$drive_board, data.frame(x = 1:3), "pq_pin", type = "parquet")
+  )
+  suppressMessages(gdpins_sync(b, direction = "from_drive"))
+  expect_equal(pins::pin_meta(b$local_board, "pq_pin")$type, "parquet")
 })
 
 test_that("raw_conn new-computer: empty local + populated drive pulls files", {
@@ -583,22 +600,145 @@ test_that("gdpins_sync errors on unsupported class", {
   expect_error(suppressMessages(gdpins_sync(list())), class = "rlang_error")
 })
 
-# ── drive_cache_local (super) board ──────────────────────────────────────────
+# ── drive_only board (no local copy) ─────────────────────────────────────────
 
-test_that("drive_cache_local board status uses cache_board as local side", {
-  b <- new_fake_board("drive_cache_local")
+test_that("drive_only board status returns empty tibble and informs no local copy", {
+  b <- new_fake_board("drive_only")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
-  .write_pin(b$drive_board, data.frame(x = 1), "super_pin")
-  st <- gdpins_board_status(b)
-  expect_equal(st$state[st$name == "super_pin"], "drive_ahead")
+  .write_pin(b$drive_board, data.frame(x = 1), "do_pin")
+  msgs <- capture.output(
+    st <- gdpins_board_status(b),
+    type = "message"
+  )
+  expect_equal(nrow(st), 0L)
+  expect_identical(names(st), names(gdpins:::.empty_board_status_tbl()))
+  expect_true(any(grepl("no local copy", msgs)))
 })
 
-test_that("drive_cache_local board sync from_drive copies to cache_board", {
-  b <- new_fake_board("drive_cache_local")
+test_that("drive_only board sync is a no-op: returns x invisibly, informs, touches nothing", {
+  b <- new_fake_board("drive_only")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
-  .write_pin(b$drive_board, data.frame(x = 99), "s2")
-  suppressMessages(gdpins_sync(b, direction = "from_drive"))
-  expect_true("s2" %in% pins::pin_list(b$cache_board))
+  .write_pin(b$drive_board, data.frame(x = 99), "do_sync")
+  n_before <- length(pins::pin_list(b$drive_board))
+  msgs <- capture.output(
+    result <- gdpins_sync(b, direction = "from_drive"),
+    type = "message"
+  )
+  expect_s3_class(result, "gdpins_board")
+  expect_true(any(grepl("no local copy", msgs)))
+  expect_equal(length(pins::pin_list(b$drive_board)), n_before)
+})
+
+test_that(".handle_init_sync emits no warning for a drive_only board", {
+  b <- new_fake_board("drive_only")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+  expect_no_warning(
+    suppressMessages(gdpins:::.handle_init_sync(b, "warn"))
+  )
+})
+
+test_that("drive_only board status offline still 0-row + informs (no connectivity warning)", {
+  b <- new_fake_board("drive_only")
+  local_mocked_bindings(gdpins_is_online = function() FALSE, .package = "gdpins")
+  msgs <- capture.output(
+    expect_no_warning(st <- gdpins_board_status(b)),
+    type = "message"
+  )
+  expect_equal(nrow(st), 0L)
+  expect_true(any(grepl("no local copy", msgs)))
+})
+
+# ── [V4] Verifier additions: drive_only guard ordering + edge cases ──────────
+
+test_that("[V4] drive_only board_status short-circuits before the offline guard", {
+  b <- new_fake_board("drive_only")
+  # If the local-copy guard were below the offline guard, this mock would fire
+  # and the test would error instead of returning the empty tibble.
+  local_mocked_bindings(
+    gdpins_is_online = function() stop("gdpins_is_online should not be called for drive_only boards"),
+    .package = "gdpins"
+  )
+  st <- NULL
+  expect_no_error(
+    st <- suppressMessages(gdpins_board_status(b))
+  )
+  expect_equal(nrow(st), 0L)
+})
+
+test_that("[V4] drive_only sync short-circuits before the offline guard", {
+  b <- new_fake_board("drive_only")
+  local_mocked_bindings(
+    gdpins_is_online = function() stop("gdpins_is_online should not be called for drive_only boards"),
+    .package = "gdpins"
+  )
+  expect_no_error(
+    suppressMessages(gdpins_sync(b, direction = "from_drive"))
+  )
+})
+
+test_that("[V4] drive_only offline status informs about local copy, not connectivity", {
+  b <- new_fake_board("drive_only")
+  local_mocked_bindings(gdpins_is_online = function() FALSE, .package = "gdpins")
+  msgs <- character()
+  st <- withCallingHandlers(
+    gdpins_board_status(b),
+    message = function(m) {
+      msgs <<- c(msgs, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    },
+    warning = function(w) {
+      fail(paste("Unexpected warning:", conditionMessage(w)))
+    }
+  )
+  expect_equal(nrow(st), 0L)
+  expect_true(any(grepl("no local copy", msgs)))
+  expect_false(any(grepl("Cannot check sync status", msgs)))
+  expect_false(any(grepl("internet connection", msgs)))
+})
+
+test_that("[V4] drive_only sync is a no-op across to_drive and auto directions, fields stay NULL", {
+  b <- new_fake_board("drive_only")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+  .write_pin(b$drive_board, data.frame(x = 1), "do_multi")
+  n_before <- length(pins::pin_list(b$drive_board))
+
+  for (dir in c("to_drive", "auto")) {
+    msgs <- capture.output(
+      result <- gdpins_sync(b, direction = dir),
+      type = "message"
+    )
+    expect_s3_class(result, "gdpins_board")
+    expect_true(any(grepl("no local copy", msgs)))
+    expect_equal(length(pins::pin_list(b$drive_board)), n_before)
+    expect_null(result$local_board)
+    expect_null(result$cache_dir)
+  }
+})
+
+test_that("[V4] .board_local_side returns NULL for a fixture-built drive_only board", {
+  b <- new_fake_board("drive_only")
+  expect_null(b$local_board)
+  expect_null(b$cache_dir)
+  expect_null(gdpins:::.board_local_side(b))
+})
+
+test_that("[V4] drive_only inform message handles a glue-special board name without erroring", {
+  # cli::cli_inform() glue-interpolates "{x$name}"; a name containing brace
+  # characters must not break the inform (nor the sync no-op path).
+  b <- new_fake_board("drive_only", name = "weird}{name")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+  st <- NULL
+  msgs <- character()
+  expect_no_error({
+    msgs <- capture.output(st <- gdpins_board_status(b), type = "message")
+  })
+  expect_equal(nrow(st), 0L)
+  expect_true(any(grepl("no local copy", msgs)))
+
+  .write_pin(b$drive_board, data.frame(x = 1), "wn_pin")
+  expect_no_error(
+    suppressMessages(gdpins_sync(b, direction = "from_drive"))
+  )
 })
 
 # ── Empty boards/conns return x invisibly ─────────────────────────────────────
@@ -631,8 +771,8 @@ test_that("board offline status with no local pins returns empty tibble", {
 test_that("board status detects drive_ahead via newer drive timestamp", {
   b <- new_fake_board("drive_cache")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
-  # Write to cache first, then write newer/different data to drive
-  .write_pin(b$cache_board, data.frame(x = 1), "ts_pin")
+  # Write to local first, then write newer/different data to drive
+  .write_pin(b$local_board, data.frame(x = 1), "ts_pin")
   Sys.sleep(1.1)  # ensure timestamp difference
   .write_pin(b$drive_board, data.frame(x = 2), "ts_pin")
   st <- gdpins_board_status(b)
@@ -645,7 +785,7 @@ test_that("board status detects local_ahead via newer local timestamp", {
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
   .write_pin(b$drive_board, data.frame(x = 1), "ts_local")
   Sys.sleep(1.1)
-  .write_pin(b$cache_board, data.frame(x = 2), "ts_local")
+  .write_pin(b$local_board, data.frame(x = 2), "ts_local")
   st <- gdpins_board_status(b)
   row <- st[st$name == "ts_local", ]
   expect_true(row$state %in% c("local_ahead", "conflict"))
@@ -678,10 +818,10 @@ test_that(".empty_raw_status_tbl returns correct structure", {
                        "drive_mtime", "local_mtime"))
 })
 
-# Cover .board_local_side returning NULL for drive_cache with no cache or local
-test_that(".board_local_side returns NULL when neither cache nor local board set", {
+# Cover .board_local_side returning NULL when local_board is not set
+test_that(".board_local_side returns NULL when local_board is not set", {
   b <- new_gdpins_board(
-    config      = "drive_cache",
+    config      = "drive_only",
     name        = "test",
     drive_board = pins::board_folder(tempfile()),
     versioned   = TRUE
@@ -690,13 +830,13 @@ test_that(".board_local_side returns NULL when neither cache nor local board set
   expect_null(result)
 })
 
-# Cover .board_local_side returning local_board when cache_board is NULL
-test_that(".board_local_side returns local_board when cache_board is NULL", {
+# Cover .board_local_side returning local_board when set
+test_that(".board_local_side returns local_board when set", {
   local_dir   <- tempfile("local_")
   fs::dir_create(local_dir)
   local_board <- pins::board_folder(local_dir)
   b <- new_gdpins_board(
-    config      = "drive_cache_local",
+    config      = "drive_cache",
     name        = "test",
     drive_board = pins::board_folder(tempfile()),
     local_board = local_board,
@@ -710,7 +850,7 @@ test_that(".board_local_side returns local_board when cache_board is NULL", {
 test_that("unversioned board on_conflict=version copies both directions", {
   b <- new_fake_board("drive_cache", versioned = FALSE)
   .write_pin(b$drive_board, data.frame(x = 10), "p_uv_ver")
-  .write_pin(b$cache_board, data.frame(x = 20), "p_uv_ver")
+  .write_pin(b$local_board, data.frame(x = 20), "p_uv_ver")
 
   local_mocked_bindings(
     gdpins_is_online    = function() TRUE,
@@ -719,14 +859,14 @@ test_that("unversioned board on_conflict=version copies both directions", {
   )
   suppressMessages(gdpins_sync(b, direction = "auto", on_conflict = "version"))
   expect_true("p_uv_ver" %in% pins::pin_list(b$drive_board))
-  expect_true("p_uv_ver" %in% pins::pin_list(b$cache_board))
+  expect_true("p_uv_ver" %in% pins::pin_list(b$local_board))
 })
 
 # Cover unversioned board conflict with on_conflict = "prompt"
 test_that("unversioned board on_conflict=prompt with 'l' pushes local to drive", {
   b <- new_fake_board("drive_cache", versioned = FALSE)
   .write_pin(b$drive_board, data.frame(x = 10), "p_uv_prompt")
-  .write_pin(b$cache_board, data.frame(x = 20), "p_uv_prompt")
+  .write_pin(b$local_board, data.frame(x = 20), "p_uv_prompt")
 
   local_mocked_bindings(
     gdpins_is_online    = function() TRUE,
@@ -742,7 +882,7 @@ test_that("unversioned board on_conflict=prompt with 'l' pushes local to drive",
 test_that("unversioned board on_conflict=prompt with 'd' pulls drive to local", {
   b <- new_fake_board("drive_cache", versioned = FALSE)
   .write_pin(b$drive_board, data.frame(x = 10), "p_uv_pd")
-  .write_pin(b$cache_board, data.frame(x = 20), "p_uv_pd")
+  .write_pin(b$local_board, data.frame(x = 20), "p_uv_pd")
 
   local_mocked_bindings(
     gdpins_is_online    = function() TRUE,
@@ -751,14 +891,14 @@ test_that("unversioned board on_conflict=prompt with 'd' pulls drive to local", 
   )
   local_mocked_bindings(readline = function(prompt = "") "d", .package = "base")
   suppressMessages(gdpins_sync(b, direction = "auto", on_conflict = "prompt"))
-  obj <- pins::pin_read(b$cache_board, "p_uv_pd")
+  obj <- pins::pin_read(b$local_board, "p_uv_pd")
   expect_equal(obj$x, 10L)
 })
 
 test_that("unversioned board on_conflict=prompt with 's' skips (no change)", {
   b <- new_fake_board("drive_cache", versioned = FALSE)
   .write_pin(b$drive_board, data.frame(x = 10), "p_uv_ps")
-  .write_pin(b$cache_board, data.frame(x = 20), "p_uv_ps")
+  .write_pin(b$local_board, data.frame(x = 20), "p_uv_ps")
 
   local_mocked_bindings(
     gdpins_is_online    = function() TRUE,
@@ -768,18 +908,274 @@ test_that("unversioned board on_conflict=prompt with 's' skips (no change)", {
   local_mocked_bindings(readline = function(prompt = "") "s", .package = "base")
   suppressMessages(gdpins_sync(b, direction = "auto", on_conflict = "prompt"))
   obj_d <- pins::pin_read(b$drive_board, "p_uv_ps")
-  obj_l <- pins::pin_read(b$cache_board, "p_uv_ps")
+  obj_l <- pins::pin_read(b$local_board, "p_uv_ps")
   expect_equal(obj_d$x, 10L)
   expect_equal(obj_l$x, 20L)
 })
 
-# Cover .raw_copy_to_drive when local file doesn't exist (warn path)
-test_that(".raw_copy_to_drive warns when local file missing", {
+# Cover .raw_copy_to_drive when local file doesn't exist (abort path).
+# Regression: this used to cli_warn() and return success, which made the
+# caller (wrapped in attempt(), see gdpins_sync.default) record the file as
+# synced even though nothing was copied -- see tests below.
+test_that(".raw_copy_to_drive errors when local file missing", {
   conn <- new_fake_raw_conn("drive_local")
-  expect_warning(
+  expect_error(
     gdpins:::.raw_copy_to_drive(conn, "nonexistent.csv"),
-    class = "rlang_warning"
+    "Local file not found"
   )
+})
+
+# ── Unreadable / locked local files ──────────────────────────────────────────
+# Regression: a file held open by another program passes file.exists() but
+# fails when curl streams it mid-upload ("read error getting mime data"), and
+# that error used to abort the whole sync loop.
+
+test_that(".file_is_readable() distinguishes readable from unopenable paths", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  writeLines("a,b", tmp)
+  expect_true(gdpins:::.file_is_readable(tmp))
+
+  # A directory exists but cannot be opened as a file -- portable stand-in for
+  # a locked file.
+  d <- withr::local_tempdir()
+  expect_false(gdpins:::.file_is_readable(d))
+  expect_false(gdpins:::.file_is_readable(file.path(d, "nope.csv")))
+})
+
+# Regression guard for the read-probe fix below: an empty file reads 0 bytes
+# for a perfectly ordinary reason (there's nothing in it), not because it's
+# locked, so it must stay "readable".
+test_that(".file_is_readable() treats an empty file as readable", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  file.create(tmp)
+  expect_equal(file.size(tmp), 0)
+  expect_true(gdpins:::.file_is_readable(tmp))
+})
+
+# Regression: on Windows, a byte-range lock held by another process (as
+# Microsoft Office does) lets file(path, "rb") open successfully while
+# readBin() silently returns 0 bytes -- the old open-only check reported the
+# file as readable. This can't be reproduced with a real OS-level lock
+# portably (and a same-process lock wouldn't trigger it -- byte-range locks
+# are per-handle), so .read_first_byte() is mocked to return raw(0) instead,
+# standing in for what a byte-range lock does to readBin().
+test_that(".file_is_readable() is FALSE when a non-empty file yields no bytes (byte-range lock)", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  writeLines(strrep("a", 100), tmp)
+
+  local_mocked_bindings(.read_first_byte = function(path) raw(0), .package = "gdpins")
+
+  expect_false(gdpins:::.file_is_readable(tmp))
+})
+
+test_that(".file_is_readable() is TRUE when an empty file yields no bytes", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  file.create(tmp)
+  expect_equal(file.size(tmp), 0)
+
+  local_mocked_bindings(.read_first_byte = function(path) raw(0), .package = "gdpins")
+
+  expect_true(gdpins:::.file_is_readable(tmp))
+})
+
+test_that(".file_is_readable() is FALSE when the read probe errors", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  writeLines(strrep("a", 100), tmp)
+
+  local_mocked_bindings(
+    .read_first_byte = function(path) stop("simulated read failure"),
+    .package = "gdpins"
+  )
+
+  expect_false(gdpins:::.file_is_readable(tmp))
+})
+
+test_that(".raw_copy_to_drive aborts with an actionable error on unreadable file", {
+  conn <- new_fake_raw_conn("drive_local")
+  dir.create(file.path(conn$local_path, "locked.csv"))
+  expect_error(
+    gdpins:::.raw_copy_to_drive(conn, "locked.csv"),
+    "Cannot read local file"
+  )
+})
+
+test_that("raw sync keeps going when one file fails, and reports it", {
+  conn <- new_fake_raw_conn("drive_local")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+
+  for (nm in c("aaa.csv", "bbb.csv", "ccc.csv")) {
+    write.csv(data.frame(x = 1:3), file.path(conn$local_path, nm), row.names = FALSE)
+  }
+
+  real_copy <- gdpins:::.raw_copy_to_drive
+  local_mocked_bindings(
+    .raw_copy_to_drive = function(conn, rel_name) {
+      if (rel_name == "bbb.csv") stop("read error getting mime data")
+      real_copy(conn, rel_name)
+    },
+    .package = "gdpins"
+  )
+
+  expect_warning(
+    suppressMessages(gdpins_sync(conn, direction = "auto")),
+    "2 files synced, 1 failed"
+  )
+
+  # The files either side of the failure made it to Drive.
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/aaa.csv")))
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/ccc.csv")))
+  expect_false(gd_exists(conn$adapter, paste0(conn$drive_path, "/bbb.csv")))
+})
+
+# Regression: a failing file name and/or error message containing literal
+# "{"/"}" must not make the end-of-run cli_warn() itself error out -- cli
+# treats those characters as glue syntax unless the value is substituted by
+# reference rather than pasted straight into the template string.
+test_that("raw sync failure summary survives braces in file names and error messages", {
+  conn <- new_fake_raw_conn("drive_local")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+
+  for (nm in c("aaa.csv", "a{bad}.csv")) {
+    write.csv(data.frame(x = 1:3), file.path(conn$local_path, nm), row.names = FALSE)
+  }
+
+  real_copy <- gdpins:::.raw_copy_to_drive
+  local_mocked_bindings(
+    .raw_copy_to_drive = function(conn, rel_name) {
+      if (rel_name == "a{bad}.csv") stop("read error with {curly} in message")
+      real_copy(conn, rel_name)
+    },
+    .package = "gdpins"
+  )
+
+  expect_warning(
+    suppressMessages(gdpins_sync(conn, direction = "auto")),
+    "a\\{bad\\}\\.csv"
+  )
+
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/aaa.csv")))
+})
+
+# The "close any program" hint is only accurate for the unreadable/locked-file
+# failure mode; it must not appear for unrelated transfer failures.
+test_that("raw sync shows the 'close the program' hint only for unreadable-file failures", {
+  conn <- new_fake_raw_conn("drive_local")
+  dir.create(file.path(conn$local_path, "locked.csv"))
+
+  local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) {
+      tibble::tibble(name = "locked.csv", state = "local_ahead")
+    },
+    .package = "gdpins"
+  )
+
+  expect_warning(
+    suppressMessages(gdpins_sync(conn, direction = "auto")),
+    "Close any program"
+  )
+})
+
+test_that("raw sync omits the 'close the program' hint for non-lock failures", {
+  conn <- new_fake_raw_conn("drive_local")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+
+  write.csv(data.frame(x = 1:3), file.path(conn$local_path, "aaa.csv"), row.names = FALSE)
+
+  local_mocked_bindings(
+    .raw_copy_to_drive = function(conn, rel_name) stop("network down"),
+    .package = "gdpins"
+  )
+
+  w <- tryCatch(
+    {
+      suppressMessages(gdpins_sync(conn, direction = "auto"))
+      NULL
+    },
+    warning = function(w) w
+  )
+  expect_false(is.null(w))
+  expect_false(grepl("Close any program", conditionMessage(w), fixed = TRUE))
+})
+
+# Regression: a status row can say a file is local-ahead (needs uploading)
+# while the file itself is missing from disk -- e.g. deleted after
+# gdpins_board_status() ran. .raw_copy_to_drive() used to cli_warn() and
+# return success for this, so gdpins_sync() printed "Synced ... local ->
+# Drive" for a file that was never touched. It must be counted as a failure
+# instead, and the other file must still sync normally.
+test_that("raw sync counts a missing local file as a failure, not a success", {
+  conn <- new_fake_raw_conn("drive_local")
+  write.csv(data.frame(x = 1:3), file.path(conn$local_path, "real.csv"), row.names = FALSE)
+
+  local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) {
+      tibble::tibble(
+        name  = c("ghost.csv", "real.csv"),
+        state = c("local_ahead", "local_ahead")
+      )
+    },
+    .package = "gdpins"
+  )
+
+  msgs <- character()
+  expect_warning(
+    withCallingHandlers(
+      gdpins_sync(conn, direction = "auto"),
+      message = function(m) {
+        msgs <<- c(msgs, conditionMessage(m))
+        invokeRestart("muffleMessage")
+      }
+    ),
+    "1 failed"
+  )
+
+  # The real file synced and said so; the missing one did not.
+  expect_true(any(grepl("real.csv", msgs, fixed = TRUE) & grepl("Synced", msgs, fixed = TRUE)))
+  expect_false(any(grepl("ghost.csv", msgs, fixed = TRUE) & grepl("Synced", msgs, fixed = TRUE)))
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/real.csv")))
+  expect_false(gd_exists(conn$adapter, paste0(conn$drive_path, "/ghost.csv")))
+})
+
+# A download failure must be isolated exactly like an upload failure: other
+# files still land locally, the failed one is listed in the warning summary,
+# and the "close the program" hint (which only applies to unreadable/locked
+# local files) is absent since this is a download-side failure.
+test_that("raw sync isolates a download failure from Drive, and reports it", {
+  conn <- new_fake_raw_conn("drive_local")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  for (nm in c("aaa.csv", "bbb.csv", "ccc.csv")) {
+    write.csv(data.frame(x = 1:3), tmp, row.names = FALSE)
+    gd_upload(conn$adapter, tmp, paste0(conn$drive_path, "/", nm))
+  }
+
+  real_copy <- gdpins:::.raw_copy_to_local
+  local_mocked_bindings(
+    .raw_copy_to_local = function(conn, rel_name) {
+      if (rel_name == "bbb.csv") stop("download failed")
+      real_copy(conn, rel_name)
+    },
+    .package = "gdpins"
+  )
+
+  w <- tryCatch(
+    {
+      suppressMessages(gdpins_sync(conn, direction = "from_drive"))
+      NULL
+    },
+    warning = function(w) w
+  )
+  expect_false(is.null(w))
+  expect_match(conditionMessage(w), "2 files synced, 1 failed")
+  expect_false(grepl("Close any program", conditionMessage(w), fixed = TRUE))
+
+  # The files either side of the failure made it to local disk.
+  expect_true(file.exists(file.path(conn$local_path, "aaa.csv")))
+  expect_true(file.exists(file.path(conn$local_path, "ccc.csv")))
+  expect_false(file.exists(file.path(conn$local_path, "bbb.csv")))
 })
 
 # Cover .effective_direction skip fallthrough for offline state
@@ -839,7 +1235,7 @@ test_that(".copy_pin_to_board warns when pin not found on source", {
   b <- new_fake_board("drive_cache")
   # drive_board doesn't have the pin; this triggers the warn path
   expect_warning(
-    gdpins:::.copy_pin_to_board(b$drive_board, b$cache_board, "nonexistent_pin"),
+    gdpins:::.copy_pin_to_board(b$drive_board, b$local_board, "nonexistent_pin"),
     class = "rlang_warning"
   )
 })
@@ -850,9 +1246,9 @@ test_that(".copy_pin_to_board preserves the source pin's type", {
     pins::pin_write(b$drive_board, fx_plain_tbl(), "typed_pin", type = "parquet")
   )
 
-  gdpins:::.copy_pin_to_board(b$drive_board, b$cache_board, "typed_pin")
+  gdpins:::.copy_pin_to_board(b$drive_board, b$local_board, "typed_pin")
 
-  expect_equal(pins::pin_meta(b$cache_board, "typed_pin")$type, "parquet")
+  expect_equal(pins::pin_meta(b$local_board, "typed_pin")$type, "parquet")
 })
 
 # Cover .sync_raw "skip" effective_dir (in_sync state with auto direction)
@@ -871,11 +1267,11 @@ test_that("sync_raw skips in_sync files without error", {
 test_that(".compare_board_pin returns in_sync when both sides absent (defensive)", {
   b <- new_fake_board("drive_cache")
   .write_pin(b$drive_board, data.frame(x = 1), "p_def")
-  .write_pin(b$cache_board, data.frame(x = 1), "p_def")
+  .write_pin(b$local_board, data.frame(x = 1), "p_def")
   result <- gdpins:::.compare_board_pin(
     pin_name    = "p_def",
     drive_board = b$drive_board,
-    local_board = b$cache_board,
+    local_board = b$local_board,
     in_drive    = FALSE,
     in_local    = FALSE
   )
@@ -900,7 +1296,7 @@ test_that(".compare_board_pin returns conflict when timestamps are NA", {
   result <- gdpins:::.compare_board_pin(
     pin_name    = "p_na",
     drive_board = b$drive_board,
-    local_board = b$cache_board,
+    local_board = b$local_board,
     in_drive    = TRUE,
     in_local    = TRUE
   )

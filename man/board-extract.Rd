@@ -21,9 +21,8 @@
 The field value, or \code{NULL} if there is no such field.
 }
 \description{
-Connects a lazy board on first read of \code{drive_board}, \code{cache_board}, or
-\code{local_board}; every other field is answered without connecting. See
-\link{lazy-boards}.
+Connects a lazy board on first read of \code{drive_board} or \code{local_board};
+every other field is answered without connecting. See \link{lazy-boards}.
 }
 \details{
 Unlike \code{$} on a plain list, these do \strong{not} partial-match: \code{board$drive}

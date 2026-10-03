@@ -25,7 +25,7 @@ Dispatches on the class of \code{x}:
 \details{
 \itemize{
 \item \strong{\code{gdpins_board}}: compares pins version id/timestamp between the Drive
-board and the local side (cache board if present, else local board).
+board and the board's one local copy (\code{local_board}).
 \item \strong{\code{gdpins_raw_conn}}: compares MD5 checksums between the Drive folder and
 the local mirror directory; mtime is used as a tiebreaker.
 }
@@ -57,7 +57,6 @@ adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
 board   <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )

@@ -15,7 +15,7 @@ gdpins_pin_remove(board, name)
 Invisibly \code{NULL}.
 }
 \description{
-Deletes \code{name} from every non-NULL board component (Drive, cache, local).
+Deletes \code{name} from every non-NULL board component (Drive, local).
 Missing pins are ignored (idempotent no-op).
 }
 \examples{

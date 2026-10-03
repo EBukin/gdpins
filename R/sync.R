@@ -16,7 +16,7 @@ NULL
 #' Dispatches on the class of `x`:
 #'
 #' - **`gdpins_board`**: compares pins version id/timestamp between the Drive
-#'   board and the local side (cache board if present, else local board).
+#'   board and the board's one local copy (`local_board`).
 #' - **`gdpins_raw_conn`**: compares MD5 checksums between the Drive folder and
 #'   the local mirror directory; mtime is used as a tiebreaker.
 #'
@@ -60,7 +60,6 @@ NULL
 #' board   <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )
@@ -139,7 +138,6 @@ gdpins_board_status.default <- function(x) {
 #' board   <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )
@@ -196,6 +194,14 @@ gdpins_sync.default <- function(
 .board_status_board <- function(x) {
   # local-only boards have no drive_board -- nothing to compare
   if (is.null(x$drive_board)) {
+    return(.empty_board_status_tbl())
+  }
+
+  # drive_only boards have no local copy -- nothing to compare
+  if (is.null(x$local_board)) {
+    cli::cli_inform(c(
+      "i" = "Board {.val {x$name}} has no local copy; nothing to compare."
+    ))
     return(.empty_board_status_tbl())
   }
 
@@ -292,10 +298,7 @@ gdpins_sync.default <- function(
 
 #' @keywords internal
 .board_local_side <- function(x) {
-  # Preference: cache_board, then local_board
-  if (!is.null(x$cache_board)) return(x$cache_board)
-  if (!is.null(x$local_board)) return(x$local_board)
-  NULL
+  x$local_board
 }
 
 #' @keywords internal
@@ -541,6 +544,14 @@ gdpins_sync.default <- function(
     return(invisible(x))
   }
 
+  # drive_only boards -- no local copy, nothing to sync
+  if (is.null(x$local_board)) {
+    cli::cli_inform(c(
+      "i" = "Board {.val {x$name}} has no local copy ({.code cache_dir = FALSE}). Nothing to sync."
+    ))
+    return(invisible(x))
+  }
+
   # Offline guard -- blocks all writes
   if (!gdpins_is_online()) {
     cli::cli_abort(c(
@@ -564,7 +575,7 @@ gdpins_sync.default <- function(
   if (length(local_pins) == 0L && any(status$state == "drive_ahead")) {
     n_drive <- sum(status$state == "drive_ahead")
     cli::cli_inform(c(
-      "i" = "New-computer setup detected: local cache is empty.",
+      "i" = "New-computer setup detected: local copy is empty.",
       "v" = "Pulling {n_drive} pin{?s} from Drive -> local."
     ))
   }
@@ -760,8 +771,25 @@ gdpins_sync.default <- function(
     ))
   }
 
-  conflicts <- character()
-  n_actions <- 0L
+  conflicts  <- character()
+  failures   <- character()
+  fail_msgs  <- character()
+  unreadable <- logical()
+  n_actions  <- 0L
+
+  # One unreadable/locked file must not abandon the remaining files: each
+  # transfer is isolated and its error collected for a summary at the end.
+  attempt <- function(fname, expr) {
+    tryCatch({
+      force(expr)
+      TRUE
+    }, error = function(e) {
+      failures   <<- c(failures, fname)
+      fail_msgs  <<- c(fail_msgs, conditionMessage(e))
+      unreadable <<- c(unreadable, inherits(e, "gdpins_error_unreadable_file"))
+      FALSE
+    })
+  }
 
   for (i in seq_len(nrow(status))) {
     row   <- status[i, ]
@@ -779,36 +807,63 @@ gdpins_sync.default <- function(
       } else if (on_conflict == "prompt") {
         choice <- .prompt_raw_conflict(fname, row)
         if (choice == "local") {
-          .raw_copy_to_drive(x, fname)
-          n_actions <- n_actions + 1L
+          if (attempt(fname, .raw_copy_to_drive(x, fname))) n_actions <- n_actions + 1L
         } else if (choice == "drive") {
-          .raw_copy_to_local(x, fname)
-          n_actions <- n_actions + 1L
+          if (attempt(fname, .raw_copy_to_local(x, fname))) n_actions <- n_actions + 1L
         }
       } else {
         # on_conflict == "version" on raw -- drive wins as safest default
-        .raw_copy_to_local(x, fname)
-        n_actions <- n_actions + 1L
-        cli::cli_inform(c(
-          "i" = "File {.val {fname}}: conflict -- Drive version kept (raw connection)."
-        ))
+        if (attempt(fname, .raw_copy_to_local(x, fname))) {
+          n_actions <- n_actions + 1L
+          cli::cli_inform(c(
+            "i" = "File {.val {fname}}: conflict -- Drive version kept (raw connection)."
+          ))
+        }
       }
       next
     }
 
     if (effective_dir == "to_drive") {
-      .raw_copy_to_drive(x, fname)
-      n_actions <- n_actions + 1L
-      cli::cli_inform(c("v" = "Synced {.val {fname}}: local -> Drive."))
+      if (attempt(fname, .raw_copy_to_drive(x, fname))) {
+        n_actions <- n_actions + 1L
+        cli::cli_inform(c("v" = "Synced {.val {fname}}: local -> Drive."))
+      }
     } else if (effective_dir == "from_drive") {
-      .raw_copy_to_local(x, fname)
-      n_actions <- n_actions + 1L
-      cli::cli_inform(c("v" = "Synced {.val {fname}}: Drive -> local."))
+      if (attempt(fname, .raw_copy_to_local(x, fname))) {
+        n_actions <- n_actions + 1L
+        cli::cli_inform(c("v" = "Synced {.val {fname}}: Drive -> local."))
+      }
     }
   }
 
+  if (length(failures) > 0L) {
+    # File names and error messages are arbitrary text that may itself
+    # contain "{"/"}" -- pasting them straight into a cli template would make
+    # cli re-parse that text as glue and crash (e.g. a file named "a{b}.csv").
+    # Referencing them as indexed expressions instead keeps them data: cli
+    # substitutes the looked-up value without re-parsing it.
+    bullets <- vapply(seq_along(failures), function(i) {
+      sprintf("{.val {failures[%d]}}: {fail_msgs[%d]}", i, i)
+    }, character(1))
+    names(bullets) <- rep("x", length(bullets))
+
+    # The "close the program" hint only applies to the unreadable/locked-file
+    # case; showing it for download/auth/network failures is misleading.
+    hint <- if (any(unreadable)) {
+      c("i" = "Close any program holding these files open, then re-run {.fn gdpins_sync}.")
+    } else {
+      character()
+    }
+
+    cli::cli_warn(c(
+      "!" = "{n_actions} file{?s} synced, {length(failures)} failed.",
+      bullets,
+      hint
+    ))
+  }
+
   # Nothing moved and nothing blocked -- say so, rather than exiting silently.
-  if (n_actions == 0L && length(conflicts) == 0L) {
+  if (n_actions == 0L && length(conflicts) == 0L && length(failures) == 0L) {
     cli::cli_inform(c(
       "v" = paste0(
         "Raw connection: everything in sync, nothing to reconcile ",
@@ -831,6 +886,47 @@ gdpins_sync.default <- function(
   invisible(x)
 }
 
+#' Test whether a local file can actually be opened for reading
+#'
+#' `file.exists()` and `file.access()` both consult metadata only, so a file
+#' held open by another program (Word, Excel, a running R session) still looks
+#' fine. Uploads hand libcurl a *path*, and curl only opens it mid-request --
+#' at which point the failure surfaces as an opaque
+#' `"read error getting mime data"`. Opening the file up front turns that into
+#' an actionable, per-file error -- but on Windows a byte-range lock (as held
+#' by Microsoft Office) lets the open succeed while `readBin()` silently
+#' returns 0 bytes, so a 1-byte read probe is needed to actually catch it.
+#'
+#' @param path Character scalar. Path to a local file.
+#'
+#' @return `TRUE` if the file could be opened and read from.
+#' @keywords internal
+.file_is_readable <- function(path) {
+  tryCatch({
+    probe <- .read_first_byte(path)
+    if (length(probe) == 0L && isTRUE(file.size(path) > 0)) {
+      return(FALSE)
+    }
+    TRUE
+  }, error = function(e) FALSE, warning = function(w) FALSE)
+}
+
+#' Read the first byte of a file
+#'
+#' Isolated as its own function so tests can mock the byte-range-lock failure
+#' mode (a read that silently returns 0 bytes) without needing a real
+#' cross-process OS-level lock.
+#'
+#' @param path Character scalar. Path to a local file.
+#'
+#' @return A raw vector of length 0 or 1.
+#' @keywords internal
+.read_first_byte <- function(path) {
+  con <- file(path, "rb")
+  on.exit(close(con), add = TRUE)
+  readBin(con, "raw", 1L)
+}
+
 #' @keywords internal
 .raw_copy_to_drive <- function(conn, rel_name) {
   local_file <- file.path(
@@ -839,8 +935,16 @@ gdpins_sync.default <- function(
   )
   drive_path <- paste0(conn$drive_path, "/", rel_name)
   if (!file.exists(local_file)) {
-    cli::cli_warn("Local file not found: {.path {local_file}}")
-    return(invisible(NULL))
+    cli::cli_abort("Local file not found: {.path {local_file}}")
+  }
+  if (!.file_is_readable(local_file)) {
+    cli::cli_abort(
+      c(
+        "Cannot read local file: {.path {local_file}}",
+        "i" = "It is most likely open in another program, or locked by a sync client."
+      ),
+      class = "gdpins_error_unreadable_file"
+    )
   }
   gd_upload(conn$adapter, local_file, drive_path)
   invisible(NULL)

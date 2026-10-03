@@ -5,6 +5,6 @@
 \title{Read/write verbs for gdpins boards}
 \description{
 Core verbs for writing R objects to a board and reading them back. Writes
-fan out to all non-NULL board components (Drive, cache, local). Reads are
-local-first: local → cache → Drive.
+fan out to all non-NULL board components (Drive, local). Reads are
+local-first: local → Drive.
 }

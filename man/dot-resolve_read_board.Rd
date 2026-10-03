@@ -13,6 +13,6 @@
 A \code{pins} board object.
 }
 \description{
-Local-first: local_board > cache_board > drive_board.
+Local-first: local_board > drive_board.
 }
 \keyword{internal}

@@ -22,29 +22,32 @@ test_that("gdpins_go_offline() on a local_only board is a no-op", {
   expect_identical(offline, board)
 })
 
+test_that("[T5] gdpins_go_offline() on a drive_only board errors", {
+  board <- new_fake_board(config = "drive_only")
+  expect_error(gdpins_go_offline(board), "cache_dir = FALSE")
+})
+
 test_that("gdpins_go_offline() converts drive_cache board to local_only using cache dir", {
   board <- new_fake_board(config = "drive_cache")
   expect_message(offline <- gdpins_go_offline(board), "local-only")
   expect_s3_class(offline, "gdpins_board")
   expect_equal(offline$config, "local_only")
   expect_null(offline$drive_board)
-  expect_null(offline$cache_board)
   expect_null(offline$adapter)
-  expect_identical(offline$local_board, board$cache_board)
-  expect_equal(offline$local_dir, board$cache_dir)
+  expect_identical(offline$local_board, board$local_board)
+  expect_equal(offline$cache_dir, board$cache_dir)
   expect_equal(offline$name, board$name)
 })
 
-test_that("gdpins_go_offline() converts drive_cache_local board to local_only using local_dir", {
-  board <- new_fake_board(config = "drive_cache_local")
+test_that("[T5] gdpins_go_offline() offline local_board$path matches original cache_dir", {
+  board   <- new_fake_board(config = "drive_cache")
   offline <- suppressMessages(gdpins_go_offline(board))
-  expect_equal(offline$config, "local_only")
-  expect_identical(offline$local_board, board$local_board)
-  expect_equal(offline$local_dir, board$local_dir)
+  expect_equal(fs::path(offline$local_board$path), fs::path(board$cache_dir))
+  expect_equal(offline$cache_dir, board$cache_dir)
 })
 
 test_that("gdpins_go_offline() preserves reads/writes locally while offline", {
-  board   <- new_fake_board(config = "drive_cache_local")
+  board   <- new_fake_board(config = "drive_cache")
   offline <- suppressMessages(gdpins_go_offline(board))
 
   gdpins_pin_write(offline, mtcars, "cars", format = "rds")
@@ -52,9 +55,8 @@ test_that("gdpins_go_offline() preserves reads/writes locally while offline", {
 
   # Write landed on the same local_board object -- visible via the original too
   expect_true(pins::pin_exists(board$local_board, "cars"))
-  # ...but never reached Drive or the cache
+  # ...but never reached Drive
   expect_false(pins::pin_exists(board$drive_board, "cars"))
-  expect_false(pins::pin_exists(board$cache_board, "cars"))
 })
 
 test_that("gdpins_go_offline() stashes the original Drive configuration", {
@@ -64,6 +66,37 @@ test_that("gdpins_go_offline() stashes the original Drive configuration", {
   expect_equal(state$config, "drive_cache")
   expect_identical(state$adapter, board$adapter)
   expect_equal(state$drive_path, board$drive_path)
+})
+
+test_that("[T5] gdpins_go_offline() stash has exactly the five expected fields", {
+  board   <- new_fake_board(config = "drive_cache")
+  offline <- suppressMessages(gdpins_go_offline(board))
+  state   <- attr(offline, "gdpins_offline_state")
+  expect_identical(
+    names(state),
+    c("config", "drive_board", "cache_dir", "drive_path", "adapter")
+  )
+})
+
+test_that("[T5] gdpins_go_offline() is a no-op when called twice in a row", {
+  board   <- new_fake_board(config = "drive_cache")
+  offline <- suppressMessages(gdpins_go_offline(board))
+  expect_message(offline2 <- gdpins_go_offline(offline), "already local-only")
+  expect_identical(offline2, offline)
+})
+
+test_that("[V5] gdpins_go_offline() on drive_only names the board in the error", {
+  board <- new_fake_board(config = "drive_only", name = "my_special_board")
+  err <- tryCatch(gdpins_go_offline(board), error = function(e) e)
+  expect_s3_class(err, "rlang_error")
+  expect_match(conditionMessage(err), "my_special_board")
+})
+
+test_that("[V5] gdpins_go_offline() on drive_only leaves the input object untouched", {
+  board <- new_fake_board(config = "drive_only")
+  expect_error(gdpins_go_offline(board), "cache_dir = FALSE")
+  expect_null(attr(board, "gdpins_offline_state"))
+  expect_equal(board$config, "drive_only")
 })
 
 # ── gdpins_go_online.gdpins_board ─────────────────────────────────────────────
@@ -94,26 +127,9 @@ test_that("gdpins_go_online() restores a drive_cache board and reattaches the ad
   expect_equal(online$config, "drive_cache")
   expect_identical(online$adapter, board$adapter)
   expect_identical(online$drive_board, board$drive_board)
-  expect_identical(online$cache_board, board$cache_board)
-  expect_equal(online$drive_path, board$drive_path)
-  expect_null(online$local_board)
-})
-
-test_that("gdpins_go_online() restores a drive_cache_local board, keeping local_board", {
-  board   <- new_fake_board(config = "drive_cache_local")
-  offline <- suppressMessages(gdpins_go_offline(board))
-
-  testthat::local_mocked_bindings(
-    gdpins_is_online    = function() TRUE,
-    gdpins_board_status = function(x) mock_status_ok(),
-    .package = "gdpins"
-  )
-
-  online <- suppressMessages(gdpins_go_online(offline, on_discrepancy = "ignore"))
-  expect_equal(online$config, "drive_cache_local")
   expect_identical(online$local_board, board$local_board)
-  expect_identical(online$drive_board, board$drive_board)
-  expect_equal(online$local_dir, board$local_dir)
+  expect_equal(online$drive_path, board$drive_path)
+  expect_equal(online$cache_dir, board$cache_dir)
 })
 
 test_that("gdpins_go_online() accepts an override adapter", {
@@ -133,8 +149,43 @@ test_that("gdpins_go_online() accepts an override adapter", {
   expect_identical(online$adapter, new_adapter)
 })
 
+test_that("[V5] gdpins_go_online() with adapter = NULL explicitly still reuses the stashed adapter", {
+  board   <- new_fake_board(config = "drive_cache")
+  offline <- suppressMessages(gdpins_go_offline(board))
+
+  testthat::local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
+    .package = "gdpins"
+  )
+
+  online <- suppressMessages(gdpins_go_online(offline, adapter = NULL, on_discrepancy = "ignore"))
+  expect_identical(online$adapter, board$adapter)
+})
+
+test_that("[V5] full offline/online cycle round-trips cache_dir and local_board identity twice", {
+  board    <- new_fake_board(config = "drive_cache")
+  offline1 <- suppressMessages(gdpins_go_offline(board))
+
+  testthat::local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) mock_status_ok(),
+    .package = "gdpins"
+  )
+
+  online1 <- suppressMessages(gdpins_go_online(offline1, on_discrepancy = "ignore"))
+  expect_equal(online1$config, "drive_cache")
+  expect_equal(online1$cache_dir, board$cache_dir)
+  expect_identical(online1$local_board, board$local_board)
+
+  offline2 <- suppressMessages(gdpins_go_offline(online1))
+  expect_equal(offline2$config, "local_only")
+  expect_equal(offline2$cache_dir, board$cache_dir)
+  expect_identical(offline2$local_board, board$local_board)
+})
+
 test_that("gdpins_go_online() runs a sync when on_discrepancy = sync_to_drive", {
-  board   <- new_fake_board(config = "drive_cache_local")
+  board   <- new_fake_board(config = "drive_cache")
   offline <- suppressMessages(gdpins_go_offline(board))
   gdpins_pin_write(offline, mtcars, "cars") # written while offline
 
@@ -158,23 +209,14 @@ test_that("gdpins_go_online() runs a sync when on_discrepancy = sync_to_drive", 
 # ── Round trip: fake adapter, real data flow (no status/sync mocking) ────────
 
 test_that("go_offline -> write -> go_online(sync_to_drive) pushes the pin to Drive (fake)", {
-  board   <- new_fake_board(config = "drive_cache_local")
-  offline <- suppressMessages(gdpins_go_offline(board))
-  gdpins_pin_write(offline, mtcars, "cars", format = "rds")
-
-  online <- suppressMessages(
-    gdpins_go_online(offline, on_discrepancy = "sync_to_drive")
-  )
-
-  expect_true(pins::pin_exists(board$drive_board, "cars"))
-  expect_true(pins::pin_exists(board$cache_board, "cars"))
-  expect_equal(gdpins_pin_read(online, "cars"), mtcars)
-})
-
-test_that("go_offline -> write -> go_online(drive_cache) pushes the pin to Drive (fake)", {
   board   <- new_fake_board(config = "drive_cache")
   offline <- suppressMessages(gdpins_go_offline(board))
   gdpins_pin_write(offline, mtcars, "cars", format = "rds")
+
+  testthat::local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    .package = "gdpins"
+  )
 
   online <- suppressMessages(
     gdpins_go_online(offline, on_discrepancy = "sync_to_drive")

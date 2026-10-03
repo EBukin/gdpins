@@ -73,7 +73,7 @@ gdpins_save_figure <- function(
 #'
 #' @param tables_board A `gdpins_board` or `NULL`. Source board for output
 #'   tables. The read-authoritative local pins board inside `tables_board` is
-#'   mirrored to Drive (local-first: local > cache > drive board).
+#'   mirrored to Drive (local-first: local > drive board).
 #' @param figures_dir Character scalar or `NULL`. Local directory containing
 #'   PNG/SVG figures to publish.
 #' @param drive_tables Character scalar. Drive destination folder name for
@@ -207,14 +207,13 @@ gdpins_publish_output <- function(
 
 #' Resolve the read-authoritative pins board from a gdpins_board
 #'
-#' Local-first: local_board > cache_board > drive_board.
+#' Local-first: local_board > drive_board.
 #'
 #' @param board A `gdpins_board`.
 #' @return A `pins` board object.
 #' @keywords internal
 .resolve_read_board <- function(board) {
   if (!is.null(board$local_board)) return(board$local_board)
-  if (!is.null(board$cache_board)) return(board$cache_board)
   board$drive_board
 }
 
