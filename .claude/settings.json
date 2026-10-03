@@ -1,0 +1,86 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "extraKnownMarketplaces": {
+    "eb-ai-skills": {
+      "source": {
+        "source": "github",
+        "repo": "EBukin/eb-ai-skills"
+      }
+    },
+    "posit-dev-skills": {
+      "source": {
+        "source": "github",
+        "repo": "posit-dev/skills"
+      }
+    },
+    "caveman": {
+      "source": {
+        "source": "github",
+        "repo": "JuliusBrussee/caveman"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "caveman@caveman": true,
+    "r-run@eb-ai-skills": true,
+    "r-lib@posit-dev-skills": true,
+    "posit-dev@posit-dev-skills": true,
+    "shiny@posit-dev-skills": true,
+    "shiny-dev@eb-ai-skills": true
+  },
+  "skillOverrides": {
+    "caveman:caveman-help": "user-invocable-only",
+    "caveman:caveman-init": "user-invocable-only",
+    "caveman:caveman-stats": "user-invocable-only",
+    "caveman:cavecrew": "off",
+    "caveman:caveman-compress": "off",
+    "caveman:caveman-discover": "off",
+    "caveman:caveman-evidence-review": "off",
+    "caveman:caveman-explore": "off",
+    "caveman:caveman-learn": "off",
+    "caveman:caveman-manage": "off",
+    "caveman:caveman-optimize": "off",
+    "caveman:caveman-review": "off",
+    "caveman:caveman-setup": "off",
+    "caveman:investigate-first": "off",
+    "caveman:lean-build": "off",
+    "caveman:megacave": "off",
+    "caveman:migration": "off",
+    "caveman:safe-refactor": "off",
+    "caveman:surgical-patch": "off",
+    "caveman:ultracave": "off",
+    "caveman:verify-and-stop": "off"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git *)",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/no-coauthor.sh\""
+          },
+          {
+            "type": "command",
+            "if": "Bash(gh *)",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/no-coauthor.sh\""
+          },
+          {
+            "type": "command",
+            "if": "PowerShell(git *)",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/no-coauthor.sh\""
+          },
+          {
+            "type": "command",
+            "if": "PowerShell(gh *)",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/no-coauthor.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

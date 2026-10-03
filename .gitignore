@@ -16,3 +16,11 @@ renv/sandbox/
 .DS_Store
 Thumbs.db
 docs
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Claude Code: per-user settings stay out of the repo
+.claude/settings.local.json

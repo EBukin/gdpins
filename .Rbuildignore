@@ -12,3 +12,6 @@
 ^test\.R$
 ^nanotest\.R$
 ^\.renvignore$
+^\.docs$
+^\.claude$
+^\.gitattributes$
