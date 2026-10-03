@@ -23,6 +23,23 @@
   pin) so they never carry the nanoparquet-authored payload that triggers the
   blow-up. The upstream `nanoparquet` bug is tracked separately.
 
+* **`gdpins_sync()` on a raw connection no longer aborts the whole run when one
+  file cannot be read.** A file held open by another program (Word, Excel, a
+  sync client) passes `file.exists()`, so the upload started and only failed
+  once `curl` streamed the bytes — surfacing as an opaque
+  `"read error getting mime data"` from `curl::curl_fetch_memory()`, with every
+  remaining file left unsynced. Raw sync now checks that each local file can
+  actually be opened *and read* before uploading (a Windows byte-range lock,
+  as held by Office, lets the open succeed but returns no bytes), and isolates
+  per-file failures — uploads and downloads alike — so the rest of the folder
+  still syncs. A single end-of-run warning reports how many files synced and
+  which failed, with each error message; the "close the program" hint appears
+  only for unreadable local files.
+
+* **Raw sync no longer reports a missing local file as synced.** It used to
+  warn and then print "Synced … local -> Drive" anyway; it is now counted as a
+  failure in the end-of-run summary.
+
 # gdpins 0.0.1.9022
 
 ## Bug fixes
