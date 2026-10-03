@@ -782,6 +782,60 @@ test_that(".raw_copy_to_drive warns when local file missing", {
   )
 })
 
+# ── Unreadable / locked local files ──────────────────────────────────────────
+# Regression: a file held open by another program passes file.exists() but
+# fails when curl streams it mid-upload ("read error getting mime data"), and
+# that error used to abort the whole sync loop.
+
+test_that(".file_is_readable() distinguishes readable from unopenable paths", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  writeLines("a,b", tmp)
+  expect_true(gdpins:::.file_is_readable(tmp))
+
+  # A directory exists but cannot be opened as a file -- portable stand-in for
+  # a locked file.
+  d <- withr::local_tempdir()
+  expect_false(gdpins:::.file_is_readable(d))
+  expect_false(gdpins:::.file_is_readable(file.path(d, "nope.csv")))
+})
+
+test_that(".raw_copy_to_drive aborts with an actionable error on unreadable file", {
+  conn <- new_fake_raw_conn("drive_local")
+  dir.create(file.path(conn$local_path, "locked.csv"))
+  expect_error(
+    gdpins:::.raw_copy_to_drive(conn, "locked.csv"),
+    "Cannot read local file"
+  )
+})
+
+test_that("raw sync keeps going when one file fails, and reports it", {
+  conn <- new_fake_raw_conn("drive_local")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+
+  for (nm in c("aaa.csv", "bbb.csv", "ccc.csv")) {
+    write.csv(data.frame(x = 1:3), file.path(conn$local_path, nm), row.names = FALSE)
+  }
+
+  real_copy <- gdpins:::.raw_copy_to_drive
+  local_mocked_bindings(
+    .raw_copy_to_drive = function(conn, rel_name) {
+      if (rel_name == "bbb.csv") stop("read error getting mime data")
+      real_copy(conn, rel_name)
+    },
+    .package = "gdpins"
+  )
+
+  expect_warning(
+    suppressMessages(gdpins_sync(conn, direction = "auto")),
+    "could not be synced"
+  )
+
+  # The files either side of the failure made it to Drive.
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/aaa.csv")))
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/ccc.csv")))
+  expect_false(gd_exists(conn$adapter, paste0(conn$drive_path, "/bbb.csv")))
+})
+
 # Cover .effective_direction skip fallthrough for offline state
 test_that(".effective_direction returns skip for unknown state with auto", {
   result <- gdpins:::.effective_direction("unknown_state", "auto")

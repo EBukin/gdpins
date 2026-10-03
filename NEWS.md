@@ -1,3 +1,16 @@
+# gdpins 0.0.1.9023
+
+## Bug fixes
+
+* **`gdpins_sync()` on a raw connection no longer aborts the whole run when one
+  file cannot be read.** A file held open by another program (Word, Excel, a
+  sync client) passes `file.exists()`, so the upload started and only failed
+  once `curl` streamed the bytes — surfacing as an opaque
+  `"read error getting mime data"` from `curl::curl_fetch_memory()`, with every
+  remaining file left unsynced. Raw sync now checks that each local file can
+  actually be opened before uploading, reports unreadable files by name, and
+  isolates per-file failures so the rest of the folder still syncs.
+
 # gdpins 0.0.1.9022
 
 ## Bug fixes

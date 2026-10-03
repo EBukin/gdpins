@@ -761,7 +761,22 @@ gdpins_sync.default <- function(
   }
 
   conflicts <- character()
+  failures  <- character()
+  fail_msgs <- character()
   n_actions <- 0L
+
+  # One unreadable/locked file must not abandon the remaining files: each
+  # transfer is isolated and its error collected for a summary at the end.
+  attempt <- function(fname, expr) {
+    tryCatch({
+      force(expr)
+      TRUE
+    }, error = function(e) {
+      failures  <<- c(failures, fname)
+      fail_msgs <<- c(fail_msgs, conditionMessage(e))
+      FALSE
+    })
+  }
 
   for (i in seq_len(nrow(status))) {
     row   <- status[i, ]
@@ -779,36 +794,45 @@ gdpins_sync.default <- function(
       } else if (on_conflict == "prompt") {
         choice <- .prompt_raw_conflict(fname, row)
         if (choice == "local") {
-          .raw_copy_to_drive(x, fname)
-          n_actions <- n_actions + 1L
+          if (attempt(fname, .raw_copy_to_drive(x, fname))) n_actions <- n_actions + 1L
         } else if (choice == "drive") {
-          .raw_copy_to_local(x, fname)
-          n_actions <- n_actions + 1L
+          if (attempt(fname, .raw_copy_to_local(x, fname))) n_actions <- n_actions + 1L
         }
       } else {
         # on_conflict == "version" on raw -- drive wins as safest default
-        .raw_copy_to_local(x, fname)
-        n_actions <- n_actions + 1L
-        cli::cli_inform(c(
-          "i" = "File {.val {fname}}: conflict -- Drive version kept (raw connection)."
-        ))
+        if (attempt(fname, .raw_copy_to_local(x, fname))) {
+          n_actions <- n_actions + 1L
+          cli::cli_inform(c(
+            "i" = "File {.val {fname}}: conflict -- Drive version kept (raw connection)."
+          ))
+        }
       }
       next
     }
 
     if (effective_dir == "to_drive") {
-      .raw_copy_to_drive(x, fname)
-      n_actions <- n_actions + 1L
-      cli::cli_inform(c("v" = "Synced {.val {fname}}: local -> Drive."))
+      if (attempt(fname, .raw_copy_to_drive(x, fname))) {
+        n_actions <- n_actions + 1L
+        cli::cli_inform(c("v" = "Synced {.val {fname}}: local -> Drive."))
+      }
     } else if (effective_dir == "from_drive") {
-      .raw_copy_to_local(x, fname)
-      n_actions <- n_actions + 1L
-      cli::cli_inform(c("v" = "Synced {.val {fname}}: Drive -> local."))
+      if (attempt(fname, .raw_copy_to_local(x, fname))) {
+        n_actions <- n_actions + 1L
+        cli::cli_inform(c("v" = "Synced {.val {fname}}: Drive -> local."))
+      }
     }
   }
 
+  if (length(failures) > 0L) {
+    cli::cli_warn(c(
+      "!" = "{length(failures)} file{?s} could not be synced; the rest were synced normally.",
+      .named_bullets("x", paste0(failures, ": ", fail_msgs)),
+      "i" = "Close any program holding these files open, then re-run {.fn gdpins_sync}."
+    ))
+  }
+
   # Nothing moved and nothing blocked -- say so, rather than exiting silently.
-  if (n_actions == 0L && length(conflicts) == 0L) {
+  if (n_actions == 0L && length(conflicts) == 0L && length(failures) == 0L) {
     cli::cli_inform(c(
       "v" = paste0(
         "Raw connection: everything in sync, nothing to reconcile ",
@@ -831,6 +855,39 @@ gdpins_sync.default <- function(
   invisible(x)
 }
 
+#' Build a named character vector for use as cli bullets
+#'
+#' @param nm Character scalar. Bullet name to repeat (e.g. `"x"`).
+#' @param x Character vector of bullet texts.
+#'
+#' @return `x`, with every element named `nm`.
+#' @keywords internal
+.named_bullets <- function(nm, x) {
+  names(x) <- rep(nm, length(x))
+  x
+}
+
+#' Test whether a local file can actually be opened for reading
+#'
+#' `file.exists()` and `file.access()` both consult metadata only, so a file
+#' held open by another program (Word, Excel, a running R session) still looks
+#' fine. Uploads hand libcurl a *path*, and curl only opens it mid-request --
+#' at which point the failure surfaces as an opaque
+#' `"read error getting mime data"`. Opening the file up front turns that into
+#' an actionable, per-file error.
+#'
+#' @param path Character scalar. Path to a local file.
+#'
+#' @return `TRUE` if the file could be opened for binary reading.
+#' @keywords internal
+.file_is_readable <- function(path) {
+  tryCatch({
+    con <- file(path, "rb")
+    on.exit(close(con), add = TRUE)
+    TRUE
+  }, error = function(e) FALSE, warning = function(w) FALSE)
+}
+
 #' @keywords internal
 .raw_copy_to_drive <- function(conn, rel_name) {
   local_file <- file.path(
@@ -841,6 +898,12 @@ gdpins_sync.default <- function(
   if (!file.exists(local_file)) {
     cli::cli_warn("Local file not found: {.path {local_file}}")
     return(invisible(NULL))
+  }
+  if (!.file_is_readable(local_file)) {
+    cli::cli_abort(c(
+      "Cannot read local file: {.path {local_file}}",
+      "i" = "It is most likely open in another program, or locked by a sync client."
+    ))
   }
   gd_upload(conn$adapter, local_file, drive_path)
   invisible(NULL)
