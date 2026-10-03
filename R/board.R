@@ -200,11 +200,11 @@ NULL
 #' Builds a board in one of three legal configurations depending on the
 #' combination of arguments supplied:
 #'
-#' - **`"local_only"`** — `local_dir` provided, no `drive_path`/`adapter`.
-#' - **`"drive_cache"`** — `drive_path` + `adapter` + `cache_dir`, no
-#'   `local_dir`.
-#' - **`"drive_cache_local"`** — all three: `drive_path`, `cache_dir`, and
-#'   `local_dir`.
+#' - **`"local_only"`** — no `drive_path`; `cache_dir` is the local board path.
+#' - **`"drive_cache"`** — `drive_path` + `adapter`; one local copy at
+#'   `cache_dir` (default `NULL`/`TRUE`: `getOption("gdpins.cache_dir")/<root>/<drive_path>`).
+#' - **`"drive_only"`** — `drive_path` + `adapter` + `cache_dir = FALSE`; no
+#'   local copy, Drive downloads go to a session temp dir.
 #'
 #' The board checks for sync discrepancies between Drive and local (governed by
 #' `on_discrepancy`). Non-existent Drive boards are never auto-created unless
@@ -430,36 +430,43 @@ gdpins_init_board <- function(
   name           <- spec$name
   drive_path     <- spec$drive_path
   cache_dir      <- spec$cache_dir
-  local_dir      <- spec$local_dir
   versioned      <- spec$versioned
   create         <- spec$create
   adapter        <- spec$adapter
   config         <- spec$config
-  has_local      <- !is.null(local_dir)
 
   # ── local_only ───────────────────────────────────────────────────────────────
   if (config == "local_only") {
-    if (!dir.exists(local_dir)) {
-      fs::dir_create(local_dir)
+    if (!dir.exists(cache_dir)) {
+      fs::dir_create(cache_dir)
     }
-    local_board <- pins::board_folder(local_dir, versioned = versioned)
+    local_board <- pins::board_folder(cache_dir, versioned = versioned)
     board <- new_gdpins_board(
       config      = "local_only",
       name        = name,
       local_board = local_board,
-      local_dir   = local_dir,
+      cache_dir   = cache_dir,
       versioned   = versioned
     )
     return(board)
   }
 
-  # ── Drive configs (drive_cache / drive_cache_local) ───────────────────────────
+  # ── Drive configs (drive_cache / drive_only) ──────────────────────────────────
 
-  # Offline check — if offline and Drive is needed, fall back to local-only
-  # if a local_dir is available, otherwise error
+  # Offline check — if offline and Drive is needed:
+  # - drive_cache has a local copy to fall back to (cache_dir doubles as the
+  #   local-only board's path).
+  # - drive_only has no local copy at all; there is nothing to fall back to.
   is_online <- tryCatch(gdpins_is_online(), error = function(e) FALSE)
 
   if (!is_online) {
+    if (config == "drive_only") {
+      cli::cli_abort(c(
+        "Drive board {.val {drive_path}} is unreachable offline and has no local copy ({.code cache_dir = FALSE}).",
+        i = "Reconnect, or initialise with a {.arg cache_dir} path."
+      ))
+    }
+
     cli::cli_warn(c(
       "!" = "No internet connection detected.",
       "i" = paste0(
@@ -468,28 +475,15 @@ gdpins_init_board <- function(
       )
     ))
 
-    if (config == "drive_cache_local" && has_local) {
-      if (!dir.exists(local_dir)) fs::dir_create(local_dir)
-      local_board <- pins::board_folder(local_dir, versioned = versioned)
-      board <- new_gdpins_board(
-        config      = "local_only",
-        name        = name,
-        local_board = local_board,
-        local_dir   = local_dir,
-        versioned   = versioned
-      )
-    } else {
-      # drive_cache with no local_dir — fall back to cache as local
-      if (!dir.exists(cache_dir)) fs::dir_create(cache_dir)
-      local_board <- pins::board_folder(cache_dir, versioned = versioned)
-      board <- new_gdpins_board(
-        config      = "local_only",
-        name        = name,
-        local_board = local_board,
-        local_dir   = cache_dir,
-        versioned   = versioned
-      )
-    }
+    if (!dir.exists(cache_dir)) fs::dir_create(cache_dir)
+    local_board <- pins::board_folder(cache_dir, versioned = versioned)
+    board <- new_gdpins_board(
+      config      = "local_only",
+      name        = name,
+      local_board = local_board,
+      cache_dir   = cache_dir,
+      versioned   = versioned
+    )
     return(board)
   }
 
@@ -513,35 +507,23 @@ gdpins_init_board <- function(
       ))
     }
     drive_folder_id <- drive_path
-    if (!dir.exists(cache_dir)) fs::dir_create(cache_dir)
+    scratch <- if (config == "drive_cache") cache_dir else tempfile("gdpins_scratch_")
+    fs::dir_create(scratch)
     drive_board <- pins::board_gdrive(
       googledrive::as_id(drive_folder_id),
-      cache = cache_dir
+      cache = scratch
     )
-    cache_board <- pins::board_folder(cache_dir, versioned = versioned)
-    if (config == "drive_cache") {
-      board <- new_gdpins_board(
-        config      = "drive_cache",
-        name        = name,
-        drive_board = drive_board,
-        cache_board = cache_board,
-        cache_dir   = cache_dir,
-        drive_path  = drive_path,
-        adapter     = adapter,
-        versioned   = versioned
-      )
-      return(board)
+    local_board <- if (config == "drive_cache") {
+      pins::board_folder(cache_dir, versioned = versioned)
+    } else {
+      NULL
     }
-    if (!dir.exists(local_dir)) fs::dir_create(local_dir)
-    local_board <- pins::board_folder(local_dir, versioned = versioned)
     board <- new_gdpins_board(
-      config      = "drive_cache_local",
+      config      = config,
       name        = name,
       drive_board = drive_board,
-      cache_board = cache_board,
       local_board = local_board,
-      cache_dir   = cache_dir,
-      local_dir   = local_dir,
+      cache_dir   = if (config == "drive_cache") cache_dir else NULL,
       drive_path  = drive_path,
       adapter     = adapter,
       versioned   = versioned
@@ -589,11 +571,7 @@ gdpins_init_board <- function(
 
   # ── Build drive_board ────────────────────────────────────────────────────────
   # Fake adapter: board_folder over <fake_root>/<drive_path>
-  # Real adapter: pins::board_gdrive(drive_path, cache = cache_dir)
-  if (!dir.exists(cache_dir)) {
-    fs::dir_create(cache_dir)
-  }
-
+  # Real adapter: pins::board_gdrive(drive_path, cache = <scratch dir>)
   if (identical(adapter$kind, "fake")) {
     drive_board_dir <- file.path(
       adapter$root,
@@ -605,24 +583,24 @@ gdpins_init_board <- function(
     drive_board <- pins::board_folder(drive_board_dir, versioned = versioned)
   } else {
     # Resolve the subfolder's Drive ID so board_gdrive is anchored inside the
-    # adapter's root folder rather than searching from My Drive root.
+    # adapter's root folder rather than searching from My Drive root. The
+    # scratch dir is the one local copy for drive_cache, or a disposable
+    # session temp dir for drive_only (no local copy requested).
+    scratch <- if (config == "drive_cache") cache_dir else tempfile("gdpins_scratch_")
+    fs::dir_create(scratch)
     drive_folder_id <- adapter$get_id(drive_path)
     drive_board <- pins::board_gdrive(
       googledrive::as_id(drive_folder_id),
-      cache = cache_dir
+      cache = scratch
     )
   }
 
-  cache_board <- pins::board_folder(cache_dir, versioned = versioned)
-
-  # ── drive_cache ───────────────────────────────────────────────────────────────
-  if (config == "drive_cache") {
+  # ── drive_only ───────────────────────────────────────────────────────────────
+  if (config == "drive_only") {
     board <- new_gdpins_board(
-      config      = "drive_cache",
+      config      = "drive_only",
       name        = name,
       drive_board = drive_board,
-      cache_board = cache_board,
-      cache_dir   = cache_dir,
       drive_path  = drive_path,
       adapter     = adapter,
       versioned   = versioned
@@ -630,20 +608,18 @@ gdpins_init_board <- function(
     return(board)
   }
 
-  # ── drive_cache_local ────────────────────────────────────────────────────────
-  if (!dir.exists(local_dir)) {
-    fs::dir_create(local_dir)
+  # ── drive_cache ───────────────────────────────────────────────────────────────
+  if (!dir.exists(cache_dir)) {
+    fs::dir_create(cache_dir)
   }
-  local_board <- pins::board_folder(local_dir, versioned = versioned)
+  local_board <- pins::board_folder(cache_dir, versioned = versioned)
 
   board <- new_gdpins_board(
-    config      = "drive_cache_local",
+    config      = "drive_cache",
     name        = name,
     drive_board = drive_board,
-    cache_board = cache_board,
     local_board = local_board,
     cache_dir   = cache_dir,
-    local_dir   = local_dir,
     drive_path  = drive_path,
     adapter     = adapter,
     versioned   = versioned
@@ -665,14 +641,14 @@ gdpins_init_board <- function(
 #' @export
 #' @exportS3Method format gdpins_board
 format.gdpins_board <- function(x, ...) {
-  # Components indicator: D=drive, C=cache, L=local. Derived from config
-  # rather than the components themselves — reading those would force a lazy
-  # board to connect just to print it.
+  # Components indicator: D=drive, C=drive_cache (one local copy), L=local_only.
+  # Derived from config rather than the components themselves — reading those
+  # would force a lazy board to connect just to print it.
   present <- .config_components(x$config)
   comps <- paste0(
     if ("drive_board" %in% present) "D" else "-",
-    if ("cache_board" %in% present) "C" else "-",
-    if ("local_board" %in% present) "L" else "-"
+    if (identical(x$config, "drive_cache")) "C" else "-",
+    if (identical(x$config, "local_only")) "L" else "-"
   )
   ver <- if (isTRUE(x$versioned)) "v+" else "v-"
   cfg <- x$config
@@ -682,10 +658,10 @@ format.gdpins_board <- function(x, ...) {
     dp <- x$drive_path
     if (nchar(dp) > 20L) dp <- paste0("...", substr(dp, nchar(dp) - 16L, nchar(dp)))
     dp
-  } else if (!is.null(x$local_dir)) {
-    ld <- x$local_dir
-    if (nchar(ld) > 20L) ld <- paste0("...", substr(ld, nchar(ld) - 16L, nchar(ld)))
-    ld
+  } else if (!is.null(x$cache_dir)) {
+    cd <- x$cache_dir
+    if (nchar(cd) > 20L) cd <- paste0("...", substr(cd, nchar(cd) - 16L, nchar(cd)))
+    cd
   } else {
     ""
   }
@@ -727,10 +703,11 @@ print.gdpins_board <- function(x, ...) {
     gd_cli_kv(drive = x$drive_path)
   }
   if (!is.null(x$cache_dir)) {
-    gd_cli_kv(cache = x$cache_dir)
-  }
-  if (!is.null(x$local_dir)) {
-    gd_cli_kv(local = x$local_dir)
+    if (identical(x$config, "local_only")) {
+      gd_cli_kv(local = x$cache_dir)
+    } else {
+      gd_cli_kv(cache = x$cache_dir)
+    }
   }
   invisible(x)
 }
@@ -759,10 +736,11 @@ summary.gdpins_board <- function(object, ...) {
     gd_cli_kv(drive_path = object$drive_path)
   }
   if (!is.null(object$cache_dir)) {
-    gd_cli_kv(cache_dir = object$cache_dir)
-  }
-  if (!is.null(object$local_dir)) {
-    gd_cli_kv(local_dir = object$local_dir)
+    if (identical(object$config, "local_only")) {
+      gd_cli_kv(local = object$cache_dir)
+    } else {
+      gd_cli_kv(cache = object$cache_dir)
+    }
   }
   gd_cli_kv(
     components = paste(.config_components(object$config), collapse = ", ")

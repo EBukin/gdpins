@@ -15,7 +15,8 @@ Do NOT read `tools/plan-single-local-copy.md` or `tools/design-local-cache.md` â
   Otherwise run the whole file and read failures for your sections.
 - Tests must never spawn background processes or file-lock helpers (antivirus). Mock seams with
   `testthat::local_mocked_bindings(..., .package = "gdpins")`.
-- Never run `tests/testthat/test-live.R`.
+- Never run `tests/testthat/test-live.R`. `GDRIVE_TEST_FOLDER` is set in this env, so `test_dir()` would
+  run it against real Drive: any `test_dir()` call must first `Sys.setenv(GDRIVE_TEST_FOLDER = "")`.
 - Never write to the real user cache: tests rely on `tests/testthat/setup.R` setting option
   `gdpins.cache_dir` to a tempdir; examples always pass `cache_dir = tempfile("cache_")`.
 - Global state in tests (options/env/wd) â†’ `withr::local_*`.

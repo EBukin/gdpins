@@ -53,10 +53,11 @@ Companion: `tools/design-local-cache.md` (how it works today). Tracker section a
   ```
 - Full suite (gates only):
   ```
-  "/c/Program Files/R/R-4.5.3/bin/x64/Rscript" --no-init-file -e 'pkgload::load_all("."); testthat::test_dir("tests/testthat")'
+  "/c/Program Files/R/R-4.5.3/bin/x64/Rscript" --no-init-file -e 'Sys.setenv(GDRIVE_TEST_FOLDER = ""); pkgload::load_all("."); testthat::test_dir("tests/testthat")'
   ```
 - Never spawn background processes or file-lock helpers in tests (antivirus trips). Mock a seam.
-- `test-live.R` needs real Drive; skipped by default. Edit by reading only; never run.
+- `test-live.R` needs real Drive. `GDRIVE_TEST_FOLDER` IS SET in this machine's environment, so it is
+  NOT skipped by default: every `test_dir()` must run with `Sys.setenv(GDRIVE_TEST_FOLDER = "")`. Never run it.
 - Snapshots: only commit real `_snaps/` changes; revert LF↔CRLF-only churn.
 
 ### Package hygiene (AGENTS.md)
@@ -348,7 +349,7 @@ Leftovers / risks:          <list>
 |---|---|---|---|---|---|
 | P0 | orchestrator | done | – | – | branch + plan committed; raw-sync fix merged (184a935); briefs in `tools/briefs/` |
 | T1 | sonnet | done | V1 | PASS | 6 [V1] tests; test-board.R non-§8 RED until T2 (expected) |
-| T2 | sonnet | in progress | V2 | todo | |
+| T2 | sonnet | done | V2 | PASS | 4 [V2] tests; T2 ~199k tokens (over budget) |
 | T3 | | todo | V3 | todo | Phase 2 |
 | T4 | | todo | V4 | todo | Phase 2 |
 | T5 | | todo | V5 | todo | Phase 2 |
@@ -373,3 +374,7 @@ Decisions log
 - 2026-10-03: print/summary path label `local` for `local_only`, `cache` otherwise (orchestrator).
 - 2026-10-03: T1 adds placeholder `# gdpins 0.0.1.9024` NEWS heading to keep DESCRIPTION == NEWS;
   T8 writes the entry (orchestrator).
+- 2026-10-03: Phase 1 gate full suite ran test-live.R against real Drive (GDRIVE_TEST_FOLDER set in
+  env; 5 errors, rest passed). Full-suite command now blanks the env var (orchestrator; reported to user).
+- 2026-10-03: Phase 1 gate: test-board/lazy/classes/helpers green; 119 expected failures in Phase 2/3
+  files (discovery, integration, name-resolution, offline, output, pipeline, prune, sync, verbs) + live.

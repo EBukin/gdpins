@@ -6,7 +6,7 @@
 #' first use: the online probe, the Drive existence/create check, folder-ID
 #' resolution, `pins` board construction, and the `on_discrepancy` sync check
 #' all run the first time something reads one of the board's components
-#' (`drive_board`, `cache_board`, `local_board`).
+#' (`drive_board`, `local_board`).
 #'
 #' The point is scripts that set up several boards but only touch some of them.
 #' Initialising three Drive boards costs three round-trips plus three sync
@@ -21,7 +21,7 @@
 #'
 #' [print()], [format()], and [summary()] do **not** force: they describe the
 #' board from its declared config. Nor do the plain metadata fields (`name`,
-#' `config`, `versioned`, `drive_path`, `cache_dir`, `local_dir`, `adapter`).
+#' `config`, `versioned`, `drive_path`, `cache_dir`, `adapter`).
 #'
 #' @section Consequences:
 #' Errors move. A mistyped `drive_path`, a missing folder with `create =
@@ -49,7 +49,7 @@ NULL
 
 # Fields that force a connection when read. Everything else in the frozen
 # layout is known from the arguments alone.
-.LAZY_FIELDS <- c("drive_board", "cache_board", "local_board")
+.LAZY_FIELDS <- c("drive_board", "local_board")
 
 # Attribute holding the state environment. Absent on eager boards, which keeps
 # `$`/`[[` on them a plain .subset2() call.
@@ -77,7 +77,6 @@ new_gdpins_board_lazy <- function(spec) {
     config     = spec$config,
     name       = spec$name,
     cache_dir  = spec$cache_dir,
-    local_dir  = spec$local_dir,
     drive_path = spec$drive_path,
     adapter    = spec$adapter,
     versioned  = spec$versioned
@@ -127,7 +126,7 @@ new_gdpins_board_lazy <- function(spec) {
     return(.subset2(x, name))
   }
   if (state$resolved) {
-    # .build_board() may have downgraded config/local_dir/adapter on an offline
+    # .build_board() may have downgraded config/adapter on an offline
     # fallback, so every field comes from the resolved set, not just components.
     return(state$fields[[name]])
   }
@@ -140,9 +139,8 @@ new_gdpins_board_lazy <- function(spec) {
 
 #' Extract a field from a gdpins_board
 #'
-#' Connects a lazy board on first read of `drive_board`, `cache_board`, or
-#' `local_board`; every other field is answered without connecting. See
-#' [lazy-boards].
+#' Connects a lazy board on first read of `drive_board` or `local_board`;
+#' every other field is answered without connecting. See [lazy-boards].
 #'
 #' Unlike `$` on a plain list, these do **not** partial-match: `board$drive`
 #' is `NULL`, not `board$drive_board`.
