@@ -2,7 +2,7 @@
 % Please edit documentation in R/prune.R
 \name{.remove_local_version}
 \alias{.remove_local_version}
-\title{Remove one version directory from a local board (cache or local_only)}
+\title{Remove one version directory from a local board}
 \usage{
 .remove_local_version(board_path, name, version)
 }

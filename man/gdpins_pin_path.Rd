@@ -26,8 +26,8 @@ the object inside them. Use it to hand a pin to a reader gdpins does not
 know about, or to inspect the stored bytes.
 }
 \details{
-Resolution mirrors \code{\link[=gdpins_pin_read]{gdpins_pin_read()}} exactly — local board, then cache
-board, then Drive — and the pin is materialised (downloaded into the pins
+Resolution mirrors \code{\link[=gdpins_pin_read]{gdpins_pin_read()}} exactly — local board, then
+Drive — and the pin is materialised (downloaded into the pins
 cache) when Drive holds the only copy, just as \code{\link[=gdpins_raw_path]{gdpins_raw_path()}} downloads
 on demand.
 }

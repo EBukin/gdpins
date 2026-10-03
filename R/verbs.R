@@ -91,7 +91,6 @@ NULL
 #' board <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )
@@ -378,7 +377,6 @@ gdpins_pin_path <- function(board, name, version = NULL) {
 #' board <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )

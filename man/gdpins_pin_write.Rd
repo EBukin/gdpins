@@ -35,7 +35,7 @@ Invisibly \code{NULL}. Called for its side effect.
 }
 \description{
 Serialises \code{x} and writes it to every non-NULL component of \code{board}
-(Drive board, cache board, local board). Format auto-detection calls
+(Drive board, local board). Format auto-detection calls
 \code{\link[=gdpins_detect_format]{gdpins_detect_format()}} unless \code{format} is supplied explicitly.
 }
 \details{
@@ -59,7 +59,6 @@ adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
 board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
-  cache_dir  = "~/.cache/gdpins/data-raw",
   adapter    = adapter,
   create     = TRUE
 )

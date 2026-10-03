@@ -16,7 +16,7 @@ NULL
 #' Dispatches on the class of `x`:
 #'
 #' - **`gdpins_board`**: compares pins version id/timestamp between the Drive
-#'   board and the local side (cache board if present, else local board).
+#'   board and the board's one local copy (`local_board`).
 #' - **`gdpins_raw_conn`**: compares MD5 checksums between the Drive folder and
 #'   the local mirror directory; mtime is used as a tiebreaker.
 #'
@@ -60,7 +60,6 @@ NULL
 #' board   <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )
@@ -139,7 +138,6 @@ gdpins_board_status.default <- function(x) {
 #' board   <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )

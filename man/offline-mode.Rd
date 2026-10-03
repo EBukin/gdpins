@@ -41,19 +41,19 @@ purpose) without losing the ability to reconnect and sync afterwards.
 returns a \code{"local_only"} object backed by whichever local storage \code{x}
 already had on disk:
 \itemize{
-\item \code{"drive_cache_local"} boards keep using their standalone \code{local_board}
-/ \code{local_dir} — the same directory the user was already working in.
-\item \code{"drive_cache"} boards (no standalone local dir) fall back to their
-\code{cache_board} / \code{cache_dir}, mirroring the automatic offline fallback in
-\code{\link[=gdpins_init_board]{gdpins_init_board()}}.
+\item \code{"drive_cache"} boards keep using their one local copy — \code{local_board} /
+\code{cache_dir} — the same directory Drive reads/writes already fell back to
+when offline.
+\item \code{"drive_only"} boards have no local copy and cannot go offline; see
+below.
 \item \code{"drive_local"} raw connections keep using their existing \code{local_path}.
 }
 
 No files are copied, moved, or deleted — the returned object reuses the
 exact same local \code{pins} board / directory, so anything already on disk
 stays reachable, and anything written afterwards lands in the same place.
-The original Drive configuration (adapter, drive_path, drive/cache boards)
-is stashed on the returned object as an attribute so
+The original Drive configuration (adapter, drive_path, drive_board) is
+stashed on the returned object as an attribute so
 \code{gdpins_go_online()} can restore it later. Calling \code{gdpins_go_offline()} on
 an object that is already \code{"local_only"} is a no-op.
 
@@ -71,7 +71,6 @@ board <- gdpins_init_board(
   name       = "data_raw",
   drive_path = "my-project/data-raw",
   cache_dir  = tempfile("cache_"),
-  local_dir  = tempfile("local_"),
   adapter    = adapter,
   create     = TRUE
 )
@@ -83,7 +82,7 @@ gdpins_pin_write(board_offline, mtcars, "cars")
 
 # Reconnect and push local changes back up to Drive
 board_online <- gdpins_go_online(board_offline, on_discrepancy = "sync_to_drive")
-board_online$config    # "drive_cache_local"
+board_online$config    # "drive_cache"
 }
 \seealso{
 \code{\link[=gdpins_init_board]{gdpins_init_board()}}, \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}}, \code{\link[=gdpins_sync]{gdpins_sync()}},

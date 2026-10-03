@@ -9,7 +9,7 @@ network work at init. It records the arguments it was given and connects on
 first use: the online probe, the Drive existence/create check, folder-ID
 resolution, \code{pins} board construction, and the \code{on_discrepancy} sync check
 all run the first time something reads one of the board's components
-(\code{drive_board}, \code{cache_board}, \code{local_board}).
+(\code{drive_board}, \code{local_board}).
 
 The point is scripts that set up several boards but only touch some of them.
 Initialising three Drive boards costs three round-trips plus three sync
@@ -25,7 +25,7 @@ Any verb that touches board contents — \code{\link[=gdpins_pin_read]{gdpins_pi
 
 \code{\link[=print]{print()}}, \code{\link[=format]{format()}}, and \code{\link[=summary]{summary()}} do \strong{not} force: they describe the
 board from its declared config. Nor do the plain metadata fields (\code{name},
-\code{config}, \code{versioned}, \code{drive_path}, \code{cache_dir}, \code{local_dir}, \code{adapter}).
+\code{config}, \code{versioned}, \code{drive_path}, \code{cache_dir}, \code{adapter}).
 }
 
 \section{Consequences}{

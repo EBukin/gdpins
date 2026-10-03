@@ -35,10 +35,10 @@ Invisibly, a character vector of the version labels that were (or
 would be) removed (as reported by the primary / Drive board).
 }
 \description{
-Removes old versions of one pin from Drive \strong{and} cache (or local board),
-keeping the \code{keep} most recent. Drive versions are always \strong{trashed}
-(recoverable via \code{gd_trash()}), never hard-deleted. Cache versions are
-deleted from the local filesystem.
+Removes old versions of one pin from Drive \strong{and} the local copy (whichever
+are present on \code{board}), keeping the \code{keep} most recent. Drive versions are
+always \strong{trashed} (recoverable via \code{gd_trash()}), never hard-deleted.
+Local-copy versions are deleted from the local filesystem.
 }
 \details{
 Defaults to \code{dry_run = TRUE} for safety: the plan is shown but nothing is

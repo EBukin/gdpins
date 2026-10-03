@@ -16,7 +16,7 @@ gdpins_publish_output(
 \arguments{
 \item{tables_board}{A \code{gdpins_board} or \code{NULL}. Source board for output
 tables. The read-authoritative local pins board inside \code{tables_board} is
-mirrored to Drive (local-first: local > cache > drive board).}
+mirrored to Drive (local-first: local > drive board).}
 
 \item{figures_dir}{Character scalar or \code{NULL}. Local directory containing
 PNG/SVG figures to publish.}

@@ -3,9 +3,10 @@
 **Google Drive + pins data management for R projects.**
 
 `gdpins` layers three storage models over Google Drive for reproducible,
-offline-capable data pipelines. Drive is the source of truth; a local cache
-mirrors it. Reads are local-first; writes fan out to Drive and cache
-simultaneously; sync and delete are always explicit and guarded.
+offline-capable data pipelines. Drive is the source of truth; each Drive
+board keeps one local copy. Writes go to Drive, then the local copy; reads
+check the local copy first, then Drive; sync and delete are always explicit
+and guarded.
 
 ## Storage layers
 
@@ -55,25 +56,24 @@ A board wraps one layer of the data pipeline. Three configurations:
 # Local only — no Drive, works fully offline
 bd_local <- gdpins_init_board(
   name      = "scratch",
-  local_dir = "path/to/local/folder"
+  cache_dir = "path/to/local/folder"
 )
 
-# Drive + cache — standard production configuration
+# Drive + one local copy — standard production configuration
 bd_raw <- gdpins_init_board(
   name           = "data_raw",
   drive_path     = "my-project-data/data-raw",
-  cache_dir      = "path/to/data-raw-cache",
+  cache_dir      = "path/to/data-raw-cache",   # or omit for the default path
   versioned      = TRUE,
   create         = NA,        # prompt to create if Drive folder absent
   on_discrepancy = "prompt"   # "warn" for non-interactive scripts
 )
 
-# Drive + cache + standalone local (super config)
+# Drive only — no local copy; Drive downloads go to a session temp dir
 bd_clean <- gdpins_init_board(
   name       = "data_clean",
   drive_path = "my-project-data/data-clean",
-  cache_dir  = "path/to/data-clean-cache",
-  local_dir  = "path/to/data-clean-local",
+  cache_dir  = FALSE,
   versioned  = TRUE
 )
 ```

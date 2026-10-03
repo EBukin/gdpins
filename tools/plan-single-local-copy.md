@@ -354,9 +354,9 @@ Leftovers / risks:          <list>
 | T4 | sonnet | done | V4 | PASS (6 [V4]) | 2 locked-files tests use `b$cache_board` (off-limits) → T7 |
 | T5 | sonnet | done | V5 | PASS | 4 [V5] tests |
 | T6 | sonnet | done | V6 | PASS (5 [V6]) | vector `name` gives raw R error (pre-existing; hardening idea) |
-| T7 | sonnet | in progress | V7 | todo | Phase 3 |
-| T8 | sonnet | in progress | V8 | todo | Phase 3 |
-| Gate | orchestrator | todo | – | – | |
+| T7 | sonnet | done | V7 | PASS (5 [V7]) | scope extended to test-sync.R 1238/1249/1251 |
+| T8 | sonnet | done | V8 | PASS (round 2) | round 1 FAIL: @param cache_dir wrong for local_only; fixed |
+| Gate | orchestrator | done | – | – | 740 tests 0 fail 0 warn 28 skip; R CMD check 0E/0W/2 pre-existing NOTEs |
 
 Decisions log
 - 2026-10-03: default cache root `fs::path_home(".gdpins","cache")`, not `tools::R_user_dir()` (user).
@@ -383,3 +383,11 @@ Decisions log
   read-order / fan-out / remove assertions would catch regressions (orchestrator).
 - 2026-10-03: Phase 2 gate: 735 tests, 24 failures (integration 13, pipeline 9, sync locked-files 2 —
   all T7 scope), 0 warnings. No `cache_board`/`drive_cache_local` in R code (orchestrator).
+- 2026-10-04: reboot mid-Phase 3; T7/T8 resumed from saved transcripts, partial work intact.
+- 2026-10-04: T7 scope extended to test-sync.R 1238/1249/1251 (same mechanical rename; brief missed them).
+- 2026-10-04: Final gate: full suite 740 tests, 0 failed, 0 warnings, 28 skipped (3 benchmark, 4 On CRAN,
+  21 LIVE). R CMD check --no-manual: 0 errors, 0 warnings, 2 NOTEs, both pre-existing (untracked `.claude/`
+  worktree dir; `nanoparquet` in Imports unused since 1a4658e on main). Nothing under real `~/.gdpins`.
+  roxygenise stable; NAMESPACE unchanged. Leftovers: test-lazy.R:112 unmocked `gdpins_is_online()` DNS
+  flake (pre-existing); 1-second version-label resolution can turn same-second offline/online writes into
+  a "conflict" whose copy-back aborts in pins (pre-existing, R/sync.R); prune vector `name` raw error.

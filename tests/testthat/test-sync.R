@@ -1235,7 +1235,7 @@ test_that(".copy_pin_to_board warns when pin not found on source", {
   b <- new_fake_board("drive_cache")
   # drive_board doesn't have the pin; this triggers the warn path
   expect_warning(
-    gdpins:::.copy_pin_to_board(b$drive_board, b$cache_board, "nonexistent_pin"),
+    gdpins:::.copy_pin_to_board(b$drive_board, b$local_board, "nonexistent_pin"),
     class = "rlang_warning"
   )
 })
@@ -1246,9 +1246,9 @@ test_that(".copy_pin_to_board preserves the source pin's type", {
     pins::pin_write(b$drive_board, fx_plain_tbl(), "typed_pin", type = "parquet")
   )
 
-  gdpins:::.copy_pin_to_board(b$drive_board, b$cache_board, "typed_pin")
+  gdpins:::.copy_pin_to_board(b$drive_board, b$local_board, "typed_pin")
 
-  expect_equal(pins::pin_meta(b$cache_board, "typed_pin")$type, "parquet")
+  expect_equal(pins::pin_meta(b$local_board, "typed_pin")$type, "parquet")
 })
 
 # Cover .sync_raw "skip" effective_dir (in_sync state with auto direction)
@@ -1267,11 +1267,11 @@ test_that("sync_raw skips in_sync files without error", {
 test_that(".compare_board_pin returns in_sync when both sides absent (defensive)", {
   b <- new_fake_board("drive_cache")
   .write_pin(b$drive_board, data.frame(x = 1), "p_def")
-  .write_pin(b$cache_board, data.frame(x = 1), "p_def")
+  .write_pin(b$local_board, data.frame(x = 1), "p_def")
   result <- gdpins:::.compare_board_pin(
     pin_name    = "p_def",
     drive_board = b$drive_board,
-    local_board = b$cache_board,
+    local_board = b$local_board,
     in_drive    = FALSE,
     in_local    = FALSE
   )
@@ -1296,7 +1296,7 @@ test_that(".compare_board_pin returns conflict when timestamps are NA", {
   result <- gdpins:::.compare_board_pin(
     pin_name    = "p_na",
     drive_board = b$drive_board,
-    local_board = b$cache_board,
+    local_board = b$local_board,
     in_drive    = TRUE,
     in_local    = TRUE
   )

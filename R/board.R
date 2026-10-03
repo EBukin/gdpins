@@ -219,9 +219,16 @@ NULL
 #' @param name Character scalar. Board/layer label (e.g. `"data_raw"`).
 #' @param drive_path Character scalar. Drive path for the board (relative to
 #'   the adapter root), or `NULL` for `"local_only"`.
-#' @param cache_dir Character scalar. Local cache directory path, or `NULL`.
-#' @param local_dir Character scalar. Standalone local board directory path, or
-#'   `NULL`.
+#' @param cache_dir Character scalar, `TRUE`, `FALSE`, or `NULL` (default).
+#'   Path of the board's one local copy. `NULL`/`TRUE` use the default path
+#'   under `getOption("gdpins.cache_dir")`; `FALSE` means no local copy
+#'   (`"drive_only"`); a path uses that directory. For boards without
+#'   `drive_path` (`"local_only"`), `cache_dir` must be a non-empty character
+#'   path — the local board's directory; `NULL`/`TRUE`/`FALSE` error ("Supply
+#'   `drive_path`, or `cache_dir` as a path for a local-only board.").
+#' @param local_dir Character scalar. Deprecated as of 0.0.1.9024; superseded
+#'   by `cache_dir`. If supplied while `cache_dir` is `NULL`, it is used as
+#'   `cache_dir`; otherwise it is ignored (with a deprecation warning).
 #' @param versioned Logical. Whether the board stores pin versions. Default
 #'   `TRUE`.
 #' @param create Logical or `NA`. `TRUE` = create Drive board if absent;
@@ -255,10 +262,11 @@ NULL
 #' # --- Real adapter (requires Google Drive auth) ---
 #' \dontrun{
 #' adapter <- gdpins_real_drive("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms")
+#' # cache_dir omitted: local copy defaults to
+#' # getOption("gdpins.cache_dir")/<root>/<drive_path>
 #' board <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "my-project/data-raw",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )
@@ -267,7 +275,6 @@ NULL
 #' board2 <- gdpins_init_board(
 #'   name       = "data_raw",
 #'   drive_path = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
-#'   cache_dir  = "~/.cache/gdpins/data-raw",
 #'   adapter    = adapter,
 #'   create     = TRUE
 #' )
