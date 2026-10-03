@@ -760,10 +760,11 @@ gdpins_sync.default <- function(
     ))
   }
 
-  conflicts <- character()
-  failures  <- character()
-  fail_msgs <- character()
-  n_actions <- 0L
+  conflicts  <- character()
+  failures   <- character()
+  fail_msgs  <- character()
+  unreadable <- logical()
+  n_actions  <- 0L
 
   # One unreadable/locked file must not abandon the remaining files: each
   # transfer is isolated and its error collected for a summary at the end.
@@ -772,8 +773,9 @@ gdpins_sync.default <- function(
       force(expr)
       TRUE
     }, error = function(e) {
-      failures  <<- c(failures, fname)
-      fail_msgs <<- c(fail_msgs, conditionMessage(e))
+      failures   <<- c(failures, fname)
+      fail_msgs  <<- c(fail_msgs, conditionMessage(e))
+      unreadable <<- c(unreadable, inherits(e, "gdpins_error_unreadable_file"))
       FALSE
     })
   }
@@ -824,10 +826,28 @@ gdpins_sync.default <- function(
   }
 
   if (length(failures) > 0L) {
+    # File names and error messages are arbitrary text that may itself
+    # contain "{"/"}" -- pasting them straight into a cli template would make
+    # cli re-parse that text as glue and crash (e.g. a file named "a{b}.csv").
+    # Referencing them as indexed expressions instead keeps them data: cli
+    # substitutes the looked-up value without re-parsing it.
+    bullets <- vapply(seq_along(failures), function(i) {
+      sprintf("{.val {failures[%d]}}: {fail_msgs[%d]}", i, i)
+    }, character(1))
+    names(bullets) <- rep("x", length(bullets))
+
+    # The "close the program" hint only applies to the unreadable/locked-file
+    # case; showing it for download/auth/network failures is misleading.
+    hint <- if (any(unreadable)) {
+      c("i" = "Close any program holding these files open, then re-run {.fn gdpins_sync}.")
+    } else {
+      character()
+    }
+
     cli::cli_warn(c(
-      "!" = "{length(failures)} file{?s} could not be synced; the rest were synced normally.",
-      .named_bullets("x", paste0(failures, ": ", fail_msgs)),
-      "i" = "Close any program holding these files open, then re-run {.fn gdpins_sync}."
+      "!" = "{n_actions} file{?s} synced, {length(failures)} failed.",
+      bullets,
+      hint
     ))
   }
 
@@ -853,18 +873,6 @@ gdpins_sync.default <- function(
   }
 
   invisible(x)
-}
-
-#' Build a named character vector for use as cli bullets
-#'
-#' @param nm Character scalar. Bullet name to repeat (e.g. `"x"`).
-#' @param x Character vector of bullet texts.
-#'
-#' @return `x`, with every element named `nm`.
-#' @keywords internal
-.named_bullets <- function(nm, x) {
-  names(x) <- rep(nm, length(x))
-  x
 }
 
 #' Test whether a local file can actually be opened for reading
@@ -900,10 +908,13 @@ gdpins_sync.default <- function(
     return(invisible(NULL))
   }
   if (!.file_is_readable(local_file)) {
-    cli::cli_abort(c(
-      "Cannot read local file: {.path {local_file}}",
-      "i" = "It is most likely open in another program, or locked by a sync client."
-    ))
+    cli::cli_abort(
+      c(
+        "Cannot read local file: {.path {local_file}}",
+        "i" = "It is most likely open in another program, or locked by a sync client."
+      ),
+      class = "gdpins_error_unreadable_file"
+    )
   }
   gd_upload(conn$adapter, local_file, drive_path)
   invisible(NULL)

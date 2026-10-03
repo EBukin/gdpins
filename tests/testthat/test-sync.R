@@ -827,13 +827,84 @@ test_that("raw sync keeps going when one file fails, and reports it", {
 
   expect_warning(
     suppressMessages(gdpins_sync(conn, direction = "auto")),
-    "could not be synced"
+    "2 files synced, 1 failed"
   )
 
   # The files either side of the failure made it to Drive.
   expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/aaa.csv")))
   expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/ccc.csv")))
   expect_false(gd_exists(conn$adapter, paste0(conn$drive_path, "/bbb.csv")))
+})
+
+# Regression: a failing file name and/or error message containing literal
+# "{"/"}" must not make the end-of-run cli_warn() itself error out -- cli
+# treats those characters as glue syntax unless the value is substituted by
+# reference rather than pasted straight into the template string.
+test_that("raw sync failure summary survives braces in file names and error messages", {
+  conn <- new_fake_raw_conn("drive_local")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+
+  for (nm in c("aaa.csv", "a{bad}.csv")) {
+    write.csv(data.frame(x = 1:3), file.path(conn$local_path, nm), row.names = FALSE)
+  }
+
+  real_copy <- gdpins:::.raw_copy_to_drive
+  local_mocked_bindings(
+    .raw_copy_to_drive = function(conn, rel_name) {
+      if (rel_name == "a{bad}.csv") stop("read error with {curly} in message")
+      real_copy(conn, rel_name)
+    },
+    .package = "gdpins"
+  )
+
+  expect_warning(
+    suppressMessages(gdpins_sync(conn, direction = "auto")),
+    "a\\{bad\\}\\.csv"
+  )
+
+  expect_true(gd_exists(conn$adapter, paste0(conn$drive_path, "/aaa.csv")))
+})
+
+# The "close any program" hint is only accurate for the unreadable/locked-file
+# failure mode; it must not appear for unrelated transfer failures.
+test_that("raw sync shows the 'close the program' hint only for unreadable-file failures", {
+  conn <- new_fake_raw_conn("drive_local")
+  dir.create(file.path(conn$local_path, "locked.csv"))
+
+  local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) {
+      tibble::tibble(name = "locked.csv", state = "local_ahead")
+    },
+    .package = "gdpins"
+  )
+
+  expect_warning(
+    suppressMessages(gdpins_sync(conn, direction = "auto")),
+    "Close any program"
+  )
+})
+
+test_that("raw sync omits the 'close the program' hint for non-lock failures", {
+  conn <- new_fake_raw_conn("drive_local")
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+
+  write.csv(data.frame(x = 1:3), file.path(conn$local_path, "aaa.csv"), row.names = FALSE)
+
+  local_mocked_bindings(
+    .raw_copy_to_drive = function(conn, rel_name) stop("network down"),
+    .package = "gdpins"
+  )
+
+  w <- tryCatch(
+    {
+      suppressMessages(gdpins_sync(conn, direction = "auto"))
+      NULL
+    },
+    warning = function(w) w
+  )
+  expect_false(is.null(w))
+  expect_false(grepl("Close any program", conditionMessage(w), fixed = TRUE))
 })
 
 # Cover .effective_direction skip fallthrough for offline state
