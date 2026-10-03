@@ -84,7 +84,7 @@ Two numbered series in `.docs/`, `NNNN-short-name.md`: four digits, next number 
 |---|---|---|
 | `.docs/handoffs/` | a session ends with work unfinished; written for an agent with no context | date, where things stand, how to verify, next steps |
 | `.docs/notes/` | the user says "note this" or "record this", or a decision is worth keeping | date, author, one-line summary, then the instruction quoted verbatim |
-| `.docs/plans/` | the user says "note this" or "record this", or a decision is worth keeping | date, author, one-line summary, then the instruction quoted verbatim |
+| `.docs/plans/` | plans of hte features that needs to be developed | see the template |
 
 Quote the user's instruction verbatim in a note before paraphrasing it. Never renumber, rename or delete an existing file in these folders.
 <!-- /eb:docs -->
