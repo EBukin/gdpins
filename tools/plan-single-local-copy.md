@@ -346,8 +346,8 @@ Leftovers / risks:          <list>
 
 | Task | Agent | State | Verifier | State | Notes |
 |---|---|---|---|---|---|
-| P0 | orchestrator | in progress | – | – | branch + plan committed; raw-sync fix merged (184a935); briefs todo |
-| T1 | | todo | V1 | todo | |
+| P0 | orchestrator | done | – | – | branch + plan committed; raw-sync fix merged (184a935); briefs in `tools/briefs/` |
+| T1 | sonnet | in progress | V1 | todo | |
 | T2 | | todo | V2 | todo | after V1 PASS |
 | T3 | | todo | V3 | todo | Phase 2 |
 | T4 | | todo | V4 | todo | Phase 2 |
@@ -364,3 +364,12 @@ Decisions log
   `drive_cache`, `drive_only` (orchestrator, accepted).
 - 2026-10-03: merged `fix/raw-sync-locked-files` into this branch before Phase 1; T4 must leave
   raw-sync code and `Unreadable / locked local files` tests untouched (user).
+- 2026-10-03: test-board.R sections 1–3 moved T1 → T2 (they go through `.build_board`; T1 cannot
+  make them GREEN). T1 keeps section 8 + pure `.board_spec()` tests (orchestrator).
+- 2026-10-03: spec list drops `local_dir`; names `name, drive_path, cache_dir, versioned, create,
+  on_discrepancy, adapter, config`; `cache_dir` NULL for `drive_only` (orchestrator).
+- 2026-10-03: `.default_cache_dir()` also drops empty components and maps `.`/`..` to `_`
+  (traversal guard) (orchestrator).
+- 2026-10-03: print/summary path label `local` for `local_only`, `cache` otherwise (orchestrator).
+- 2026-10-03: T1 adds placeholder `# gdpins 0.0.1.9024` NEWS heading to keep DESCRIPTION == NEWS;
+  T8 writes the entry (orchestrator).
