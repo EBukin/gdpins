@@ -217,8 +217,8 @@ gdpins_sync.default <- function(
   drive_board <- x$drive_board
   local_board <- .board_local_side(x)
 
-  drive_pins <- tryCatch(pins::pin_list(drive_board), error = function(e) character())
-  local_pins <- tryCatch(pins::pin_list(local_board), error = function(e) character())
+  drive_pins <- pins::pin_list(drive_board)
+  local_pins <- pins::pin_list(local_board)
   all_pins   <- union(drive_pins, local_pins)
   all_pins   <- .drop_invalid_names(all_pins, .check_pin_name, "pin name")
 
@@ -290,11 +290,9 @@ gdpins_sync.default <- function(
 
 #' @keywords internal
 .latest_version <- function(board, pin_name) {
-  tryCatch({
-    v <- pins::pin_versions(board, pin_name)
-    if (nrow(v) == 0L) return(NULL)
-    v[nrow(v), ]
-  }, error = function(e) NULL)
+  v <- pins::pin_versions(board, pin_name)
+  if (nrow(v) == 0L) return(NULL)
+  v[nrow(v), ]
 }
 
 #' @keywords internal
@@ -363,10 +361,7 @@ gdpins_sync.default <- function(
   }
 
   # List files on drive side
-  drive_files_tbl <- tryCatch(
-    gd_ls(x$adapter, x$drive_path, recursive = TRUE),
-    error = function(e) .empty_gd_ls_tbl()
-  )
+  drive_files_tbl <- gd_ls(x$adapter, x$drive_path, recursive = TRUE)
   drive_files <- drive_files_tbl |>
     dplyr::filter(!.data$is_dir) |>
     dplyr::mutate(

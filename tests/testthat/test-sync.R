@@ -1346,16 +1346,15 @@ test_that("raw status returns conflict when md5 differs and mtime is NA", {
   expect_true(file.exists(file.path(conn$local_path, "na_mtime.csv")))
 })
 
-# Cover .board_status_raw gd_ls error fallback to empty tbl
-test_that("board_status_raw handles gd_ls error gracefully", {
+# A Drive listing error must propagate, not read as an empty Drive folder (H4)
+test_that("board_status_raw propagates a gd_ls error", {
   conn <- new_fake_raw_conn("drive_local")
   local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     gd_ls            = function(...) stop("Drive error"),
     .package = "gdpins"
   )
-  st <- gdpins_board_status(conn)
-  expect_equal(nrow(st), 0L)
+  expect_error(gdpins_board_status(conn), "Drive error")
 })
 
 # Cover .latest_version returning NULL when pin_versions has 0 rows
@@ -1397,4 +1396,47 @@ test_that("raw_conn status local_ahead via newer local mtime", {
 
   st <- gdpins_board_status(conn)
   expect_true(st$state[st$name == "both2.csv"] %in% c("local_ahead", "conflict"))
+})
+
+# ── H4: Drive listing errors propagate instead of reading as "absent" ────────
+
+test_that("raw status and sync propagate a Drive listing error", {
+  conn <- new_fake_raw_conn("drive_local")
+  writeLines("a,b", file.path(conn$local_path, "local.csv"))
+  local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    gd_ls = function(...) {
+      cli::cli_abort("403", class = "gdpins_error_drive_listing")
+    },
+    .package = "gdpins"
+  )
+  expect_error(gdpins_board_status(conn), class = "gdpins_error_drive_listing")
+  expect_error(gdpins_sync(conn), class = "gdpins_error_drive_listing")
+  expect_false(conn$adapter$exists(paste0(conn$drive_path, "/local.csv")))
+})
+
+test_that("board status and sync propagate a Drive pin_list error", {
+  b <- new_fake_board("drive_cache")
+  pins::pin_write(b$local_board, 1:3, "p1", type = "rds")
+  real_pin_list <- pins::pin_list
+  drive_path <- b$drive_board$path
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+  local_mocked_bindings(
+    pin_list = function(board, ...) {
+      if (identical(board$path, drive_path)) stop("403") else real_pin_list(board, ...)
+    },
+    .package = "pins"
+  )
+  expect_error(gdpins_board_status(b), "403")
+  expect_error(gdpins_sync(b), "403")
+  expect_false(fs::dir_exists(fs::path(drive_path, "p1")))
+})
+
+test_that(".latest_version propagates a pin_versions error", {
+  b <- new_fake_board("drive_cache")
+  local_mocked_bindings(
+    pin_versions = function(board, name, ...) stop("403"),
+    .package = "pins"
+  )
+  expect_error(gdpins:::.latest_version(b$drive_board, "p"), "403")
 })

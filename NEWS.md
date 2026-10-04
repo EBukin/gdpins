@@ -2,6 +2,19 @@
 
 ## Breaking changes
 
+* **Duplicate-named Drive items now error (H3).** When a Drive folder holds
+  more than one item with the same name, the real Drive adapter stops with an
+  error of class `gdpins_error_ambiguous_drive_name` that lists each
+  duplicate's id and modified time. Previously it silently picked the first
+  one, so a read, overwrite or trash could hit an arbitrary duplicate.
+* **Drive errors surface instead of reading as "absent" (H4).** An error from
+  Drive while listing or looking up a path (expired token, 403, quota, network)
+  now propagates. `gdpins_init_board()` and `gdpins_raw_connect()` stop with
+  that error instead of taking the create-confirm path for a folder that
+  exists. A transient error means "re-run". `gdpins_raw_remove()` deletes the
+  local file before trashing it on Drive, so a Drive error there now surfaces
+  after the local delete; before, the Drive failure was silently ignored.
+
 ## Bug fixes
 
 * **Pin names are validated (H1).** `gdpins_pin_write()`, `gdpins_pin_read()`,
@@ -31,6 +44,25 @@
   `gdpins_refresh_disconnect()` skip an unsafe Drive name with a
   `gdpins_warning_invalid_name` warning; `gdpins_sync()` reports it as a failed
   file.
+* **Drive names are matched literally (H3).** The real Drive adapter compared
+  names as unescaped regular expressions. A name containing `(`, `)`, `+`,
+  `[`, `*`, `?`, `^`, `$`, `|`, `{` or `}` never matched itself: `exists()`
+  returned `FALSE`, downloads said "not found", trash did nothing, and every
+  upload created a new duplicate file. `.` matched any character, so `a.csv`
+  could resolve to `abcsv`. Names are now compared with `==`. The raw
+  connection's Drive-prefix strip had the same bug and now uses `startsWith()`.
+* **Remediation for duplicates left by the old H3 bug.** Each write of a name
+  with regex metacharacters created another Drive file of the same name; such
+  folders now raise `gdpins_error_ambiguous_drive_name`. List them with
+  `googledrive::drive_ls(<folder>)`, keep the file with the newest
+  `modifiedTime`, and `googledrive::drive_trash()` the rest.
+* **Drive listing and lookup errors are no longer swallowed (H4).** The real
+  adapter's `exists`, `get_id`, `download`, `trash`, `md5`, `mtime`, `ls`,
+  `mkdir` and `upload`, and `gdpins_board_status()` / `gdpins_sync()` for
+  boards (`pins::pin_list()`, `pins::pin_versions()`) and raw connections
+  (`gd_ls()`), caught every error and treated it as "nothing there". During
+  an outage that created duplicate folders and files, and made sync report
+  every local item `local_ahead` and push stale local copies over Drive.
 
 ## Security
 

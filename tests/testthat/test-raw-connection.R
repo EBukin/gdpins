@@ -1316,3 +1316,18 @@ test_that("put verbs reject a vector name with a gdpins class (not base R if())"
     class = "gdpins_error_invalid_name"
   )
 })
+
+# ── H3: .gd_ls_to_rel strips drive_path literally, not as a regex ─────────────
+
+test_that(".gd_ls_to_rel strips a drive_path containing regex metacharacters", {
+  adapter <- gdpins_fake_drive(withr::local_tempdir())
+  expect_identical(
+    gdpins:::.gd_ls_to_rel("data (raw)/a.csv", adapter, "data (raw)"),
+    "a.csv"
+  )
+  # '.' in drive_path must not match an arbitrary character
+  expect_identical(
+    gdpins:::.gd_ls_to_rel("dataXraw/a.csv", adapter, "data.raw"),
+    "dataXraw/a.csv"
+  )
+})

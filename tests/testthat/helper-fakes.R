@@ -275,3 +275,35 @@ mock_status_offline <- function() {
     local_hash    = NA_character_
   )
 }
+
+# ── Real-adapter fixtures ─────────────────────────────────────────────────────
+# A minimal stand-in for a googledrive dribble: the columns the real adapter
+# reads (`name`, `id`, `drive_resource` with mimeType / md5Checksum /
+# modifiedTime / size). Vectorised over `name`; used with
+# local_mocked_bindings(..., .package = "googledrive").
+
+fake_dribble <- function(name    = character(),
+                         id      = paste0("id_", name),
+                         mime    = "text/csv",
+                         md5     = "d41d8cd98f00b204e9800998ecf8427e",
+                         mtime   = "2024-01-01T00:00:00.000Z") {
+  n <- length(name)
+  mime  <- rep_len(mime, n)
+  md5   <- rep_len(md5, n)
+  mtime <- rep_len(mtime, n)
+  tibble::tibble(
+    name = as.character(name),
+    id   = as.character(id),
+    drive_resource = lapply(seq_len(n), function(i) list(
+      kind         = "drive#file",
+      mimeType     = mime[[i]],
+      md5Checksum  = md5[[i]],
+      modifiedTime = mtime[[i]],
+      size         = "10"
+    ))
+  )
+}
+
+fake_folder_dribble <- function(name, id = paste0("id_", name)) {
+  fake_dribble(name, id, mime = "application/vnd.google-apps.folder")
+}

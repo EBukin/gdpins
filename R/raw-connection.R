@@ -415,9 +415,10 @@ print.gdpins_raw_listing <- function(x, ...) {
                                   adapter_root_norm), "/?"), "", paths)
   }
 
-  # Now strip drive_path prefix if present
+  # Now strip drive_path prefix if present (literal match, not a regex)
   prefix <- paste0(drive_path, "/")
-  paths  <- sub(paste0("^", prefix), "", paths)
+  hit    <- startsWith(paths, prefix)
+  paths[hit] <- substring(paths[hit], nchar(prefix) + 1L)
 
   paths
 }
