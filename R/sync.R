@@ -146,7 +146,7 @@ gdpins_board_status.default <- function(x) {
 #'   `gdpins_error_sync_conflict` (plus `gdpins_error_unversioned_conflict`
 #'   for `"version"`). `"prompt"` asks which side to keep.
 #' - Raw connections with `"version"` (default): the local file is copied to
-#'   `<name>.conflict-<UTC timestamp>.<ext>` next to it, then the Drive copy
+#'   `<stem>.conflict-<UTC timestamp>.<ext>` next to it, then the Drive copy
 #'   replaces it, with a warning of class
 #'   `gdpins_warning_raw_conflict_backup`. The backup is a normal file in
 #'   `local_path`: the next sync uploads it unless you delete it. `"stop"`

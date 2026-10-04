@@ -38,25 +38,6 @@
 
 ## Bug fixes
 
-* **Versioned conflicts keep both sides on both boards (H5).** Conflict
-  resolution copied Drive to local and then local's *new* latest (Drive's
-  content) back to Drive, so the local content never reached Drive and the pin
-  was reported in sync. Now both pre-conflict contents become versions on both
-  boards; the one with the later `created` time (tie: Drive) is the latest on
-  both. Writes wait for the next second when needed, because pins version ids
-  have one-second resolution and same-second ids sort by hash, not by write
-  order. Copies between boards (conflicts and normal sync) now keep `title`,
-  `description`, user `metadata`, `tags` and `urls`, not only `type`. A copy
-  whose source cannot be read is no longer counted or reported as synced.
-* **Raw conflicts back up the local file (H7).** With the default
-  `on_conflict = "version"`, a raw file that changed on both sides was
-  overwritten by Drive's copy with only an info message. The local file is
-  now first copied to `<name>.conflict-<UTC timestamp>.<ext>` in the same
-  folder, then Drive's copy replaces it, with a warning of class
-  `gdpins_warning_raw_conflict_backup`. The backup is a normal file in
-  `local_path`, so the next `gdpins_sync()` uploads it to Drive unless you
-  delete it.
-
 * **Pin names are validated (H1).** `gdpins_pin_write()`, `gdpins_pin_read()`,
   `gdpins_pin_path()`, `gdpins_pin_remove()`, `gdpins_pin_info()` and
   `gdpins_prune_pin_versions()` reject `"."`, `".."`, names starting with a
@@ -103,6 +84,16 @@
   (`gd_ls()`), caught every error and treated it as "nothing there". During
   an outage that created duplicate folders and files, and made sync report
   every local item `local_ahead` and push stale local copies over Drive.
+* **Versioned conflicts keep both sides on both boards (H5).** Conflict
+  resolution copied Drive to local and then local's *new* latest (Drive's
+  content) back to Drive, so the local content never reached Drive and the pin
+  was reported in sync. Now both pre-conflict contents become versions on both
+  boards; the one with the later `created` time (tie: Drive) is the latest on
+  both. Writes wait for the next second when needed, because pins version ids
+  have one-second resolution and same-second ids sort by hash, not by write
+  order. Copies between boards (conflicts and normal sync) now keep `title`,
+  `description`, user `metadata`, `tags` and `urls`, not only `type`. A copy
+  whose source cannot be read is no longer counted or reported as synced.
 * **Edits on both sides are detected as conflicts (H6).** Status used
   "newer timestamp wins" whenever the two sides differed, so a pin or raw file
   edited on both sides since the last sync was reported `drive_ahead` or
@@ -120,6 +111,14 @@
   timestamp rule until the first sync records one. An unreadable baseline file
   raises one warning of class `gdpins_warning_baseline_unreadable` and is
   ignored. The status tibble's columns are unchanged.
+* **Raw conflicts back up the local file (H7).** With the default
+  `on_conflict = "version"`, a raw file that changed on both sides was
+  overwritten by Drive's copy with only an info message. The local file is
+  now first copied to `<stem>.conflict-<UTC timestamp>.<ext>` in the same
+  folder, then Drive's copy replaces it, with a warning of class
+  `gdpins_warning_raw_conflict_backup`. The backup is a normal file in
+  `local_path`, so the next `gdpins_sync()` uploads it to Drive unless you
+  delete it.
 * **Pruning no longer deletes unsynced local versions, and reports every
   deletion (H8).** The plan, the dry-run listing, the threshold count and the
   return value came from Drive only, while the local copy was pruned on its

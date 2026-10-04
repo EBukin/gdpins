@@ -15,3 +15,4 @@
 ^\.docs$
 ^\.claude$
 ^\.gitattributes$
+^\.git$

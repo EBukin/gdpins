@@ -184,6 +184,12 @@ See `?"lazy-boards"` for the full picture.
 ## Writing and reading pins
 
 Pin names are **bare snake_case** — the board encodes the layer.
+A pin name becomes a directory, so gdpins rejects `"."`, `".."`, names
+starting with a dot, and names containing `/`, `\` or a control character,
+with an error of class `gdpins_error_invalid_name`. Raw file names may hold
+`/` sub-folders but no `.` or `..` segment, absolute path, drive letter or
+backslash. Such names are refused before anything is read or written; a bad
+name found in a Drive listing is skipped with a warning. See `?verbs`.
 
 ```{r pin-write}
 library(dplyr)
@@ -471,14 +477,21 @@ Conflict handling (an item changed on both sides since the last sync):
 
 - Versioned boards: both contents, with their metadata, become versions on
   Drive and local. The newer one (tie: Drive) is the latest version on both,
-  so the pin is in sync afterwards.
+  so the pin is in sync afterwards. `on_conflict` is ignored here.
 - Unversioned boards: one slot per pin cannot hold both sides. The default
   `on_conflict = "version"` and `"stop"` leave conflicting pins unchanged and
   stop with an error; `"prompt"` asks which side to keep.
 - Raw connections: the default copies the local file to
-  `<name>.conflict-<timestamp>.<ext>`, lets Drive's copy replace it and warns.
-  The backup is a normal file, so the next sync uploads it unless you delete
-  it. `"stop"` halts and reports; `"prompt"` asks per conflict.
+  `<stem>.conflict-<UTC timestamp>.<ext>`, lets Drive's copy replace it and
+  warns. The backup is a normal file, so the next sync uploads it unless you
+  delete it. `"stop"` halts and reports; `"prompt"` asks per conflict.
+
+Drive errors (expired token, 403, quota, network) propagate: status, sync,
+`gdpins_init_board()` and `gdpins_raw_connect()` stop instead of treating the
+Drive side as empty. Re-run once Drive is reachable. Drive names are matched
+literally; a folder holding two items of the same name raises
+`gdpins_error_ambiguous_drive_name`. Keep one (`googledrive::drive_ls()`) and
+`googledrive::drive_trash()` the rest.
 
 ## Discovery
 
@@ -534,8 +547,17 @@ gdpins_publish_output(
 gdpins_prune_pin_versions(bd_raw, "gdp_panel", keep = 3, dry_run = TRUE)
 
 # Actually prune
-gdpins_prune_board_versions(bd_raw, keep = 2, dry_run = FALSE, force = TRUE)
+plan <- gdpins_prune_board_versions(bd_raw, keep = 2, dry_run = FALSE, force = TRUE)
+plan[plan$action == "keep_unsynced", ]   # local versions not yet on Drive
 ```
+
+Both prune functions return, invisibly, one tibble with columns `name`,
+`version`, `side` (`"drive"` or `"local"`), `hash` and `action` (`"remove"` or
+`"keep_unsynced"`). A local version beyond `keep` is deleted only when its
+content hash is also on Drive; otherwise it is kept. On a board taken offline
+with `gdpins_go_offline()`, every local version is kept. `threshold` is
+compared with the total over all pins of the larger of the Drive and local
+removal counts, so local-only deletions count too.
 
 ## Console output
 
