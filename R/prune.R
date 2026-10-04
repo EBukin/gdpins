@@ -12,8 +12,8 @@ NULL
 
 #' Resolve the authoritative sub-board for a given config
 #'
-#' For Drive boards (`drive_cache`, `drive_only`): Drive board is authoritative
-#' for reporting the removed version labels. For `local_only`: the local copy
+#' For Drive boards (`drive_cache`, `drive_only`): Drive board is the one
+#' whose pins are enumerated by board-level pruning. For `local_only`: the local copy
 #' is the only board.
 #'
 #' @param board A `gdpins_board` object.
@@ -23,24 +23,165 @@ NULL
   if (!is.null(board$drive_board)) board$drive_board else board$local_board
 }
 
-#' Compute version labels to remove for a given sub-board (oldest, keeping newest)
+#' An empty prune plan
 #'
-#' `pins::pin_versions()` returns rows sorted ascending by `created` (oldest
-#' first, newest last). We keep the last `keep` rows and remove the rest.
-#' Each sub-board (drive, local) may have slightly different timestamp
-#' prefixes in version labels even for the same logical version, so each board
-#' must compute its own removal list independently.
+#' @return A 0-row tibble with the prune plan columns `name`, `version`,
+#'   `side`, `hash` and `action`.
+#' @keywords internal
+.empty_prune_plan <- function() {
+  tibble::tibble(
+    name    = character(),
+    version = character(),
+    side    = character(),
+    hash    = character(),
+    action  = character()
+  )
+}
+
+#' Build prune plan rows
 #'
-#' @param sub_board A `pins` board.
+#' @param name Pin name.
+#' @param versions A `pins::pin_versions()` tibble (subset of rows), or
+#'   `NULL` for none.
+#' @param side `"drive"` or `"local"`.
+#' @param action Character vector, recycled to `nrow(versions)`.
+#' @return A prune plan tibble.
+#' @keywords internal
+.prune_plan_rows <- function(name, versions, side, action) {
+  n <- if (is.null(versions)) 0L else nrow(versions)
+  if (n == 0L) return(.empty_prune_plan())
+  hash <- if (is.null(versions$hash)) NA_character_ else as.character(versions$hash)
+  tibble::tibble(
+    name    = rep(name, n),
+    version = as.character(versions$version),
+    side    = rep(side, n),
+    hash    = rep_len(hash, n),
+    action  = rep_len(action, n)
+  )
+}
+
+#' List a pin's versions on a sub-board, or `NULL` when it is not there
+#'
+#' @param sub_board A `pins` board or `NULL`.
+#' @param name Pin name.
+#' @return A `pins::pin_versions()` tibble, or `NULL`.
+#' @keywords internal
+.pin_versions_if_exists <- function(sub_board, name) {
+  if (is.null(sub_board) || !pins::pin_exists(sub_board, name)) return(NULL)
+  pins::pin_versions(sub_board, name)
+}
+
+#' Rows of a versions tibble beyond the newest `keep`
+#'
+#' `pins::pin_versions()` returns rows oldest first, newest last. We keep the
+#' last `keep` rows and return the rest.
+#'
+#' @param versions A `pins::pin_versions()` tibble or `NULL`.
+#' @param keep Integer. Number of newest versions to keep.
+#' @return A tibble (possibly 0 rows) or `NULL`.
+#' @keywords internal
+.versions_beyond_keep <- function(versions, keep) {
+  if (is.null(versions)) return(NULL)
+  n <- nrow(versions)
+  if (n <= keep) return(versions[0L, , drop = FALSE])
+  versions[seq_len(n - keep), , drop = FALSE]
+}
+
+#' Plan which local versions to remove and which to keep unsynced
+#'
+#' Local versions beyond the newest `keep` are candidates. A candidate is
+#' planned for removal only when its content hash is also among the Drive
+#' versions (listed before any trashing), so the content survives on Drive.
+#' A candidate whose hash is absent from Drive, or unparseable (`NA`), is a
+#' version that was never synced: it is kept and marked `"keep_unsynced"`.
+#' On an offline board Drive cannot be checked, so every candidate is kept.
+#' A board that is `local_only` by construction (no Drive, not offline) has
+#' nothing to sync to: every candidate is removed.
+#'
+#' Matching uses the 5-character hash prefix pins puts in version ids. Two
+#' different contents share a prefix with probability about 1 in 16^5; that
+#' risk is accepted.
+#'
+#' @param local_versions A `pins::pin_versions()` tibble of the local copy, or
+#'   `NULL` when the pin is not there.
+#' @param drive_versions A `pins::pin_versions()` tibble of Drive, or `NULL`.
 #' @param name Pin name.
 #' @param keep Integer. Number of newest versions to keep.
-#' @return Character vector of version labels to remove (may be empty).
+#' @param mode One of `"drive"` (board has a Drive board), `"offline"` or
+#'   `"local_only"`.
+#' @return A prune plan tibble with `side = "local"`.
 #' @keywords internal
-.versions_to_remove <- function(sub_board, name, keep) {
-  v <- pins::pin_versions(sub_board, name)
-  n <- nrow(v)
-  if (n <= keep) return(character(0L))
-  v$version[seq_len(n - keep)]
+.local_versions_to_remove <- function(local_versions, drive_versions, name,
+                                      keep, mode) {
+  cand <- .versions_beyond_keep(local_versions, keep)
+  if (is.null(cand) || nrow(cand) == 0L) return(.empty_prune_plan())
+
+  hash <- if (is.null(cand$hash)) rep(NA_character_, nrow(cand)) else as.character(cand$hash)
+  synced <- switch(mode,
+    local_only = rep(TRUE, nrow(cand)),
+    offline    = rep(FALSE, nrow(cand)),
+    drive      = {
+      drive_hash <- if (is.null(drive_versions$hash)) character() else
+        as.character(drive_versions$hash)
+      drive_hash <- drive_hash[!is.na(drive_hash)]
+      !is.na(hash) & hash %in% drive_hash
+    }
+  )
+  .prune_plan_rows(name, cand, "local", ifelse(synced, "remove", "keep_unsynced"))
+}
+
+#' Compute the prune plan for one pin
+#'
+#' @param board A `gdpins_board` object.
+#' @param name Pin name.
+#' @param keep Integer. Number of newest versions to keep.
+#' @return A list with `plan` (prune plan tibble) and `present` (named integer
+#'   vector of version counts per side that holds the pin).
+#' @keywords internal
+.prune_plan <- function(board, name, keep) {
+  offline <- !is.null(attr(board, .GDPINS_OFFLINE_STATE_ATTR, exact = TRUE))
+  mode <- if (offline) {
+    "offline"
+  } else if (is.null(board$drive_board)) {
+    "local_only"
+  } else {
+    "drive"
+  }
+
+  # Drive is listed once, before any trashing; listing errors propagate.
+  drive_v <- .pin_versions_if_exists(board$drive_board, name)
+  local_v <- .pin_versions_if_exists(board$local_board, name)
+  if (is.null(drive_v) && is.null(local_v)) {
+    # Neither side holds the pin: let pins raise its usual "pin missing" error.
+    pins::pin_versions(.prune_primary_board(board), name)
+  }
+
+  drive_plan <- .prune_plan_rows(
+    name, .versions_beyond_keep(drive_v, keep), "drive", "remove"
+  )
+  local_plan <- .local_versions_to_remove(local_v, drive_v, name, keep, mode)
+
+  present <- c(
+    drive = if (is.null(drive_v)) NA_integer_ else nrow(drive_v),
+    local = if (is.null(local_v)) NA_integer_ else nrow(local_v)
+  )
+  list(
+    plan    = dplyr::bind_rows(.empty_prune_plan(), drive_plan, local_plan),
+    present = present[!is.na(present)]
+  )
+}
+
+#' Number of removals a plan counts against the threshold
+#'
+#' A synced version is removed on both sides but counts once: the larger of
+#' the Drive and local removal counts.
+#'
+#' @param plan A prune plan tibble.
+#' @return Integer scalar.
+#' @keywords internal
+.prune_n_remove <- function(plan) {
+  rm <- plan$action == "remove"
+  max(sum(rm & plan$side == "drive"), sum(rm & plan$side == "local"))
 }
 
 #' Trash one version directory from Drive via the adapter
@@ -123,14 +264,98 @@ NULL
   }
 }
 
+#' Report a prune plan and carry it out
+#'
+#' Shared by [gdpins_prune_pin_versions()] and [gdpins_prune_board_versions()]
+#' after the threshold check.
+#'
+#' @param board A `gdpins_board` object.
+#' @param name Pin name.
+#' @param keep Integer. Number of newest versions to keep.
+#' @param planned A `.prune_plan()` result.
+#' @param dry_run Logical. Report only.
+#' @return The prune plan tibble.
+#' @keywords internal
+.prune_report_and_apply <- function(board, name, keep, planned, dry_run) {
+  plan     <- planned$plan
+  rm       <- plan$action == "remove"
+  drive_rm <- plan$version[rm & plan$side == "drive"]
+  local_rm <- plan$version[rm & plan$side == "local"]
+  unsynced <- plan$version[plan$action == "keep_unsynced"]
+  n_drive  <- length(drive_rm)
+  n_local  <- length(local_rm)
+  n_kept   <- length(unsynced)
+
+  kept_msg <- if (n_kept > 0L) {
+    c(i = cli::format_inline(
+      "Kept {n_kept} older local version{?s} not on Drive: {.val {unsynced}}."
+    ))
+  }
+
+  if (n_drive + n_local == 0L) {
+    present <- planned$present
+    present_txt <- if (length(present) == 2L) {
+      cli::format_inline(
+        "{present[['drive']]} present on Drive, {present[['local']]} locally"
+      )
+    } else {
+      cli::format_inline("{present[[1L]]} present")
+    }
+    cli::cli_inform(c(
+      i = "No versions to remove for pin {.val {name}} (keep = {keep}, {present_txt}).",
+      kept_msg
+    ))
+    return(plan)
+  }
+
+  if (dry_run) {
+    cli::cli_inform(c(
+      i = paste0(
+        "DRY RUN -- pin {.val {name}}: would trash {n_drive} Drive version{?s} ",
+        "and delete {n_local} local version{?s}."
+      ),
+      if (n_drive > 0L) c(" " = cli::format_inline("Drive: {.val {drive_rm}}")),
+      if (n_local > 0L) c(" " = cli::format_inline("Local: {.val {local_rm}}")),
+      kept_msg
+    ))
+    return(plan)
+  }
+
+  # Drive versions are trashed (recoverable -- NEVER hard-delete).
+  for (v in drive_rm) {
+    .trash_drive_version(board$adapter, board$drive_path, name, v)
+  }
+  # Local versions are deleted only when their content is on Drive (or the
+  # board is local_only by construction); see .local_versions_to_remove().
+  for (v in local_rm) {
+    .remove_local_version(board$local_board$path, name, v)
+  }
+
+  cli::cli_inform(c(
+    v = paste0(
+      "Pruned pin {.val {name}}: trashed {n_drive} Drive version{?s}, ",
+      "deleted {n_local} local version{?s}."
+    ),
+    kept_msg
+  ))
+  plan
+}
+
 # -- exported functions --------------------------------------------------------
 
 #' Prune old versions of a single pin
 #'
 #' Removes old versions of one pin from Drive **and** the local copy (whichever
-#' are present on `board`), keeping the `keep` most recent. Drive versions are
-#' always **trashed** (recoverable via `gd_trash()`), never hard-deleted.
-#' Local-copy versions are deleted from the local filesystem.
+#' are present on `board`), keeping the `keep` most recent on each side. Drive
+#' versions are always **trashed** (recoverable via `gd_trash()`), never
+#' hard-deleted. Local-copy versions are deleted from the local filesystem.
+#'
+#' A local version beyond `keep` is deleted only when its content (matched by
+#' the content hash in its version id) is also on Drive. A local version that
+#' was never synced is kept and reported with action `"keep_unsynced"`. On an
+#' offline board (see [gdpins_go_offline()]) Drive cannot be checked, so no
+#' local version is deleted. A board that is `local_only` by construction has
+#' no Drive to sync to: every version beyond `keep` is deleted.
 #'
 #' Defaults to `dry_run = TRUE` for safety: the plan is shown but nothing is
 #' removed.
@@ -143,18 +368,26 @@ NULL
 #' outside R.
 #'
 #' @param board A `gdpins_board` object.
-#' @param name Character scalar. Pin name.
-#' @param keep Integer scalar. Number of most-recent versions to keep. Default
-#'   `1`.
-#' @param dry_run Logical. If `TRUE` (default), show what would be removed
-#'   without actually removing anything.
+#' @param name Character scalar. Pin name. Must be a valid pin name; see the
+#'   Pin names section of [verbs].
+#' @param keep Integer scalar. Number of most-recent versions to keep on each
+#'   side (Drive, local copy). Default `1`.
+#' @param dry_run Logical. If `TRUE` (default), show the plan (Drive and local
+#'   removals, and unsynced local versions that are kept) without removing
+#'   anything.
 #' @param threshold Integer scalar. Maximum number of versions to remove without
-#'   requiring `force = TRUE` or interactive confirmation. Default `10`.
-#' @param force Logical. If `TRUE`, skip the interactive threshold confirmation.
-#'   Default `FALSE`.
+#'   requiring `force = TRUE` or interactive confirmation. Default `10`. The
+#'   count is the larger of the Drive and the local removal counts, so a
+#'   version removed from both sides counts once.
+#' @param force Logical. If `TRUE`, skip the threshold check and its
+#'   interactive confirmation. Default `FALSE`.
 #'
-#' @return Invisibly, a character vector of the version labels that were (or
-#'   would be) removed (as reported by the primary / Drive board).
+#' @return Invisibly, the prune plan: a tibble with one row per version that
+#'   was (or, in a dry run, would be) removed, or that was kept because it is
+#'   not on Drive. Columns: `name` (pin name), `version` (version id), `side`
+#'   (`"drive"` or `"local"`), `hash` (content-hash prefix from the version
+#'   id) and `action` (`"remove"` or `"keep_unsynced"`). Zero rows when no
+#'   version is beyond `keep`.
 #' @seealso [gdpins_real_drive()], [gdpins_init_board()].
 #' @examples
 #' adapter <- gdpins_fake_drive()
@@ -184,6 +417,7 @@ gdpins_prune_pin_versions <- function(
       x = "Got {.cls {class(board)}}."
     ))
   }
+  .check_pin_name(name)
   keep <- as.integer(keep)
   if (length(keep) != 1L || is.na(keep) || keep < 1L) {
     cli::cli_abort(c(
@@ -192,76 +426,36 @@ gdpins_prune_pin_versions <- function(
     ))
   }
 
-  # -- determine old versions from the primary (authoritative) board ---------
-  # The primary board (Drive or local_only) determines the reported version
-  # labels. Each sub-board prunes independently because version timestamps may
-  # differ slightly even for the same logical write.
-  primary      <- .prune_primary_board(board)
-  old_versions <- .versions_to_remove(primary, name, keep)
-  n_remove     <- length(old_versions)
-
-  if (n_remove == 0L) {
-    cli::cli_inform(c(
-      i = "No versions to remove for pin {.val {name}} ({keep} kept, {keep} present)."
-    ))
-    return(invisible(character(0L)))
-  }
-
-  # -- dry run: show plan, change nothing -----------------------------------
-  if (dry_run) {
-    cli::cli_inform(c(
-      i = "DRY RUN -- would remove {n_remove} version{?s} of pin {.val {name}}:",
-      " " = paste(old_versions, collapse = "\n  ")
-    ))
-    return(invisible(old_versions))
-  }
+  planned  <- .prune_plan(board, name, keep)
+  n_remove <- .prune_n_remove(planned$plan)
 
   # -- threshold guard (only for actual removals) ----------------------------
-  if (n_remove > threshold && !force) {
+  if (!dry_run && n_remove > threshold && !force) {
     .prune_check_threshold(n_remove, threshold, paste0("pin '", name, "'"))
   }
 
-  # -- perform removals -- each board prunes its own version list ------------
-  # Each sub-board independently determines which of its versions are "old"
-  # (i.e., all but the newest `keep`). This is necessary because pins generates
-  # version labels from timestamp + content hash, and the timestamp may differ
-  # by a second between drive_board and local_board writes.
-  if (!is.null(board$drive_board)) {
-    # Trash old versions from Drive (recoverable -- NEVER hard-delete)
-    drive_old <- .versions_to_remove(board$drive_board, name, keep)
-    for (v in drive_old) {
-      .trash_drive_version(board$adapter, board$drive_path, name, v)
-    }
-  }
-  if (!is.null(board$local_board)) {
-    # Remove old versions from the local copy (local filesystem)
-    local_old <- .versions_to_remove(board$local_board, name, keep)
-    for (v in local_old) {
-      .remove_local_version(board$local_board$path, name, v)
-    }
-  }
-
-  cli::cli_inform(c(
-    v = "Pruned {n_remove} old version{?s} of pin {.val {name}}."
-  ))
-
-  invisible(old_versions)
+  invisible(.prune_report_and_apply(board, name, keep, planned, dry_run))
 }
 
 #' Prune old versions of all pins in a board
 #'
 #' Applies [gdpins_prune_pin_versions()] to every pin in `board`. Defaults to
-#' `dry_run = TRUE`.
+#' `dry_run = TRUE`. Pins are listed from Drive when the board has a Drive
+#' board, otherwise from the local copy.
 #'
 #' @param board A `gdpins_board` object.
-#' @param keep Integer scalar. Versions to keep per pin. Default `1`.
+#' @param keep Integer scalar. Versions to keep per pin and side. Default `1`.
 #' @param dry_run Logical. Show plan without removing. Default `TRUE`.
-#' @param threshold Integer scalar. Threshold before requiring confirmation.
-#'   Default `10`.
-#' @param force Logical. Skip interactive confirmation. Default `FALSE`.
+#' @param threshold Integer scalar. Maximum total number of versions to remove
+#'   across all pins without `force = TRUE` or interactive confirmation.
+#'   Default `10`. Each pin counts the larger of its Drive and local removal
+#'   counts.
+#' @param force Logical. Skip the threshold check and its interactive
+#'   confirmation. Default `FALSE`.
 #'
-#' @return Invisibly, a named list of character vectors (one per pin) of
-#'   removed (or would-be-removed) version labels.
+#' @return Invisibly, one prune plan tibble holding the rows of every pin (see
+#'   [gdpins_prune_pin_versions()] for the columns). Zero rows when the board
+#'   has no pins or nothing is beyond `keep`.
 #' @seealso [gdpins_real_drive()], [gdpins_init_board()].
 #' @examples
 #' adapter <- gdpins_fake_drive()
@@ -299,22 +493,20 @@ gdpins_prune_board_versions <- function(
   # -- enumerate pins --------------------------------------------------------
   primary  <- .prune_primary_board(board)
   all_pins <- pins::pin_list(primary)
+  all_pins <- .drop_invalid_names(all_pins, .check_pin_name, "pin name")
 
   if (length(all_pins) == 0L) {
     cli::cli_inform(c(i = "No pins found in board {.val {board$name}}."))
-    return(invisible(list()))
+    return(invisible(.empty_prune_plan()))
   }
 
-  # -- pre-flight threshold check (actual removal only) ---------------------
-  # Compute removals for every pin up front so we can abort before touching
-  # anything if any pin would exceed the threshold.
-  if (!dry_run && !force) {
-    removals <- lapply(all_pins, function(nm) .versions_to_remove(primary, nm, keep))
-    names(removals) <- all_pins
-    exceeding <- names(Filter(function(v) length(v) > threshold, removals))
+  # -- plan every pin up front -----------------------------------------------
+  plans <- lapply(all_pins, function(nm) .prune_plan(board, nm, keep))
 
-    if (length(exceeding) > 0L) {
-      total <- sum(vapply(removals, length, integer(1L)))
+  # -- pre-flight threshold check on the board total (actual removal only) ---
+  if (!dry_run && !force) {
+    total <- sum(vapply(plans, function(p) .prune_n_remove(p$plan), integer(1L)))
+    if (total > threshold) {
       context <- cli::format_inline(
         "board '{board$name}' ({length(all_pins)} pin{?s}, {total} total removal{?s})"
       )
@@ -322,18 +514,10 @@ gdpins_prune_board_versions <- function(
     }
   }
 
-  # -- prune each pin (threshold already cleared above) ---------------------
-  result <- lapply(all_pins, function(nm) {
-    gdpins_prune_pin_versions(
-      board     = board,
-      name      = nm,
-      keep      = keep,
-      dry_run   = dry_run,
-      threshold = threshold,
-      force     = TRUE  # threshold already checked; skip per-pin re-check
-    )
+  # -- report and prune each pin (threshold already cleared above) ----------
+  result <- lapply(seq_along(all_pins), function(i) {
+    .prune_report_and_apply(board, all_pins[[i]], keep, plans[[i]], dry_run)
   })
-  names(result) <- all_pins
 
-  invisible(result)
+  invisible(dplyr::bind_rows(.empty_prune_plan(), result))
 }

@@ -134,9 +134,7 @@ gdpins_pin_info <- function(board, name) {
       x = "Got {.cls {class(board)}}."
     ))
   }
-  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
-    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
-  }
+  .check_pin_name(name)
 
   src      <- .read_source(board)
   all_pins <- pins::pin_list(src)

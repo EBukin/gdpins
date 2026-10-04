@@ -83,6 +83,103 @@ new_fake_board <- function(
   )
 }
 
+# ── Sandboxed fixtures ────────────────────────────────────────────────────────
+# new_fake_board()/new_fake_raw_conn() put their directories directly inside the
+# session tempdir(). Tests that feed path-escaping names ("..", ".") must never
+# use them: on unfixed code such a name deletes or writes into tempdir() itself.
+# These variants build everything under sub-directories of `parent` (normally a
+# withr::local_tempdir()), so the worst an escape can reach is `parent`.
+#
+#   <parent>/cache            local board (local_only, drive_cache)
+#   <parent>/fake_drive       fake Drive root (drive_cache, drive_only)
+#   <parent>/mirror           raw connection local_path
+#
+# Raw connections use drive_path "gdpins-fake/raw-exogenous", so the Drive side
+# of a raw file `f` is <parent>/fake_drive/gdpins-fake/raw-exogenous/<f>.
+
+new_sandboxed_board <- function(
+    parent,
+    config    = c("local_only", "drive_cache", "drive_only"),
+    versioned = TRUE,
+    name      = "test"
+) {
+  config <- match.arg(config)
+  drive_path <- paste0("gdpins-fake/", name)
+
+  cache_dir <- file.path(parent, "cache")
+  if (config == "local_only") {
+    fs::dir_create(cache_dir)
+    return(new_gdpins_board(
+      config      = "local_only",
+      name        = name,
+      local_board = pins::board_folder(cache_dir, versioned = versioned),
+      cache_dir   = cache_dir,
+      versioned   = versioned
+    ))
+  }
+
+  fake_root <- file.path(parent, "fake_drive")
+  adapter   <- gdpins_fake_drive(root = fake_root)
+  drive_dir <- file.path(fake_root, "gdpins-fake", name)
+  fs::dir_create(drive_dir)
+  drive_board <- pins::board_folder(drive_dir, versioned = versioned)
+
+  if (config == "drive_only") {
+    return(new_gdpins_board(
+      config      = "drive_only",
+      name        = name,
+      drive_board = drive_board,
+      drive_path  = drive_path,
+      adapter     = adapter,
+      versioned   = versioned
+    ))
+  }
+
+  fs::dir_create(cache_dir)
+  new_gdpins_board(
+    config      = "drive_cache",
+    name        = name,
+    drive_board = drive_board,
+    local_board = pins::board_folder(cache_dir, versioned = versioned),
+    cache_dir   = cache_dir,
+    drive_path  = drive_path,
+    adapter     = adapter,
+    versioned   = versioned
+  )
+}
+
+new_sandboxed_raw_conn <- function(
+    parent,
+    config = c("drive_local", "local_only")
+) {
+  config <- match.arg(config)
+
+  local_path <- file.path(parent, "mirror")
+  fs::dir_create(local_path)
+
+  if (config == "local_only") {
+    return(new_gdpins_raw_conn(config = "local_only", local_path = local_path))
+  }
+
+  fake_root  <- file.path(parent, "fake_drive")
+  adapter    <- gdpins_fake_drive(root = fake_root)
+  drive_path <- "gdpins-fake/raw-exogenous"
+  fs::dir_create(file.path(fake_root, "gdpins-fake", "raw-exogenous"))
+
+  new_gdpins_raw_conn(
+    config     = "drive_local",
+    drive_path = drive_path,
+    local_path = local_path,
+    adapter    = adapter
+  )
+}
+
+# Every path under `dir` (recursive, hidden included) -- a cheap fingerprint
+# for "this call did not touch storage".
+sandbox_listing <- function(dir) {
+  sort(as.character(fs::dir_ls(dir, recurse = TRUE, all = TRUE)))
+}
+
 #' Create a fake gdpins_raw_conn wired to a fake drive adapter
 #'
 #' Returns a real `gdpins_raw_conn` object backed entirely by tempdir
@@ -177,4 +274,36 @@ mock_status_offline <- function() {
     drive_hash    = NA_character_,
     local_hash    = NA_character_
   )
+}
+
+# ── Real-adapter fixtures ─────────────────────────────────────────────────────
+# A minimal stand-in for a googledrive dribble: the columns the real adapter
+# reads (`name`, `id`, `drive_resource` with mimeType / md5Checksum /
+# modifiedTime / size). Vectorised over `name`; used with
+# local_mocked_bindings(..., .package = "googledrive").
+
+fake_dribble <- function(name    = character(),
+                         id      = paste0("id_", name),
+                         mime    = "text/csv",
+                         md5     = "d41d8cd98f00b204e9800998ecf8427e",
+                         mtime   = "2024-01-01T00:00:00.000Z") {
+  n <- length(name)
+  mime  <- rep_len(mime, n)
+  md5   <- rep_len(md5, n)
+  mtime <- rep_len(mtime, n)
+  tibble::tibble(
+    name = as.character(name),
+    id   = as.character(id),
+    drive_resource = lapply(seq_len(n), function(i) list(
+      kind         = "drive#file",
+      mimeType     = mime[[i]],
+      md5Checksum  = md5[[i]],
+      modifiedTime = mtime[[i]],
+      size         = "10"
+    ))
+  )
+}
+
+fake_folder_dribble <- function(name, id = paste0("id_", name)) {
+  fake_dribble(name, id, mime = "application/vnd.google-apps.folder")
 }

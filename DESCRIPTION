@@ -1,6 +1,6 @@
 Package: gdpins
 Title: Google Drive + pins Data Management for R Projects
-Version: 0.0.1.9026
+Version: 0.0.1.9027
 Authors@R:
     person("Eduard", "Bukin", email = "ebukin@worldbank.org",
            role = c("aut", "cre"))
@@ -34,7 +34,7 @@ Imports:
     tools,
     utils
 Suggests:
-    testthat (>= 3.0.0),
+    testthat (>= 3.2.0),
     covr,
     tidyr,
     ggplot2,

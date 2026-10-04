@@ -4,6 +4,17 @@
 #' fan out to all non-NULL board components (Drive, local). Reads are
 #' local-first: local → Drive.
 #'
+#' @section Pin names:
+#' A pin name is a single, non-empty string that becomes a directory name on
+#' Drive and in the local copy. It cannot be `"."` or `".."`, cannot start with
+#' a dot, and cannot contain `/`, `\` or a control character (such as a
+#' newline). Anything else -- letters, digits, `_`, `-`, spaces, inner dots as in
+#' `"Quarterly.Report"` -- is accepted. A rejected name raises an error of class
+#' `gdpins_error_invalid_name` before anything is read or written. Names that
+#' arrive from a Drive listing and break these rules are skipped with a warning
+#' of class `gdpins_warning_invalid_name` by [gdpins_sync()],
+#' [gdpins_board_status()] and [gdpins_prune_board_versions()].
+#'
 #' @name verbs
 NULL
 
@@ -16,10 +27,18 @@ NULL
 #' @param name Pin name.
 #' @param fmt Character scalar: `"parquet"` or `"rds"`.
 #' @param versioned Logical. Whether this write creates a version.
+#' @param parquet_path Character scalar or `NULL`. A `.parquet` file already
+#'   written from `x`; uploaded as is instead of writing a new one, so every
+#'   board receives the same bytes (and the same content hash).
 #'
 #' @keywords internal
-.write_to_board <- function(pins_board, x, name, fmt, versioned) {
-  if (identical(fmt, "parquet")) {
+.write_to_board <- function(pins_board, x, name, fmt, versioned,
+                            parquet_path = NULL) {
+  if (identical(fmt, "parquet") && !is.null(parquet_path)) {
+    suppressMessages(
+      pins::pin_upload(pins_board, as.character(parquet_path), name = name)
+    )
+  } else if (identical(fmt, "parquet")) {
     # Write parquet through the configured engine (default arrow) rather than
     # pins::pin_write(type = "parquet"), which is hardwired to nanoparquet.
     # nanoparquet-authored files can also make its own reader allocate tens of
@@ -132,6 +151,7 @@ NULL
 #' )
 #' gdpins_pin_write(board, mtcars, "cars")
 #' }
+#' @inheritSection verbs Pin names
 #' @export
 gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
                              wkt_engine = NULL) {
@@ -141,9 +161,7 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
       x = "Got {.cls {class(board)}}."
     ))
   }
-  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
-    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
-  }
+  .check_pin_name(name)
 
   # Block writes when offline (Drive present = network needed)
   if (!is.null(board$drive_board)) {
@@ -185,11 +203,31 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
     local = board$local_board
   )
 
+  # Parquet is serialised once and the same file is uploaded to every
+  # component, so Drive and local versions carry the same content hash
+  # (prune and sync match versions across boards on that hash).
+  parquet_path <- NULL
+  if (identical(fmt, "parquet")) {
+    pq_dir <- tempfile("gdpins_pq_")
+    fs::dir_create(pq_dir)
+    on.exit(unlink(pq_dir, recursive = TRUE), add = TRUE)
+    parquet_path <- fs::path(pq_dir, paste0(name, ".parquet"))
+    .write_parquet_file(x_to_write, parquet_path)
+  }
+
   for (component in boards_to_write) {
     if (!is.null(component)) {
-      .write_to_board(component, x_to_write, name, fmt, versioned_write)
+      .write_to_board(
+        component, x_to_write, name, fmt, versioned_write,
+        parquet_path = parquet_path
+      )
     }
   }
+
+  # Both sides now hold this write: record it as the last-synced state, so a
+  # later edit on one side is told apart from edits on both (no-op unless the
+  # board has a Drive board and a local copy).
+  .baseline_set(board, name)
 
   invisible(NULL)
 }
@@ -339,6 +377,7 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
 #' @inheritSection raw-connection Name resolution
 #' @inheritSection raw-connection Glob and listing mode
 #' @inheritSection raw-connection Objects vs paths
+#' @inheritSection verbs Pin names
 #' @export
 gdpins_pin_path <- function(board, name, version = NULL) {
   if (!inherits(board, "gdpins_board")) {
@@ -347,9 +386,7 @@ gdpins_pin_path <- function(board, name, version = NULL) {
       x = "Got {.cls {class(board)}}."
     ))
   }
-  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
-    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
-  }
+  .check_pin_name(name)
 
   if (.is_glob(name)) {
     return(.pin_glob_listing(board, name))
@@ -420,6 +457,7 @@ gdpins_pin_path <- function(board, name, version = NULL) {
 #' }
 #' @inheritSection raw-connection Name resolution
 #' @inheritSection raw-connection Glob and listing mode
+#' @inheritSection verbs Pin names
 #' @export
 gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
   if (!inherits(board, "gdpins_board")) {
@@ -428,9 +466,7 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
       x = "Got {.cls {class(board)}}."
     ))
   }
-  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
-    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
-  }
+  .check_pin_name(name)
 
   # Listing mode. Never bulk-reads: a glob asks which pins exist.
   if (.is_glob(name)) {
@@ -545,6 +581,7 @@ gdpins_pin_read <- function(board, name, version = NULL, wkt_engine = NULL) {
 #' )
 #' gdpins_pin_write(board, mtcars, "cars")
 #' gdpins_pin_remove(board, "cars")
+#' @inheritSection verbs Pin names
 #' @export
 gdpins_pin_remove <- function(board, name) {
   if (!inherits(board, "gdpins_board")) {
@@ -553,9 +590,7 @@ gdpins_pin_remove <- function(board, name) {
       x = "Got {.cls {class(board)}}."
     ))
   }
-  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
-    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
-  }
+  .check_pin_name(name)
 
   boards_to_remove <- list(
     drive = board$drive_board,
@@ -573,6 +608,8 @@ gdpins_pin_remove <- function(board, name) {
       pins::pin_delete(component, name)
     }
   }
+
+  .baseline_drop(board, name)
 
   invisible(NULL)
 }

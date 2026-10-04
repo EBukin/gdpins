@@ -66,6 +66,7 @@ gdpins_real_drive <- function(
     }
     root_id <- d$id[[1L]]
   }
+  # nocov end
 
   # Lazy root dribble — fetched from Drive on first operation.
   state <- new.env(parent = emptyenv())
@@ -86,15 +87,14 @@ gdpins_real_drive <- function(
     parts <- strsplit(path, "/", fixed = TRUE)[[1L]]
     parts <- parts[nzchar(parts)]
     current <- .root()
+    walked <- character()
     for (part in parts) {
-      hits <- tryCatch(
-        googledrive::drive_ls(current, pattern = paste0("^", part, "$")),
-        error = function(e) NULL
-      )
-      if (is.null(hits) || nrow(hits) == 0L) {
+      walked <- c(walked, part)
+      hit <- .match_drive_name(googledrive::drive_ls(current), part, walked)
+      if (is.null(hit)) {
         current <- googledrive::drive_mkdir(part, path = current)
       } else {
-        current <- hits[1L, ]
+        current <- hit
       }
     }
     current
@@ -143,12 +143,12 @@ gdpins_real_drive <- function(
       if (is.null(parent)) {
         cli::cli_abort("Drive parent directory not found: {.path {dir_part}}")
       }
-      existing <- tryCatch(
-        googledrive::drive_ls(parent, pattern = paste0("^", name_part, "$")),
-        error = function(e) NULL
+      walked <- c(strsplit(dir_part, "/", fixed = TRUE)[[1L]], name_part)
+      existing <- .match_drive_name(
+        googledrive::drive_ls(parent), name_part, walked[nzchar(walked)]
       )
-      if (!is.null(existing) && nrow(existing) > 0L) {
-        googledrive::drive_update(existing[1L, ], media = local_path)
+      if (!is.null(existing)) {
+        googledrive::drive_update(existing, media = local_path)
       } else {
         googledrive::drive_upload(local_path, path = parent, name = name_part)
       }
@@ -199,8 +199,8 @@ gdpins_real_drive <- function(
       if (recursive) {
         .real_ls_recursive(target, prefix)
       } else {
-        hits <- tryCatch(googledrive::drive_ls(target), error = function(e) NULL)
-        if (is.null(hits) || nrow(hits) == 0L) {
+        hits <- googledrive::drive_ls(target)
+        if (nrow(hits) == 0L) {
           return(tibble::tibble(
             path  = character(), is_dir = logical(), size = double(),
             md5   = character(), mtime  = as.POSIXct(character()),
@@ -213,7 +213,6 @@ gdpins_real_drive <- function(
   )
 
   structure(adapter, class = "gdpins_drive_adapter")
-  # nocov end
 }
 
 #' Create a fake (tempdir-backed) Drive adapter
@@ -436,6 +435,9 @@ gdpins_fake_drive <- function(root = tempfile("gdpins_fake_drive_")) {
 #' @param path Character scalar. Path relative to the adapter root.
 #'
 #' @return Logical scalar.
+#' @section Errors:
+#' Errors from Drive propagate; an empty result means the path is absent.
+#'
 #' @keywords internal
 gd_exists <- function(adapter, path) {
   adapter$exists(path)
@@ -447,6 +449,9 @@ gd_exists <- function(adapter, path) {
 #' @param path Character scalar. Path relative to the adapter root.
 #'
 #' @return `invisible(adapter)`.
+#' @section Errors:
+#' Errors from Drive propagate; an empty result means the path is absent.
+#'
 #' @keywords internal
 gd_mkdir <- function(adapter, path) {
   adapter$mkdir(path)
@@ -460,6 +465,9 @@ gd_mkdir <- function(adapter, path) {
 #' @param path Character scalar. Destination path relative to the adapter root.
 #'
 #' @return `invisible(adapter)`.
+#' @section Errors:
+#' Errors from Drive propagate; an empty result means the path is absent.
+#'
 #' @keywords internal
 gd_upload <- function(adapter, local_path, path) {
   adapter$upload(local_path, path)
@@ -473,6 +481,9 @@ gd_upload <- function(adapter, local_path, path) {
 #' @param local_path Character scalar. Destination local path.
 #'
 #' @return `invisible(local_path)`.
+#' @section Errors:
+#' Errors from Drive propagate; an empty result means the path is absent.
+#'
 #' @keywords internal
 gd_download <- function(adapter, path, local_path) {
   adapter$download(path, local_path)
@@ -485,6 +496,9 @@ gd_download <- function(adapter, path, local_path) {
 #' @param path Character scalar. Path relative to the adapter root.
 #'
 #' @return `invisible(adapter)`.
+#' @section Errors:
+#' Errors from Drive propagate; an empty result means the path is absent.
+#'
 #' @keywords internal
 gd_trash <- function(adapter, path) {
   adapter$trash(path)
@@ -497,6 +511,9 @@ gd_trash <- function(adapter, path) {
 #' @param path Character scalar. Path relative to the adapter root.
 #'
 #' @return Character scalar MD5, or `NA_character_` if absent or a directory.
+#' @section Errors:
+#' Errors from Drive propagate; an empty result means the path is absent.
+#'
 #' @keywords internal
 gd_md5 <- function(adapter, path) {
   adapter$md5(path)
@@ -508,6 +525,9 @@ gd_md5 <- function(adapter, path) {
 #' @param path Character scalar. Path relative to the adapter root.
 #'
 #' @return `POSIXct` scalar, or `NA` if absent.
+#' @section Errors:
+#' Errors from Drive propagate; an empty result means the path is absent.
+#'
 #' @keywords internal
 gd_mtime <- function(adapter, path) {
   adapter$mtime(path)
@@ -524,6 +544,9 @@ gd_mtime <- function(adapter, path) {
 #'   `is_dir` (lgl), `size` (dbl, bytes), `md5` (chr), `mtime` (POSIXct),
 #'   `drive_id` (chr; `NA_character_` for fake adapter, Drive file/folder ID
 #'   for real adapter). Trashed entries are excluded.
+#' @section Errors:
+#' Errors from Drive propagate; an empty result means the path is absent.
+#'
 #' @keywords internal
 gd_ls <- function(adapter, path = "", recursive = FALSE) {
   adapter$ls(path, recursive)
@@ -575,27 +598,60 @@ gdpins_drive_url <- function(adapter, path = "") {
 #' Walk path segments from root_dribble; return the final dribble or NULL
 #' @keywords internal
 .resolve_real_path <- function(root_dribble, path) {
-  # nocov start
   parts <- strsplit(path, "/", fixed = TRUE)[[1L]]
   parts <- parts[nzchar(parts)]
   if (length(parts) == 0L) return(root_dribble)
   current <- root_dribble
+  walked <- character()
   for (part in parts) {
-    hits <- tryCatch(
-      googledrive::drive_ls(current, pattern = paste0("^", part, "$")),
-      error = function(e) NULL
-    )
-    if (is.null(hits) || nrow(hits) == 0L) return(NULL)
-    current <- hits[1L, ]
+    walked <- c(walked, part)
+    current <- .match_drive_name(googledrive::drive_ls(current), part, walked)
+    if (is.null(current)) return(NULL)
   }
   current
-  # nocov end
+}
+
+#' Pick the Drive item named exactly `name` from a listing
+#'
+#' Names are compared literally with `==` (never as a regular expression).
+#' Returns the single matching row, or `NULL` when there is none. More than
+#' one item with the same name is an error, because picking one would read,
+#' overwrite or trash an arbitrary duplicate.
+#'
+#' @param hits A dribble from [googledrive::drive_ls()].
+#' @param name Character scalar. The name to match.
+#' @param walked Character vector. Path segments walked so far, ending in
+#'   `name`; used in the error message.
+#' @param call Environment used as the error call.
+#' @return A one-row dribble, or `NULL`.
+#' @keywords internal
+.match_drive_name <- function(hits, name, walked = name,
+                              call = rlang::caller_env()) {
+  hits <- hits[hits$name == name, , drop = FALSE]
+  if (nrow(hits) == 0L) return(NULL)
+  if (nrow(hits) > 1L) {
+    mtimes <- vapply(hits$drive_resource, function(r) {
+      mt <- r$modifiedTime
+      if (is.null(mt)) NA_character_ else as.character(mt)
+    }, character(1L))
+    dupes <- paste0("id ", hits$id, ", modified ", mtimes)
+    names(dupes) <- rep("*", length(dupes))
+    cli::cli_abort(
+      c(
+        "{nrow(hits)} Drive items are named {.val {name}} at {.path {paste(walked, collapse = '/')}}.",
+        "i" = "gdpins cannot tell which one to use. Keep one and trash the others:",
+        dupes
+      ),
+      class = c("gdpins_error_ambiguous_drive_name", "gdpins_error"),
+      call = call
+    )
+  }
+  hits[1L, ]
 }
 
 #' Convert a drive_ls dribble to the standard adapter tibble with a path prefix
 #' @keywords internal
 .real_hits_to_tbl <- function(hits, prefix = "") {
-  # nocov start
   tibble::tibble(
     path  = paste0(prefix, as.character(hits$name)),
     is_dir = vapply(
@@ -622,15 +678,13 @@ gdpins_drive_url <- function(adapter, path = "") {
       if (is.null(id) || is.na(id)) NA_character_ else as.character(id)
     }, character(1L))
   )
-  # nocov end
 }
 
 #' Recursively list a Drive folder; returns root-relative paths under prefix
 #' @keywords internal
 .real_ls_recursive <- function(folder_dribble, prefix = "") {
-  # nocov start
-  hits <- tryCatch(googledrive::drive_ls(folder_dribble), error = function(e) NULL)
-  if (is.null(hits) || nrow(hits) == 0L) {
+  hits <- googledrive::drive_ls(folder_dribble)
+  if (nrow(hits) == 0L) {
     return(tibble::tibble(
       path  = character(), is_dir = logical(), size = double(),
       md5   = character(), mtime  = as.POSIXct(character()),
@@ -644,7 +698,6 @@ gdpins_drive_url <- function(adapter, path = "") {
     .real_ls_recursive(hits[i, ], prefix = paste0(tbl$path[i], "/"))
   })
   do.call(rbind, c(list(tbl), sub_tbls))
-  # nocov end
 }
 
 #' @keywords internal

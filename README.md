@@ -95,6 +95,10 @@ Pass `lazy = FALSE`, or set `options(gdpins.lazy_boards = FALSE)`, to get the
 old timing back. See `?"lazy-boards"`.
 
 Pin names are **bare snake_case** — the board encodes the pipeline layer.
+gdpins rejects `"."`, `".."`, names starting with a dot, and names containing
+`/`, `\` or a control character (`gdpins_error_invalid_name`), so a name can
+never point outside the board. Raw file names may hold `/` sub-folders but no
+`.`/`..` segment, absolute path, drive letter or backslash. See `?verbs`.
 
 ```r
 # Write any R object — tibble, sf, list, nested tibble
@@ -146,7 +150,7 @@ gdpins_raw_ls(conn, depth = 2)
 Sync is **always explicit** — never automatic.
 
 ```r
-# Auto: newer side wins, both directions
+# Auto: the side that changed since the last sync wins
 gdpins_sync(bd_raw)
 
 # Explicit direction
@@ -154,12 +158,35 @@ gdpins_sync(bd_raw, direction = "from_drive")   # pull Drive → local
 gdpins_sync(bd_raw, direction = "to_drive")     # push local → Drive
 
 # Check drift first
-gdpins_board_status(bd_raw)   # in_sync / local_ahead / drive_ahead / offline
+gdpins_board_status(bd_raw)   # in_sync / local_ahead / drive_ahead / conflict / offline
 ```
 
-For versioned boards, conflicts create new versions (zero data loss). For raw
-or unversioned boards, conflicts prompt interactively or stop with a report.
-Nothing is silently overwritten.
+Status compares content (pin hash, file MD5) against a **last-synced
+baseline**: what each side held the last time gdpins saw both agree. It is
+recorded by `gdpins_pin_write()`, the raw put verbs and every
+`gdpins_sync()`, and kept locally (`<cache_dir>/.gdpins-sync.rds` for a
+board, under `getOption("gdpins.cache_dir")` for a raw connection). Only
+one side changed since the baseline: that side is ahead. Both changed: a
+**conflict**, whatever the timestamps say. Without a baseline entry (data
+written outside gdpins) the newer timestamp wins; the first sync then
+records one.
+
+Nothing is silently overwritten on a conflict:
+
+- **Versioned boards:** both contents become versions on Drive and local
+  (with their metadata). The newer one (tie: Drive) is the latest on both.
+  `on_conflict` is ignored: nothing is lost either way.
+- **Unversioned boards:** conflicting pins are left unchanged and sync stops
+  with an error. Use `on_conflict = "prompt"` to pick a side.
+- **Raw connections:** the local file is saved as
+  `<stem>.conflict-<UTC timestamp>.<ext>`, then Drive's copy replaces it, with a
+  warning. The backup is uploaded on the next sync unless you delete it. Use
+  `on_conflict = "stop"` or `"prompt"` to decide yourself.
+
+Drive errors (expired token, 403, quota, network) are never read as "not
+there": they stop the call, so re-run once Drive is reachable. A Drive folder
+holding two items with the same name is an error
+(`gdpins_error_ambiguous_drive_name`); keep one and trash the rest.
 
 ## Discovery and output
 
@@ -188,8 +215,16 @@ gdpins_publish_output(
 gdpins_prune_pin_versions(bd_raw, "gdp_panel", keep = 3, dry_run = TRUE)
 
 # Actually prune (trash on Drive, not hard delete)
-gdpins_prune_board_versions(bd_raw, keep = 2, dry_run = FALSE, force = TRUE)
+plan <- gdpins_prune_board_versions(bd_raw, keep = 2, dry_run = FALSE, force = TRUE)
 ```
+
+Both functions return, invisibly, one tibble (`name`, `version`, `side`,
+`hash`, `action`) with a row per version removed — or, in a dry run, to be
+removed — on Drive and locally. A local version that never reached Drive is
+never deleted: it is kept and reported with `action = "keep_unsynced"`. On an
+offline board every local version is kept. `threshold` is compared
+with the total removals over all pins (per pin, the larger of the Drive and
+local counts); above it, `force = TRUE` is required.
 
 ## Data flow
 

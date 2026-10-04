@@ -1,3 +1,173 @@
+# gdpins 0.0.1.9027
+
+## Breaking changes
+
+* **Duplicate-named Drive items now error (H3).** When a Drive folder holds
+  more than one item with the same name, the real Drive adapter stops with an
+  error of class `gdpins_error_ambiguous_drive_name` that lists each
+  duplicate's id and modified time. Previously it silently picked the first
+  one, so a read, overwrite or trash could hit an arbitrary duplicate.
+* **Drive errors surface instead of reading as "absent" (H4).** An error from
+  Drive while listing or looking up a path (expired token, 403, quota, network)
+  now propagates. `gdpins_init_board()` and `gdpins_raw_connect()` stop with
+  that error instead of taking the create-confirm path for a folder that
+  exists. A transient error means "re-run". `gdpins_raw_remove()` deletes the
+  local file before trashing it on Drive, so a Drive error there now surfaces
+  after the local delete; before, the Drive failure was silently ignored.
+* **A conflict on an unversioned board now stops (H5).** `gdpins_sync(x,
+  on_conflict = "version")` (the default) on an unversioned board used to copy
+  Drive over local and lose the local content. A one-slot board cannot keep
+  both sides, so `"version"` now behaves like `"stop"`: non-conflicting pins
+  are still copied, conflicting pins are left unchanged, and sync aborts with
+  an error of class `gdpins_error_unversioned_conflict`,
+  `gdpins_error_sync_conflict` and `gdpins_error`. Use `on_conflict =
+  "prompt"` to choose a side. `gdpins_init_board(on_discrepancy = "sync_*")`
+  on such a board now warns "Sync ... failed" instead of silently
+  overwriting. The `"stop"` aborts for boards and raw connections now carry
+  the classes `gdpins_error_sync_conflict` and `gdpins_error`.
+* **Prune functions return a plan tibble (H8).**
+  `gdpins_prune_pin_versions()` used to return a character vector of the
+  Drive version ids it removed, and `gdpins_prune_board_versions()` a named
+  list of such vectors. Both now return, invisibly, one tibble with columns
+  `name`, `version`, `side` (`"drive"` or `"local"`), `hash` and `action`
+  (`"remove"` or `"keep_unsynced"`): one row per version removed (or, in a dry
+  run, to be removed) and per unsynced local version that was kept. The board
+  function returns one tibble for all pins instead of a named list. The old
+  value could not report local deletions. Read Drive removals with
+  `plan$version[plan$side == "drive" & plan$action == "remove"]`.
+
+## Bug fixes
+
+* **Pin names are validated (H1).** `gdpins_pin_write()`, `gdpins_pin_read()`,
+  `gdpins_pin_path()`, `gdpins_pin_remove()`, `gdpins_pin_info()` and
+  `gdpins_prune_pin_versions()` reject `"."`, `".."`, names starting with a
+  dot, and names containing `/`, `\` or a control character, with an error of
+  class `gdpins_error_invalid_name`. Previously `gdpins_pin_remove(board, "..")`
+  deleted the parent directory of the board's local copy, and
+  `gdpins_prune_pin_versions(board, "..")` deleted its siblings.
+  `gdpins_prune_pin_versions()` checked no name at all, and `NA` passed every
+  verb's check. Pin names that arrive from a Drive listing and break these
+  rules are skipped with a `gdpins_warning_invalid_name` warning by
+  `gdpins_board_status()`, `gdpins_sync()` and
+  `gdpins_prune_board_versions()`. See the "Pin names" section of `?verbs`.
+* **Raw file names are validated (H2).** `gdpins_raw_put_object()`,
+  `gdpins_raw_put_file()`, `gdpins_raw_remove()`, `gdpins_raw_get()` and
+  `gdpins_raw_path()` reject names with a `..` or `.` segment, an absolute path
+  or drive letter, a backslash, a segment ending in a dot or space, or a control
+  character (`gdpins_error_invalid_name`). `gdpins_raw_put_object(conn, x,
+  "../x.csv")` used to overwrite a file next to `local_path`, and on a real
+  Drive created a folder literally named `..`. A vector `name` given to the put
+  verbs now fails with that class instead of base R's "the condition has
+  length > 1".
+* Every local path built from a raw name, including names read from a Drive
+  listing, is checked to stay inside `local_path` (`gdpins_error_path_escape`).
+  `gdpins_raw_connect(on_discrepancy = "sync_from_drive")` and
+  `gdpins_refresh_disconnect()` skip an unsafe Drive name with a
+  `gdpins_warning_invalid_name` warning; `gdpins_sync()` reports it as a failed
+  file.
+* **Drive names are matched literally (H3).** The real Drive adapter compared
+  names as unescaped regular expressions. A name containing `(`, `)`, `+`,
+  `[`, `*`, `?`, `^`, `$`, `|`, `{` or `}` never matched itself: `exists()`
+  returned `FALSE`, downloads said "not found", trash did nothing, and every
+  upload created a new duplicate file. `.` matched any character, so `a.csv`
+  could resolve to `abcsv`. Names are now compared with `==`. The raw
+  connection's Drive-prefix strip had the same bug and now uses `startsWith()`.
+* **Remediation for duplicates left by the old H3 bug.** Each write of a name
+  with regex metacharacters created another Drive file of the same name; such
+  folders now raise `gdpins_error_ambiguous_drive_name`. List them with
+  `googledrive::drive_ls(<folder>)`, keep the file with the newest
+  `modifiedTime`, and `googledrive::drive_trash()` the rest.
+* **Drive listing and lookup errors are no longer swallowed (H4).** The real
+  adapter's `exists`, `get_id`, `download`, `trash`, `md5`, `mtime`, `ls`,
+  `mkdir` and `upload`, and `gdpins_board_status()` / `gdpins_sync()` for
+  boards (`pins::pin_list()`, `pins::pin_versions()`) and raw connections
+  (`gd_ls()`), caught every error and treated it as "nothing there". During
+  an outage that created duplicate folders and files, and made sync report
+  every local item `local_ahead` and push stale local copies over Drive.
+* **Versioned conflicts keep both sides on both boards (H5).** Conflict
+  resolution copied Drive to local and then local's *new* latest (Drive's
+  content) back to Drive, so the local content never reached Drive and the pin
+  was reported in sync. Now both pre-conflict contents become versions on both
+  boards; the one with the later `created` time (tie: Drive) is the latest on
+  both. Writes wait for the next second when needed, because pins version ids
+  have one-second resolution and same-second ids sort by hash, not by write
+  order. Copies between boards (conflicts and normal sync) now keep `title`,
+  `description`, user `metadata`, `tags` and `urls`, not only `type`. A copy
+  whose source cannot be read is no longer counted or reported as synced.
+* **Edits on both sides are detected as conflicts (H6).** Status used
+  "newer timestamp wins" whenever the two sides differed, so a pin or raw file
+  edited on both sides since the last sync was reported `drive_ahead` or
+  `local_ahead`, and `gdpins_sync()` replaced one edit with the other without
+  entering conflict handling (raw files were also exposed to clock skew).
+  gdpins now keeps a local **last-synced baseline**: each side's latest pin
+  hash in `<cache_dir>/.gdpins-sync.rds` for a board, the file MD5 under
+  `getOption("gdpins.cache_dir")/.gdpins-raw-baselines/` for a raw connection.
+  It is recorded by `gdpins_pin_write()`, `gdpins_raw_put_object()`,
+  `gdpins_raw_put_file()`, the connect-time sync of `gdpins_raw_connect()`,
+  and by `gdpins_sync()` for every item it copies, resolves or finds in sync;
+  `gdpins_pin_remove()` and `gdpins_raw_remove()` drop the entry. One side
+  changed since the baseline: that side is ahead. Both changed: `"conflict"`,
+  whatever the timestamps say. Items without a baseline entry keep the
+  timestamp rule until the first sync records one. An unreadable baseline file
+  raises one warning of class `gdpins_warning_baseline_unreadable` and is
+  ignored. The status tibble's columns are unchanged.
+* **Raw conflicts back up the local file (H7).** With the default
+  `on_conflict = "version"`, a raw file that changed on both sides was
+  overwritten by Drive's copy with only an info message. The local file is
+  now first copied to `<stem>.conflict-<UTC timestamp>.<ext>` in the same
+  folder, then Drive's copy replaces it, with a warning of class
+  `gdpins_warning_raw_conflict_backup`. The backup is a normal file in
+  `local_path`, so the next `gdpins_sync()` uploads it to Drive unless you
+  delete it.
+* **Pruning no longer deletes unsynced local versions, and reports every
+  deletion (H8).** The plan, the dry-run listing, the threshold count and the
+  return value came from Drive only, while the local copy was pruned on its
+  own list: a local version that never reached Drive was hard-deleted when it
+  was older than the newest `keep`, and local deletions were never shown or
+  counted. Now a local version beyond `keep` is deleted only when its content
+  hash is also on Drive; otherwise it is kept and reported as
+  `"keep_unsynced"`. The dry run lists Drive removals, local removals and kept
+  versions. The threshold counts the larger of the Drive and local removal
+  counts, so local-only deletions can trigger it. "No versions to remove"
+  reports the real number of versions present.
+* **Board-level prune threshold uses the total (H8, closes audit L5).**
+  `gdpins_prune_board_versions()` asked for confirmation (or `force = TRUE`)
+  only when a single pin exceeded `threshold`; many pins just under it were
+  pruned without a check. The total removal count over all pins is now
+  compared with `threshold`.
+* **Offline boards never delete unsynced versions (H8).** On a board switched
+  with `gdpins_go_offline()`, Drive cannot be checked, so pruning keeps every
+  local version (`"keep_unsynced"`) instead of deleting the offline writes.
+  A board built as `local_only` prunes as before.
+* **Pins present on Drive only no longer break board pruning (H8).**
+  `gdpins_prune_board_versions()` errored with "Can't find pin" for a pin
+  that was on Drive but not in the local copy; such a pin is now pruned on
+  Drive with no local rows.
+* **Parquet is written once per `gdpins_pin_write()` (H8).** The same file is
+  uploaded to Drive and to the local copy, so both versions carry the same
+  content hash by construction; prune and sync match versions on that hash.
+
+## Security
+
+* Pin names and raw file names can no longer escape the board or the raw
+  connection's `local_path`. A crafted name -- typed by a user, or a Drive item
+  named `..` created by a collaborator -- could previously write, overwrite or
+  delete files outside the gdpins directories (H1, H2).
+
+## Known limitations
+
+* Real Drive adapter: `pins::board_gdrive()` caches Drive versions under
+  `cache_dir`, which is also the local board's path (audit M10). Drive
+  versions can therefore appear as local versions and mask the local latest,
+  which can confuse status and the sync baseline. The fake adapter cannot
+  reproduce this; a fix is planned with M10.
+* Conflict resolution ignores `direction` (audit M15): a versioned-board
+  conflict is resolved by writing to both sides even under
+  `direction = "from_drive"` or `"to_drive"`.
+* `gdpins_raw_connect()`'s connect-time check still compares file-name sets
+  only, not content (audit M16), and the local listings used by status and
+  `gdpins_raw_ls()` do not skip sync sidecar files.
+
 # gdpins 0.0.1.9026
 
 ## New features

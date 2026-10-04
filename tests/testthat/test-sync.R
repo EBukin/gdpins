@@ -307,6 +307,67 @@ test_that("versioned board conflict: version count grows (no loss)", {
   expect_gte(cache_v_after, cache_v_before)
 })
 
+# Regression (H5): the conflict branch used to copy Drive -> local first and
+# then local's *new* latest (the Drive content) back to Drive, so the local
+# content never reached Drive and the pin was reported in_sync.
+test_that("versioned conflict keeps both contents as versions on both boards", {
+  b <- new_fake_board("drive_cache", versioned = TRUE)
+  .write_pin(b$drive_board, data.frame(x = 10), "p_vc2")
+  .write_pin(b$local_board, data.frame(x = 20), "p_vc2")
+  h_drive <- substr(pins::pin_meta(b$drive_board, "p_vc2")$pin_hash, 1, 5)
+  h_local <- substr(pins::pin_meta(b$local_board, "p_vc2")$pin_hash, 1, 5)
+
+  with_mocked_bindings(
+    suppressMessages(gdpins_sync(b, on_conflict = "version")),
+    gdpins_board_status = function(x) .fake_board_status_conflict("p_vc2"),
+    gdpins_is_online    = function() TRUE,
+    .package = "gdpins"
+  )
+
+  drive_hashes <- pins::pin_versions(b$drive_board, "p_vc2")$hash
+  local_hashes <- pins::pin_versions(b$local_board, "p_vc2")$hash
+  expect_true(h_drive %in% drive_hashes)
+  expect_true(h_local %in% drive_hashes)
+  expect_true(h_drive %in% local_hashes)
+  expect_true(h_local %in% local_hashes)
+
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+  st <- gdpins_board_status(b)
+  expect_identical(st$state[st$name == "p_vc2"], "in_sync")
+  expect_identical(
+    pins::pin_read(b$drive_board, "p_vc2"),
+    pins::pin_read(b$local_board, "p_vc2")
+  )
+})
+
+# Regression (H5 / M12): only `type` was forwarded on copy; title,
+# description and user metadata were dropped.
+test_that("versioned conflict copy keeps title, description and metadata", {
+  b <- new_fake_board("drive_cache", versioned = TRUE)
+  .write_pin(b$drive_board, data.frame(x = 10), "p_meta")
+  suppressMessages(pins::pin_write(
+    b$local_board, data.frame(x = 20), "p_meta",
+    title = "Local title", description = "Local description",
+    metadata = list(k = 1)
+  ))
+  h_local <- substr(pins::pin_meta(b$local_board, "p_meta")$pin_hash, 1, 5)
+
+  with_mocked_bindings(
+    suppressMessages(gdpins_sync(b, on_conflict = "version")),
+    gdpins_board_status = function(x) .fake_board_status_conflict("p_meta"),
+    gdpins_is_online    = function() TRUE,
+    .package = "gdpins"
+  )
+
+  dv <- pins::pin_versions(b$drive_board, "p_meta")
+  expect_true(h_local %in% dv$hash)
+  v <- dv$version[dv$hash == h_local][[1L]]
+  meta <- pins::pin_meta(b$drive_board, "p_meta", version = v)
+  expect_identical(meta$title, "Local title")
+  expect_identical(meta$description, "Local description")
+  expect_equal(meta$user$k, 1)
+})
+
 # ── Unversioned board conflict: on_conflict = "stop" ─────────────────────────
 
 test_that("unversioned board conflict with on_conflict=stop aborts + changes nothing", {
@@ -417,9 +478,49 @@ test_that("raw conflict never overwrites silently: on_conflict=version keeps a f
     gdpins_board_status = function(x) .fake_raw_status_conflict("vc.csv"),
     .package = "gdpins"
   )
-  suppressMessages(gdpins_sync(conn, direction = "auto", on_conflict = "version"))
-  # File still exists — not deleted
+  expect_warning(
+    suppressMessages(gdpins_sync(conn, direction = "auto", on_conflict = "version")),
+    class = "gdpins_warning_raw_conflict_backup"
+  )
+  # File still exists — not deleted — and the local bytes are in a backup
   expect_true(file.exists(dest_local))
+  expect_length(
+    list.files(conn$local_path, pattern = "^vc\\.conflict-.*\\.csv$"),
+    1L
+  )
+})
+
+# Regression (H7): the default "version" let Drive overwrite the local file
+# with only an info message; the local bytes were lost.
+test_that("raw conflict on_conflict=version backs up local before Drive wins", {
+  conn <- new_fake_raw_conn("drive_local")
+  tmp_d <- withr::local_tempfile(fileext = ".csv")
+  tmp_l <- withr::local_tempfile(fileext = ".csv")
+  write.csv(data.frame(x = 1:3), tmp_d, row.names = FALSE)
+  write.csv(data.frame(x = 7:9), tmp_l, row.names = FALSE)
+  gd_upload(conn$adapter, tmp_d, paste0(conn$drive_path, "/conf.csv"))
+  dest_local <- file.path(conn$local_path, "conf.csv")
+  file.copy(tmp_l, dest_local)
+  bytes_local <- readBin(dest_local, "raw", n = 10000L)
+  bytes_drive <- readBin(tmp_d, "raw", n = 10000L)
+
+  local_mocked_bindings(
+    gdpins_is_online    = function() TRUE,
+    gdpins_board_status = function(x) .fake_raw_status_conflict("conf.csv"),
+    .package = "gdpins"
+  )
+  expect_warning(
+    suppressMessages(gdpins_sync(conn)),
+    class = "gdpins_warning_raw_conflict_backup"
+  )
+
+  backups <- list.files(conn$local_path, pattern = "^conf\\.conflict-.*\\.csv$")
+  expect_length(backups, 1L)
+  expect_identical(
+    readBin(file.path(conn$local_path, backups), "raw", n = 10000L),
+    bytes_local
+  )
+  expect_identical(readBin(dest_local, "raw", n = 10000L), bytes_drive)
 })
 
 # ── Raw conflict: on_conflict = "prompt" (mock readline) ─────────────────────
@@ -846,8 +947,10 @@ test_that(".board_local_side returns local_board when set", {
   expect_identical(result, local_board)
 })
 
-# Cover unversioned board conflict with on_conflict = "version" (copies both ways)
-test_that("unversioned board on_conflict=version copies both directions", {
+# Regression (H5): on an unversioned board "version" used to copy Drive over
+# local (the local content was lost) and report success. A one-slot board
+# cannot keep both sides, so "version" now behaves like "stop".
+test_that("unversioned board on_conflict=version stops and changes nothing", {
   b <- new_fake_board("drive_cache", versioned = FALSE)
   .write_pin(b$drive_board, data.frame(x = 10), "p_uv_ver")
   .write_pin(b$local_board, data.frame(x = 20), "p_uv_ver")
@@ -857,9 +960,14 @@ test_that("unversioned board on_conflict=version copies both directions", {
     gdpins_board_status = function(x) .fake_board_status_conflict("p_uv_ver"),
     .package = "gdpins"
   )
-  suppressMessages(gdpins_sync(b, direction = "auto", on_conflict = "version"))
-  expect_true("p_uv_ver" %in% pins::pin_list(b$drive_board))
-  expect_true("p_uv_ver" %in% pins::pin_list(b$local_board))
+  err <- expect_error(
+    suppressMessages(gdpins_sync(b, direction = "auto", on_conflict = "version")),
+    class = "gdpins_error_unversioned_conflict"
+  )
+  expect_s3_class(err, "gdpins_error_sync_conflict")
+  expect_s3_class(err, "gdpins_error")
+  expect_equal(pins::pin_read(b$local_board, "p_uv_ver")$x, 20)
+  expect_equal(pins::pin_read(b$drive_board, "p_uv_ver")$x, 10)
 })
 
 # Cover unversioned board conflict with on_conflict = "prompt"
@@ -1235,9 +1343,26 @@ test_that(".copy_pin_to_board warns when pin not found on source", {
   b <- new_fake_board("drive_cache")
   # drive_board doesn't have the pin; this triggers the warn path
   expect_warning(
-    gdpins:::.copy_pin_to_board(b$drive_board, b$local_board, "nonexistent_pin"),
+    res <- gdpins:::.copy_pin_to_board(b$drive_board, b$local_board, "nonexistent_pin"),
     class = "rlang_warning"
   )
+  expect_false(res)
+})
+
+test_that(".copy_pin_to_board returns TRUE after a copy", {
+  b <- new_fake_board("drive_cache")
+  .write_pin(b$drive_board, data.frame(x = 1), "copied_pin")
+  expect_true(gdpins:::.copy_pin_to_board(b$drive_board, b$local_board, "copied_pin"))
+  expect_equal(pins::pin_read(b$local_board, "copied_pin")$x, 1)
+})
+
+test_that(".raw_conflict_backup_path keeps the extension and handles none", {
+  conn <- list(local_path = file.path(tempdir(), "lp"))
+  p1 <- gdpins:::.raw_conflict_backup_path(conn, "sub/data.csv")
+  expect_match(basename(p1), "^data\\.conflict-[0-9]{8}T[0-9]{6}Z\\.csv$")
+  expect_identical(basename(dirname(p1)), "sub")
+  p2 <- gdpins:::.raw_conflict_backup_path(conn, "README")
+  expect_match(basename(p2), "^README\\.conflict-[0-9]{8}T[0-9]{6}Z$")
 })
 
 test_that(".copy_pin_to_board preserves the source pin's type", {
@@ -1342,20 +1467,23 @@ test_that("raw status returns conflict when md5 differs and mtime is NA", {
   tmp <- withr::local_tempfile(fileext = ".csv")
   write.csv(data.frame(x = 1:3), tmp, row.names = FALSE)
   gd_upload(conn$adapter, tmp, paste0(conn$drive_path, "/na_mtime.csv"))
-  suppressMessages(gdpins_sync(conn, direction = "auto", on_conflict = "version"))
+  # No local file: nothing to back up, so no backup warning and no failure
+  expect_no_warning(
+    suppressMessages(gdpins_sync(conn, direction = "auto", on_conflict = "version"))
+  )
   expect_true(file.exists(file.path(conn$local_path, "na_mtime.csv")))
+  expect_length(list.files(conn$local_path, pattern = "conflict-"), 0L)
 })
 
-# Cover .board_status_raw gd_ls error fallback to empty tbl
-test_that("board_status_raw handles gd_ls error gracefully", {
+# A Drive listing error must propagate, not read as an empty Drive folder (H4)
+test_that("board_status_raw propagates a gd_ls error", {
   conn <- new_fake_raw_conn("drive_local")
   local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     gd_ls            = function(...) stop("Drive error"),
     .package = "gdpins"
   )
-  st <- gdpins_board_status(conn)
-  expect_equal(nrow(st), 0L)
+  expect_error(gdpins_board_status(conn), "Drive error")
 })
 
 # Cover .latest_version returning NULL when pin_versions has 0 rows
@@ -1397,4 +1525,47 @@ test_that("raw_conn status local_ahead via newer local mtime", {
 
   st <- gdpins_board_status(conn)
   expect_true(st$state[st$name == "both2.csv"] %in% c("local_ahead", "conflict"))
+})
+
+# ── H4: Drive listing errors propagate instead of reading as "absent" ────────
+
+test_that("raw status and sync propagate a Drive listing error", {
+  conn <- new_fake_raw_conn("drive_local")
+  writeLines("a,b", file.path(conn$local_path, "local.csv"))
+  local_mocked_bindings(
+    gdpins_is_online = function() TRUE,
+    gd_ls = function(...) {
+      cli::cli_abort("403", class = "gdpins_error_drive_listing")
+    },
+    .package = "gdpins"
+  )
+  expect_error(gdpins_board_status(conn), class = "gdpins_error_drive_listing")
+  expect_error(gdpins_sync(conn), class = "gdpins_error_drive_listing")
+  expect_false(conn$adapter$exists(paste0(conn$drive_path, "/local.csv")))
+})
+
+test_that("board status and sync propagate a Drive pin_list error", {
+  b <- new_fake_board("drive_cache")
+  pins::pin_write(b$local_board, 1:3, "p1", type = "rds")
+  real_pin_list <- pins::pin_list
+  drive_path <- b$drive_board$path
+  local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
+  local_mocked_bindings(
+    pin_list = function(board, ...) {
+      if (identical(board$path, drive_path)) stop("403") else real_pin_list(board, ...)
+    },
+    .package = "pins"
+  )
+  expect_error(gdpins_board_status(b), "403")
+  expect_error(gdpins_sync(b), "403")
+  expect_false(fs::dir_exists(fs::path(drive_path, "p1")))
+})
+
+test_that(".latest_version propagates a pin_versions error", {
+  b <- new_fake_board("drive_cache")
+  local_mocked_bindings(
+    pin_versions = function(board, name, ...) stop("403"),
+    .package = "pins"
+  )
+  expect_error(gdpins:::.latest_version(b$drive_board, "p"), "403")
 })
