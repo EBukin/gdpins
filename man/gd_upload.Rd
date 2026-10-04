@@ -19,4 +19,9 @@ gd_upload(adapter, local_path, path)
 \description{
 Upload a local file to Drive
 }
+\section{Errors}{
+
+Errors from Drive propagate; an empty result means the path is absent.
+}
+
 \keyword{internal}

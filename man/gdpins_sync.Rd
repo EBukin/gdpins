@@ -15,37 +15,81 @@ gdpins_sync(
 
 \item{direction}{Character scalar. One of \code{c("auto", "to_drive", "from_drive")}. Default \code{"auto"}.}
 
-\item{on_conflict}{Character scalar. One of \code{c("version", "prompt", "stop")}. Default \code{"version"}.}
+\item{on_conflict}{Character scalar. One of \code{c("version", "prompt", "stop")}. Default \code{"version"}: keep both sides as versions on a
+versioned board, back up the local file and keep Drive's on a raw
+connection, and stop (like \code{"stop"}) on an unversioned board. See
+"Conflict handling" above.}
 }
 \value{
 Invisibly \code{x}. Called for its side effect.
 }
 \description{
 Reconciles Drive and local copies bidirectionally. Direction defaults to
-\code{"auto"} (newer wins). Conflict handling is controlled by \code{on_conflict}.
+\code{"auto"} (the side that changed since the last sync wins). Conflict
+handling is controlled by \code{on_conflict}. See "Sync rules" for how each pin
+or file is classified.
 }
-\details{
-"Newer" decision (strongest signal per layer):
+\section{Sync rules}{
+
+Each pin (board) or file (raw connection) is compared by content: the
+latest version's hash for pins, the MD5 checksum for raw files. Equal
+content is \code{"in_sync"}. A pin or file present on one side only is ahead on
+that side.
+
+When the content differs, gdpins compares each side with the
+\strong{last-synced baseline}: what each side held the last time gdpins saw
+both sides agree. The baseline is recorded by \code{\link[=gdpins_pin_write]{gdpins_pin_write()}},
+\code{\link[=gdpins_raw_put_object]{gdpins_raw_put_object()}}, \code{\link[=gdpins_raw_put_file]{gdpins_raw_put_file()}}, the connect-time sync
+of \code{\link[=gdpins_raw_connect]{gdpins_raw_connect()}}, and by every \code{gdpins_sync()} for each pin or
+file it copied, resolved or found in sync.
 \itemize{
-\item Boards: compare pins version id/timestamp.
-\item Raw files: compare MD5 (\code{drive}'s \code{md5Checksum}).
-\item mtime only as tiebreaker.
+\item Only Drive changed since the baseline: \code{"drive_ahead"}.
+\item Only local changed: \code{"local_ahead"}.
+\item Both changed: \code{"conflict"}, whatever the timestamps say, so an edit on
+one side is never silently replaced by an edit on the other.
 }
 
-\strong{Conflict handling:}
+Without a baseline entry (pins or files written outside gdpins, or before
+this rule existed) the newer side wins: pins version \code{created} time for
+boards, modification time for raw files; equal or missing times are a
+conflict. The first \code{gdpins_sync()} records a baseline for every pin or
+file it leaves in sync.
+
+The baseline is local and owned by gdpins: \verb{<cache_dir>/.gdpins-sync.rds}
+for a board (invisible to pins), and a file under
+\code{getOption("gdpins.cache_dir")} for a raw connection (never inside
+\code{local_path}). \code{\link[=gdpins_pin_remove]{gdpins_pin_remove()}} and \code{\link[=gdpins_raw_remove]{gdpins_raw_remove()}} drop the
+entry. A missing baseline file means "no baseline"; an unreadable one
+raises a warning of class \code{gdpins_warning_baseline_unreadable} and is
+replaced on the next sync. Boards without a local copy or without Drive,
+and local-only raw connections, have no baseline.
+
+\strong{Conflict handling} (a conflict is a pin or file that differs on both
+sides with no clear newer side):
 \itemize{
-\item Versioned boards: both writes simply become versions (\code{pins} handles
-it, zero loss). \code{on_conflict} is effectively \code{"version"} regardless.
-\item Raw / unversioned boards with \code{on_conflict = "stop"}: abort with a
-report of the conflicting items; change nothing.
-\item Raw / unversioned boards with \code{on_conflict = "prompt"}: ask the user
-interactively per conflict.
+\item Versioned boards: both contents become versions on \strong{both} boards,
+with their title, description and metadata. The content with the later
+\code{created} time (tie: Drive) is the latest version on both boards, so the
+pin is in sync afterwards. \code{on_conflict} is ignored.
+\item Unversioned boards: a board with one slot per pin cannot keep both
+sides. \code{"version"} and \code{"stop"} leave conflicting pins unchanged, copy
+the non-conflicting ones, and then abort with an error of class
+\code{gdpins_error_sync_conflict} (plus \code{gdpins_error_unversioned_conflict}
+for \code{"version"}). \code{"prompt"} asks which side to keep.
+\item Raw connections with \code{"version"} (default): the local file is copied to
+\verb{<stem>.conflict-<UTC timestamp>.<ext>} next to it, then the Drive copy
+replaces it, with a warning of class
+\code{gdpins_warning_raw_conflict_backup}. The backup is a normal file in
+\code{local_path}: the next sync uploads it unless you delete it. \code{"stop"}
+aborts (class \code{gdpins_error_sync_conflict}) and changes no conflicting
+file; \code{"prompt"} asks per file.
 \item \strong{Never silent overwrite.}
 }
 
 Writes and syncs are blocked when offline (\code{gdpins_is_online()} is
 \code{FALSE}). An informative error is raised.
 }
+
 \examples{
 # --- Fake adapter board ---
 adapter <- gdpins_fake_drive()

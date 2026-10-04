@@ -8,3 +8,16 @@ Core verbs for writing R objects to a board and reading them back. Writes
 fan out to all non-NULL board components (Drive, local). Reads are
 local-first: local → Drive.
 }
+\section{Pin names}{
+
+A pin name is a single, non-empty string that becomes a directory name on
+Drive and in the local copy. It cannot be \code{"."} or \code{".."}, cannot start with
+a dot, and cannot contain \code{/}, \verb{\\} or a control character (such as a
+newline). Anything else -- letters, digits, \verb{_}, \code{-}, spaces, inner dots as in
+\code{"Quarterly.Report"} -- is accepted. A rejected name raises an error of class
+\code{gdpins_error_invalid_name} before anything is read or written. Names that
+arrive from a Drive listing and break these rules are skipped with a warning
+of class \code{gdpins_warning_invalid_name} by \code{\link[=gdpins_sync]{gdpins_sync()}},
+\code{\link[=gdpins_board_status]{gdpins_board_status()}} and \code{\link[=gdpins_prune_board_versions]{gdpins_prune_board_versions()}}.
+}
+

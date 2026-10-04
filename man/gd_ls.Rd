@@ -23,4 +23,9 @@ for real adapter). Trashed entries are excluded.
 \description{
 List contents of a Drive directory
 }
+\section{Errors}{
+
+Errors from Drive propagate; an empty result means the path is absent.
+}
+
 \keyword{internal}

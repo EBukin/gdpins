@@ -9,7 +9,11 @@ gdpins_raw_remove(conn, name)
 \arguments{
 \item{conn}{A \code{gdpins_raw_conn} object.}
 
-\item{name}{Character scalar. Relative file path within the raw-root.}
+\item{name}{Character scalar. Relative file path within the raw-root.
+Must stay inside the raw-root: \code{/} separators only, no \code{..} or \code{.}
+segment, no absolute path or drive letter, no backslash, no segment ending
+in a dot or space, no control character; otherwise an error of class
+\code{gdpins_error_invalid_name}.}
 }
 \value{
 Invisibly \code{NULL}.

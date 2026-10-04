@@ -17,4 +17,9 @@ gd_mkdir(adapter, path)
 \description{
 Create a directory (and parents) on Drive, idempotent
 }
+\section{Errors}{
+
+Errors from Drive propagate; an empty result means the path is absent.
+}
+
 \keyword{internal}

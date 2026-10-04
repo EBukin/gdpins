@@ -13,8 +13,8 @@
 A \code{pins} board object.
 }
 \description{
-For Drive boards (\code{drive_cache}, \code{drive_only}): Drive board is authoritative
-for reporting the removed version labels. For \code{local_only}: the local copy
+For Drive boards (\code{drive_cache}, \code{drive_only}): Drive board is the one
+whose pins are enumerated by board-level pruning. For \code{local_only}: the local copy
 is the only board.
 }
 \keyword{internal}

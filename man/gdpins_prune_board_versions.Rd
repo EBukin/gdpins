@@ -15,22 +15,27 @@ gdpins_prune_board_versions(
 \arguments{
 \item{board}{A \code{gdpins_board} object.}
 
-\item{keep}{Integer scalar. Versions to keep per pin. Default \code{1}.}
+\item{keep}{Integer scalar. Versions to keep per pin and side. Default \code{1}.}
 
 \item{dry_run}{Logical. Show plan without removing. Default \code{TRUE}.}
 
-\item{threshold}{Integer scalar. Threshold before requiring confirmation.
-Default \code{10}.}
+\item{threshold}{Integer scalar. Maximum total number of versions to remove
+across all pins without \code{force = TRUE} or interactive confirmation.
+Default \code{10}. Each pin counts the larger of its Drive and local removal
+counts.}
 
-\item{force}{Logical. Skip interactive confirmation. Default \code{FALSE}.}
+\item{force}{Logical. Skip the threshold check and its interactive
+confirmation. Default \code{FALSE}.}
 }
 \value{
-Invisibly, a named list of character vectors (one per pin) of
-removed (or would-be-removed) version labels.
+Invisibly, one prune plan tibble holding the rows of every pin (see
+\code{\link[=gdpins_prune_pin_versions]{gdpins_prune_pin_versions()}} for the columns). Zero rows when the board
+has no pins or nothing is beyond \code{keep}.
 }
 \description{
 Applies \code{\link[=gdpins_prune_pin_versions]{gdpins_prune_pin_versions()}} to every pin in \code{board}. Defaults to
-\code{dry_run = TRUE}.
+\code{dry_run = TRUE}. Pins are listed from Drive when the board has a Drive
+board, otherwise from the local copy.
 }
 \examples{
 adapter <- gdpins_fake_drive()

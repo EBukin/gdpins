@@ -17,4 +17,9 @@ gd_mtime(adapter, path)
 \description{
 Return modification time of a Drive path
 }
+\section{Errors}{
+
+Errors from Drive propagate; an empty result means the path is absent.
+}
+
 \keyword{internal}

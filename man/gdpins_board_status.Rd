@@ -24,11 +24,16 @@ Dispatches on the class of \code{x}:
 }
 \details{
 \itemize{
-\item \strong{\code{gdpins_board}}: compares pins version id/timestamp between the Drive
+\item \strong{\code{gdpins_board}}: compares the latest version's hash between the Drive
 board and the board's one local copy (\code{local_board}).
 \item \strong{\code{gdpins_raw_conn}}: compares MD5 checksums between the Drive folder and
-the local mirror directory; mtime is used as a tiebreaker.
+the local mirror directory.
 }
+
+Differing content is classified against the last-synced baseline (one side
+changed: that side is ahead; both changed: \code{"conflict"}), or by
+timestamp when there is no baseline entry. See the "Sync rules" section of
+\code{\link[=gdpins_sync]{gdpins_sync()}}.
 
 If \code{!gdpins_is_online()}, all rows are set to \code{state = "offline"} and a
 warning is emitted. No Drive calls are made offline.

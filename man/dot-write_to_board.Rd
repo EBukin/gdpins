@@ -4,7 +4,7 @@
 \alias{.write_to_board}
 \title{Write x to a single pins board with appropriate type}
 \usage{
-.write_to_board(pins_board, x, name, fmt, versioned)
+.write_to_board(pins_board, x, name, fmt, versioned, parquet_path = NULL)
 }
 \arguments{
 \item{pins_board}{A pins board object.}
@@ -16,6 +16,10 @@
 \item{fmt}{Character scalar: \code{"parquet"} or \code{"rds"}.}
 
 \item{versioned}{Logical. Whether this write creates a version.}
+
+\item{parquet_path}{Character scalar or \code{NULL}. A \code{.parquet} file already
+written from \code{x}; uploaded as is instead of writing a new one, so every
+board receives the same bytes (and the same content hash).}
 }
 \description{
 Write x to a single pins board with appropriate type

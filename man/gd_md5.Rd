@@ -17,4 +17,9 @@ Character scalar MD5, or \code{NA_character_} if absent or a directory.
 \description{
 Return MD5 checksum of a Drive file
 }
+\section{Errors}{
+
+Errors from Drive propagate; an empty result means the path is absent.
+}
+
 \keyword{internal}

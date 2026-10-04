@@ -17,4 +17,9 @@ Logical scalar.
 \description{
 Check if a path exists on Drive
 }
+\section{Errors}{
+
+Errors from Drive propagate; an empty result means the path is absent.
+}
+
 \keyword{internal}

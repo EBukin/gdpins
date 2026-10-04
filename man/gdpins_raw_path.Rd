@@ -12,7 +12,9 @@ gdpins_raw_path(conn, name_or_id)
 \item{name_or_id}{Character scalar. Either:
 \describe{
 \item{Relative path}{A path within the raw-root, using \code{"/"} as
-separator (e.g. \code{"api/gdp_2024.parquet"} or \code{"my data (2024).csv"}).}
+separator (e.g. \code{"api/gdp_2024.parquet"} or \code{"my data (2024).csv"}).
+The same rules as \code{name} in \code{\link[=gdpins_raw_get]{gdpins_raw_get()}} apply: no \code{..} or \code{.}
+segment, no absolute path, no backslash.}
 \item{Drive file ID}{A Google Drive file ID (≥ 25 alphanumeric
 characters, no slashes or hyphens). Only supported with a real adapter.}
 }}

@@ -16,31 +16,46 @@ gdpins_prune_pin_versions(
 \arguments{
 \item{board}{A \code{gdpins_board} object.}
 
-\item{name}{Character scalar. Pin name.}
+\item{name}{Character scalar. Pin name. Must be a valid pin name; see the
+Pin names section of \link{verbs}.}
 
-\item{keep}{Integer scalar. Number of most-recent versions to keep. Default
-\code{1}.}
+\item{keep}{Integer scalar. Number of most-recent versions to keep on each
+side (Drive, local copy). Default \code{1}.}
 
-\item{dry_run}{Logical. If \code{TRUE} (default), show what would be removed
-without actually removing anything.}
+\item{dry_run}{Logical. If \code{TRUE} (default), show the plan (Drive and local
+removals, and unsynced local versions that are kept) without removing
+anything.}
 
 \item{threshold}{Integer scalar. Maximum number of versions to remove without
-requiring \code{force = TRUE} or interactive confirmation. Default \code{10}.}
+requiring \code{force = TRUE} or interactive confirmation. Default \code{10}. The
+count is the larger of the Drive and the local removal counts, so a
+version removed from both sides counts once.}
 
-\item{force}{Logical. If \code{TRUE}, skip the interactive threshold confirmation.
-Default \code{FALSE}.}
+\item{force}{Logical. If \code{TRUE}, skip the threshold check and its
+interactive confirmation. Default \code{FALSE}.}
 }
 \value{
-Invisibly, a character vector of the version labels that were (or
-would be) removed (as reported by the primary / Drive board).
+Invisibly, the prune plan: a tibble with one row per version that
+was (or, in a dry run, would be) removed, or that was kept because it is
+not on Drive. Columns: \code{name} (pin name), \code{version} (version id), \code{side}
+(\code{"drive"} or \code{"local"}), \code{hash} (content-hash prefix from the version
+id) and \code{action} (\code{"remove"} or \code{"keep_unsynced"}). Zero rows when no
+version is beyond \code{keep}.
 }
 \description{
 Removes old versions of one pin from Drive \strong{and} the local copy (whichever
-are present on \code{board}), keeping the \code{keep} most recent. Drive versions are
-always \strong{trashed} (recoverable via \code{gd_trash()}), never hard-deleted.
-Local-copy versions are deleted from the local filesystem.
+are present on \code{board}), keeping the \code{keep} most recent on each side. Drive
+versions are always \strong{trashed} (recoverable via \code{gd_trash()}), never
+hard-deleted. Local-copy versions are deleted from the local filesystem.
 }
 \details{
+A local version beyond \code{keep} is deleted only when its content (matched by
+the content hash in its version id) is also on Drive. A local version that
+was never synced is kept and reported with action \code{"keep_unsynced"}. On an
+offline board (see \code{\link[=gdpins_go_offline]{gdpins_go_offline()}}) Drive cannot be checked, so no
+local version is deleted. A board that is \code{local_only} by construction has
+no Drive to sync to: every version beyond \code{keep} is deleted.
+
 Defaults to \code{dry_run = TRUE} for safety: the plan is shown but nothing is
 removed.
 

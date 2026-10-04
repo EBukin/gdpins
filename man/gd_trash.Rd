@@ -17,4 +17,9 @@ gd_trash(adapter, path)
 \description{
 Trash a Drive path (recoverable, never hard-deletes)
 }
+\section{Errors}{
+
+Errors from Drive propagate; an empty result means the path is absent.
+}
+
 \keyword{internal}

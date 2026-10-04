@@ -12,7 +12,11 @@ gdpins_raw_put_object(conn, x, name, wkt_engine = NULL)
 \item{x}{An R object.}
 
 \item{name}{Character scalar. Relative path within the raw-root, including
-extension (e.g. \code{"worldbank-api/gdp_2024.parquet"}).}
+extension (e.g. \code{"worldbank-api/gdp_2024.parquet"}).
+Must stay inside the raw-root: \code{/} separators only, no \code{..} or \code{.}
+segment, no absolute path or drive letter, no backslash, no segment ending
+in a dot or space, no control character; otherwise an error of class
+\code{gdpins_error_invalid_name}.}
 
 \item{wkt_engine}{Character scalar or \code{NULL}. WKT engine used to encode \code{sf}
 geometry when writing \code{.parquet}: \code{"wk"} (default) or \code{"sf"}. \code{NULL} uses

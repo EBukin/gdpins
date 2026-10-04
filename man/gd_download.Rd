@@ -19,4 +19,9 @@ gd_download(adapter, path, local_path)
 \description{
 Download a Drive file to a local path
 }
+\section{Errors}{
+
+Errors from Drive propagate; an empty result means the path is absent.
+}
+
 \keyword{internal}

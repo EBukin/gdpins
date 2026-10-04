@@ -11,7 +11,11 @@ gdpins_raw_put_file(conn, path, name)
 
 \item{path}{Character scalar. Path to the local source file.}
 
-\item{name}{Character scalar. Relative destination path within the raw-root.}
+\item{name}{Character scalar. Relative destination path within the raw-root.
+Must stay inside the raw-root: \code{/} separators only, no \code{..} or \code{.}
+segment, no absolute path or drive letter, no backslash, no segment ending
+in a dot or space, no control character; otherwise an error of class
+\code{gdpins_error_invalid_name}.}
 }
 \value{
 Invisibly \code{NULL}.
