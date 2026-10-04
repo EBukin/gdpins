@@ -638,6 +638,13 @@ gdpins_raw_connect <- function(
 
   has_discrepancy <- !setequal(drive_cmp, local_cmp)
 
+  conn <- new_gdpins_raw_conn(
+    config     = "drive_local",
+    drive_path = drive_path,
+    local_path = local_path,
+    adapter    = adapter
+  )
+
   if (has_discrepancy) {
     switch(
       disc,
@@ -657,6 +664,8 @@ gdpins_raw_connect <- function(
               fs::dir_create(dirname(local_dest))
               gd_download(adapter, paste0(drive_path, "/", f), local_dest)
             }
+            # Pulled files now match Drive: the last-synced baseline (H6).
+            .raw_baseline_set(conn, pull)
           }
         } else {
           cli::cli_warn(
@@ -679,14 +688,17 @@ gdpins_raw_connect <- function(
           fs::dir_create(dirname(local_dest))
           gd_download(adapter, paste0(drive_path, "/", f), local_dest)
         }
+        .raw_baseline_set(conn, pull)
       },
       "sync_to_drive" = {
-        for (f in local_rel[!.is_sync_sidecar(local_rel)]) {
+        push <- local_rel[!.is_sync_sidecar(local_rel)]
+        for (f in push) {
           local_src  <- file.path(local_path,
                                   gsub("/", .Platform$file.sep, f, fixed = TRUE))
           drive_dest <- paste0(drive_path, "/", f)
           gd_upload(adapter, local_src, drive_dest)
         }
+        .raw_baseline_set(conn, push)
       },
       "ignore" = {
         # do nothing
@@ -694,12 +706,7 @@ gdpins_raw_connect <- function(
     )
   }
 
-  new_gdpins_raw_conn(
-    config     = "drive_local",
-    drive_path = drive_path,
-    local_path = local_path,
-    adapter    = adapter
-  )
+  conn
 }
 
 # ── gdpins_raw_put_object ─────────────────────────────────────────────────────
@@ -739,6 +746,8 @@ gdpins_raw_put_object <- function(conn, x, name, wkt_engine = NULL) {
   if (!is.null(conn$adapter)) {
     drive_dest <- .drive_full_path(conn, name)
     gd_upload(conn$adapter, local_dest, drive_dest)
+    # Both sides hold the same bytes: the last-synced baseline (H6).
+    .raw_baseline_set(conn, name)
   }
 
   invisible(NULL)
@@ -789,6 +798,8 @@ gdpins_raw_put_file <- function(conn, path, name) {
   if (!is.null(conn$adapter)) {
     drive_dest <- .drive_full_path(conn, name)
     gd_upload(conn$adapter, local_dest, drive_dest)
+    # Both sides hold the same bytes: the last-synced baseline (H6).
+    .raw_baseline_set(conn, name)
   }
 
   invisible(NULL)
@@ -863,6 +874,7 @@ gdpins_raw_remove <- function(conn, name) {
 
   if (!is.null(conn$adapter)) {
     gd_trash(conn$adapter, .drive_full_path(conn, name))
+    .raw_baseline_drop(conn, name)
   }
 
   invisible(NULL)

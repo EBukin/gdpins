@@ -93,6 +93,23 @@
   (`gd_ls()`), caught every error and treated it as "nothing there". During
   an outage that created duplicate folders and files, and made sync report
   every local item `local_ahead` and push stale local copies over Drive.
+* **Edits on both sides are detected as conflicts (H6).** Status used
+  "newer timestamp wins" whenever the two sides differed, so a pin or raw file
+  edited on both sides since the last sync was reported `drive_ahead` or
+  `local_ahead`, and `gdpins_sync()` replaced one edit with the other without
+  entering conflict handling (raw files were also exposed to clock skew).
+  gdpins now keeps a local **last-synced baseline**: each side's latest pin
+  hash in `<cache_dir>/.gdpins-sync.rds` for a board, the file MD5 under
+  `getOption("gdpins.cache_dir")/.gdpins-raw-baselines/` for a raw connection.
+  It is recorded by `gdpins_pin_write()`, `gdpins_raw_put_object()`,
+  `gdpins_raw_put_file()`, the connect-time sync of `gdpins_raw_connect()`,
+  and by `gdpins_sync()` for every item it copies, resolves or finds in sync;
+  `gdpins_pin_remove()` and `gdpins_raw_remove()` drop the entry. One side
+  changed since the baseline: that side is ahead. Both changed: `"conflict"`,
+  whatever the timestamps say. Items without a baseline entry keep the
+  timestamp rule until the first sync records one. An unreadable baseline file
+  raises one warning of class `gdpins_warning_baseline_unreadable` and is
+  ignored. The status tibble's columns are unchanged.
 
 ## Security
 
@@ -102,6 +119,18 @@
   delete files outside the gdpins directories (H1, H2).
 
 ## Known limitations
+
+* Real Drive adapter: `pins::board_gdrive()` caches Drive versions under
+  `cache_dir`, which is also the local board's path (audit M10). Drive
+  versions can therefore appear as local versions and mask the local latest,
+  which can confuse status and the sync baseline. The fake adapter cannot
+  reproduce this; a fix is planned with M10.
+* Conflict resolution ignores `direction` (audit M15): a versioned-board
+  conflict is resolved by writing to both sides even under
+  `direction = "from_drive"` or `"to_drive"`.
+* `gdpins_raw_connect()`'s connect-time check still compares file-name sets
+  only, not content (audit M16), and the local listings used by status and
+  `gdpins_raw_ls()` do not skip sync sidecar files.
 
 # gdpins 0.0.1.9026
 

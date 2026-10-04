@@ -146,7 +146,7 @@ gdpins_raw_ls(conn, depth = 2)
 Sync is **always explicit** — never automatic.
 
 ```r
-# Auto: newer side wins, both directions
+# Auto: the side that changed since the last sync wins
 gdpins_sync(bd_raw)
 
 # Explicit direction
@@ -157,8 +157,17 @@ gdpins_sync(bd_raw, direction = "to_drive")     # push local → Drive
 gdpins_board_status(bd_raw)   # in_sync / local_ahead / drive_ahead / offline
 ```
 
-A conflict is an item that changed on both sides with no clear newer side.
-Nothing is silently overwritten:
+Status compares content (pin hash, file MD5) against a **last-synced
+baseline**: what each side held the last time gdpins saw both agree. It is
+recorded by `gdpins_pin_write()`, the raw put verbs and every
+`gdpins_sync()`, and kept locally (`<cache_dir>/.gdpins-sync.rds` for a
+board, under `getOption("gdpins.cache_dir")` for a raw connection). Only
+one side changed since the baseline: that side is ahead. Both changed: a
+**conflict**, whatever the timestamps say. Without a baseline entry (data
+written outside gdpins) the newer timestamp wins; the first sync then
+records one.
+
+Nothing is silently overwritten on a conflict:
 
 - **Versioned boards:** both contents become versions on Drive and local
   (with their metadata). The newer one (tie: Drive) is the latest on both.

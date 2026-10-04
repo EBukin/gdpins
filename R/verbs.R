@@ -201,6 +201,11 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
     }
   }
 
+  # Both sides now hold this write: record it as the last-synced state, so a
+  # later edit on one side is told apart from edits on both (no-op unless the
+  # board has a Drive board and a local copy).
+  .baseline_set(board, name)
+
   invisible(NULL)
 }
 
@@ -580,6 +585,8 @@ gdpins_pin_remove <- function(board, name) {
       pins::pin_delete(component, name)
     }
   }
+
+  .baseline_drop(board, name)
 
   invisible(NULL)
 }

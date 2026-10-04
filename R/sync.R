@@ -15,10 +15,15 @@ NULL
 #' Returns a per-pin/per-file tibble describing drift between Drive and local.
 #' Dispatches on the class of `x`:
 #'
-#' - **`gdpins_board`**: compares pins version id/timestamp between the Drive
+#' - **`gdpins_board`**: compares the latest version's hash between the Drive
 #'   board and the board's one local copy (`local_board`).
 #' - **`gdpins_raw_conn`**: compares MD5 checksums between the Drive folder and
-#'   the local mirror directory; mtime is used as a tiebreaker.
+#'   the local mirror directory.
+#'
+#' Differing content is classified against the last-synced baseline (one side
+#' changed: that side is ahead; both changed: `"conflict"`), or by
+#' timestamp when there is no baseline entry. See the "Sync rules" section of
+#' [gdpins_sync()].
 #'
 #' If `!gdpins_is_online()`, all rows are set to `state = "offline"` and a
 #' warning is emitted. No Drive calls are made offline.
@@ -93,12 +98,41 @@ gdpins_board_status.default <- function(x) {
 #' Synchronise a board or raw connection with Drive
 #'
 #' Reconciles Drive and local copies bidirectionally. Direction defaults to
-#' `"auto"` (newer wins). Conflict handling is controlled by `on_conflict`.
+#' `"auto"` (the side that changed since the last sync wins). Conflict
+#' handling is controlled by `on_conflict`. See "Sync rules" for how each pin
+#' or file is classified.
 #'
-#' "Newer" decision (strongest signal per layer):
-#' - Boards: compare pins version id/timestamp.
-#' - Raw files: compare MD5 (`drive`'s `md5Checksum`).
-#' - mtime only as tiebreaker.
+#' @section Sync rules:
+#' Each pin (board) or file (raw connection) is compared by content: the
+#' latest version's hash for pins, the MD5 checksum for raw files. Equal
+#' content is `"in_sync"`. A pin or file present on one side only is ahead on
+#' that side.
+#'
+#' When the content differs, gdpins compares each side with the
+#' **last-synced baseline**: what each side held the last time gdpins saw
+#' both sides agree. The baseline is recorded by [gdpins_pin_write()],
+#' [gdpins_raw_put_object()], [gdpins_raw_put_file()], the connect-time sync
+#' of [gdpins_raw_connect()], and by every `gdpins_sync()` for each pin or
+#' file it copied, resolved or found in sync.
+#' - Only Drive changed since the baseline: `"drive_ahead"`.
+#' - Only local changed: `"local_ahead"`.
+#' - Both changed: `"conflict"`, whatever the timestamps say, so an edit on
+#'   one side is never silently replaced by an edit on the other.
+#'
+#' Without a baseline entry (pins or files written outside gdpins, or before
+#' this rule existed) the newer side wins: pins version `created` time for
+#' boards, modification time for raw files; equal or missing times are a
+#' conflict. The first `gdpins_sync()` records a baseline for every pin or
+#' file it leaves in sync.
+#'
+#' The baseline is local and owned by gdpins: `<cache_dir>/.gdpins-sync.rds`
+#' for a board (invisible to pins), and a file under
+#' `getOption("gdpins.cache_dir")` for a raw connection (never inside
+#' `local_path`). [gdpins_pin_remove()] and [gdpins_raw_remove()] drop the
+#' entry. A missing baseline file means "no baseline"; an unreadable one
+#' raises a warning of class `gdpins_warning_baseline_unreadable` and is
+#' replaced on the next sync. Boards without a local copy or without Drive,
+#' and local-only raw connections, have no baseline.
 #'
 #' **Conflict handling** (a conflict is a pin or file that differs on both
 #' sides with no clear newer side):
@@ -202,6 +236,263 @@ gdpins_sync.default <- function(
   ))
 }
 
+# -- Last-synced baseline (H6) -------------------------------------------------
+#
+# A baseline records, per pin or raw file, what each side held the last time
+# gdpins knew both sides to agree. Status compares each side with its own
+# baseline: one side changed -> that side is ahead; both changed -> conflict,
+# whatever the timestamps say. No baseline row -> the timestamp rule.
+#
+# Board:  <cache_dir>/.gdpins-sync.rds, columns name, drive_hash, local_hash
+#         (5-char hash prefixes as in pins::pin_versions()$hash, stored per
+#         side), synced_at. Dot-named, so pins never lists it.
+# Raw:    <getOption("gdpins.cache_dir")>/.gdpins-raw-baselines/<key>.rds,
+#         columns name, synced_md5, synced_at. Kept outside local_path so the
+#         mirror listings never see it.
+
+.BASELINE_FILE     <- ".gdpins-sync.rds"
+.RAW_BASELINE_DIR  <- ".gdpins-raw-baselines"
+
+#' Read a baseline file
+#'
+#' @param path Character scalar, or `NULL`.
+#' @param cols Character vector of required columns.
+#' @param quiet Logical. `TRUE` suppresses the unreadable-file warning (used
+#'   by writers, which replace such a file anyway).
+#'
+#' @return A data frame, or `NULL` when there is no usable baseline.
+#' @keywords internal
+.baseline_read_file <- function(path, cols, quiet = FALSE) {
+  if (is.null(path) || !file.exists(path)) return(NULL)
+  base <- tryCatch(readRDS(path), error = function(e) NULL,
+                   warning = function(w) NULL)
+  if (!is.data.frame(base) || !all(cols %in% names(base))) {
+    if (!quiet) {
+      cli::cli_warn(
+        c(
+          "!" = "Ignoring unreadable sync baseline {.path {path}}.",
+          "i" = paste0(
+            "Changes are compared by timestamp until the next ",
+            "{.fn gdpins_sync} rewrites it."
+          )
+        ),
+        class = "gdpins_warning_baseline_unreadable"
+      )
+    }
+    return(NULL)
+  }
+  base[, cols, drop = FALSE]
+}
+
+#' Write a baseline file atomically (temp file in the same directory, then move)
+#'
+#' A failure warns and leaves detection on the timestamp rule; it never aborts
+#' the verb that triggered it.
+#'
+#' @param path Character scalar.
+#' @param base A data frame.
+#'
+#' @return `TRUE` on success, `FALSE` after a warning.
+#' @keywords internal
+.baseline_write_file <- function(path, base) {
+  tryCatch({
+    fs::dir_create(dirname(path))
+    tmp <- tempfile(".gdpins-baseline-", tmpdir = dirname(path), fileext = ".tmp")
+    on.exit(if (file.exists(tmp)) unlink(tmp), add = TRUE)
+    saveRDS(base, tmp)
+    fs::file_move(tmp, path)
+    TRUE
+  }, error = function(e) {
+    cli::cli_warn(
+      c(
+        "!" = "Could not write sync baseline {.path {path}}: {conditionMessage(e)}",
+        "i" = "Changes are compared by timestamp until a baseline is written."
+      ),
+      class = "gdpins_warning_baseline_unwritable"
+    )
+    FALSE
+  })
+}
+
+#' Upsert rows into a baseline data frame
+#' @keywords internal
+.baseline_upsert <- function(base, rows) {
+  if (is.null(base)) return(rows)
+  rbind(base[!base$name %in% rows$name, , drop = FALSE], rows)
+}
+
+# ---- Board baseline ----
+
+#' Path of a board's baseline file, or `NULL` when the board has none
+#'
+#' Only boards with both a Drive board and a local copy have a baseline.
+#'
+#' @param x A `gdpins_board`.
+#' @keywords internal
+.baseline_path <- function(x) {
+  if (is.null(x$drive_board) || is.null(x$local_board)) return(NULL)
+  dir <- x$cache_dir
+  if (is.null(dir)) dir <- x$local_board$path
+  if (is.null(dir)) return(NULL)
+  file.path(dir, .BASELINE_FILE)
+}
+
+.BOARD_BASELINE_COLS <- c("name", "drive_hash", "local_hash", "synced_at")
+
+#' Read a board's baseline
+#' @param x A `gdpins_board`.
+#' @param quiet Passed to `.baseline_read_file()`.
+#' @return A data frame or `NULL`.
+#' @keywords internal
+.baseline_read <- function(x, quiet = FALSE) {
+  .baseline_read_file(.baseline_path(x), .BOARD_BASELINE_COLS, quiet = quiet)
+}
+
+#' Record that pins are in sync, with each side's latest hash
+#'
+#' @param x A `gdpins_board`.
+#' @param name Character vector of pin names.
+#' @param drive_hash,local_hash Character vectors of 5-char hash prefixes, or
+#'   `NULL` to read each side's latest version now.
+#' @return Invisibly `TRUE` when written.
+#' @keywords internal
+.baseline_set <- function(x, name, drive_hash = NULL, local_hash = NULL) {
+  path <- .baseline_path(x)
+  if (is.null(path) || length(name) == 0L) return(invisible(FALSE))
+  latest_hash <- function(board, nm) {
+    lv <- .latest_version(board, nm)
+    if (is.null(lv)) NA_character_ else as.character(lv$hash)
+  }
+  if (is.null(drive_hash)) {
+    drive_hash <- vapply(name, latest_hash, character(1L),
+                         board = x$drive_board, USE.NAMES = FALSE)
+  }
+  if (is.null(local_hash)) {
+    local_hash <- vapply(name, latest_hash, character(1L),
+                         board = x$local_board, USE.NAMES = FALSE)
+  }
+  rows <- data.frame(
+    name       = as.character(name),
+    drive_hash = as.character(drive_hash),
+    local_hash = as.character(local_hash),
+    synced_at  = rep(as.POSIXct(Sys.time(), tz = "UTC"), length(name)),
+    stringsAsFactors = FALSE
+  )
+  # A pin missing on a side has no baseline to compare against.
+  rows <- rows[!is.na(rows$drive_hash) & !is.na(rows$local_hash), , drop = FALSE]
+  if (nrow(rows) == 0L) return(invisible(FALSE))
+  base <- .baseline_upsert(.baseline_read(x, quiet = TRUE), rows)
+  invisible(.baseline_write_file(path, base))
+}
+
+#' Drop pins from a board's baseline
+#' @param x A `gdpins_board`.
+#' @param name Character vector of pin names.
+#' @keywords internal
+.baseline_drop <- function(x, name) {
+  path <- .baseline_path(x)
+  base <- .baseline_read(x, quiet = TRUE)
+  if (is.null(base) || !any(base$name %in% name)) return(invisible(FALSE))
+  invisible(.baseline_write_file(path, base[!base$name %in% name, , drop = FALSE]))
+}
+
+# ---- Raw baseline ----
+
+#' Path of a raw connection's baseline file, or `NULL` when it has none
+#'
+#' Keyed by the Drive root, `drive_path` and the normalised `local_path`, so
+#' two connections share a baseline only when they mirror the same folder into
+#' the same directory.
+#'
+#' @param conn A `gdpins_raw_conn` (or a list with `adapter`, `drive_path`,
+#'   `local_path`).
+#' @param quiet Logical. `TRUE` suppresses the warning for an unset
+#'   `gdpins.cache_dir` option.
+#' @keywords internal
+.raw_baseline_path <- function(conn, quiet = FALSE) {
+  adapter <- conn$adapter
+  if (is.null(adapter) || identical(conn$config, "local_only")) return(NULL)
+  root_dir <- getOption("gdpins.cache_dir")
+  if (!is.character(root_dir) || length(root_dir) != 1L || is.na(root_dir) ||
+      !nzchar(root_dir)) {
+    if (!quiet) {
+      cli::cli_warn(
+        c(
+          "!" = "Option {.code gdpins.cache_dir} is unset: no sync baseline for raw connections.",
+          "i" = "Changes are compared by modification time."
+        ),
+        class = "gdpins_warning_baseline_unreadable"
+      )
+    }
+    return(NULL)
+  }
+  root <- if (identical(adapter$kind, "real")) adapter$root_id else basename(adapter$root)
+  key <- rlang::hash(list(
+    root       = root,
+    drive_path = conn$drive_path,
+    local_path = as.character(fs::path_norm(fs::path_abs(conn$local_path)))
+  ))
+  file.path(root_dir, .RAW_BASELINE_DIR, paste0(key, ".rds"))
+}
+
+.RAW_BASELINE_COLS <- c("name", "synced_md5", "synced_at")
+
+#' Read a raw connection's baseline
+#' @keywords internal
+.raw_baseline_read <- function(conn, quiet = FALSE) {
+  .baseline_read_file(.raw_baseline_path(conn, quiet = quiet),
+                      .RAW_BASELINE_COLS, quiet = quiet)
+}
+
+#' Record that raw files are in sync
+#'
+#' @param conn A `gdpins_raw_conn` (or a list with `adapter`, `drive_path`,
+#'   `local_path`).
+#' @param name Character vector of relative file names.
+#' @param md5 Character vector of md5 sums, or `NULL` to hash the local files.
+#' @keywords internal
+.raw_baseline_set <- function(conn, name, md5 = NULL) {
+  path <- .raw_baseline_path(conn, quiet = TRUE)
+  if (is.null(path) || length(name) == 0L) return(invisible(FALSE))
+  if (is.null(md5)) {
+    md5 <- vapply(name, function(nm) {
+      f <- file.path(conn$local_path, gsub("/", .Platform$file.sep, nm, fixed = TRUE))
+      if (file.exists(f)) unname(tools::md5sum(f)) else NA_character_
+    }, character(1L), USE.NAMES = FALSE)
+  }
+  rows <- data.frame(
+    name       = as.character(name),
+    synced_md5 = as.character(md5),
+    synced_at  = rep(as.POSIXct(Sys.time(), tz = "UTC"), length(name)),
+    stringsAsFactors = FALSE
+  )
+  rows <- rows[!is.na(rows$synced_md5), , drop = FALSE]
+  if (nrow(rows) == 0L) return(invisible(FALSE))
+  base <- .baseline_upsert(.raw_baseline_read(conn, quiet = TRUE), rows)
+  invisible(.baseline_write_file(path, base))
+}
+
+#' Drop raw files from a connection's baseline
+#' @keywords internal
+.raw_baseline_drop <- function(conn, name) {
+  path <- .raw_baseline_path(conn, quiet = TRUE)
+  base <- .raw_baseline_read(conn, quiet = TRUE)
+  if (is.null(base) || !any(base$name %in% name)) return(invisible(FALSE))
+  invisible(.baseline_write_file(path, base[!base$name %in% name, , drop = FALSE]))
+}
+
+#' Decide a state from each side's change against the baseline
+#'
+#' @param drive_changed,local_changed Logical scalars.
+#' @return A state string.
+#' @keywords internal
+.baseline_state <- function(drive_changed, local_changed) {
+  if (drive_changed && local_changed) "conflict"
+  else if (drive_changed) "drive_ahead"
+  else if (local_changed) "local_ahead"
+  else "in_sync"
+}
+
 # -- Board status internals ----------------------------------------------------
 
 #' @keywords internal
@@ -240,22 +531,36 @@ gdpins_sync.default <- function(
     return(.empty_board_status_tbl())
   }
 
+  # Last-synced baseline, read once per call (NULL: timestamp rule only).
+  baseline <- .baseline_read(x)
+
   rows <- lapply(all_pins, function(pin_name) {
     .compare_board_pin(
       pin_name    = pin_name,
       drive_board = drive_board,
       local_board = local_board,
       in_drive    = pin_name %in% drive_pins,
-      in_local    = pin_name %in% local_pins
+      in_local    = pin_name %in% local_pins,
+      baseline    = baseline
     )
   })
 
   do.call(rbind, rows)
 }
 
+#' Compare one pin's latest versions on Drive and local
+#'
+#' @param pin_name Character scalar.
+#' @param drive_board,local_board pins boards.
+#' @param in_drive,in_local Logical scalars: is the pin listed on that side.
+#' @param baseline A board baseline data frame (see `.baseline_read()`), or
+#'   `NULL`. When it has a row for `pin_name`, each side's latest hash is
+#'   compared with that side's baseline hash: changed on one side means that
+#'   side is ahead, changed on both means conflict. Without a row, the side
+#'   with the later `created` time is ahead.
 #' @keywords internal
 .compare_board_pin <- function(pin_name, drive_board, local_board,
-                                in_drive, in_local) {
+                                in_drive, in_local, baseline = NULL) {
   dv <- if (in_drive) .latest_version(drive_board, pin_name) else NULL
   lv <- if (in_local) .latest_version(local_board, pin_name) else NULL
 
@@ -274,8 +579,15 @@ gdpins_sync.default <- function(
     "drive_ahead"
   } else if (!is.na(drive_hash) && !is.na(local_hash) && identical(drive_hash, local_hash)) {
     "in_sync"
+  } else if (!is.null(baseline) && pin_name %in% baseline$name) {
+    # Different hashes, last synced state known: who moved since then?
+    b <- baseline[baseline$name == pin_name, , drop = FALSE][1L, ]
+    .baseline_state(
+      drive_changed = !identical(as.character(drive_hash), as.character(b$drive_hash)),
+      local_changed = !identical(as.character(local_hash), as.character(b$local_hash))
+    )
   } else {
-    # Different hashes -- compare timestamps
+    # Different hashes, no baseline -- compare timestamps
     dc <- if (inherits(drive_created, "POSIXct") && !is.na(drive_created)) drive_created else NA
     lc <- if (inherits(local_created, "POSIXct") && !is.na(local_created)) local_created else NA
     if (is.na(dc) || is.na(lc)) {
@@ -391,6 +703,9 @@ gdpins_sync.default <- function(
     return(.empty_raw_status_tbl())
   }
 
+  # Last-synced baseline, read once per call (NULL: mtime rule only).
+  baseline <- .raw_baseline_read(x)
+
   rows <- lapply(all_names, function(fname) {
     in_drive <- fname %in% drive_files$rel
     in_local <- fname %in% local_files$rel
@@ -411,8 +726,15 @@ gdpins_sync.default <- function(
       "drive_ahead"
     } else if (!is.na(drv_md5) && !is.na(loc_md5) && identical(drv_md5, loc_md5)) {
       "in_sync"
+    } else if (!is.null(baseline) && fname %in% baseline$name) {
+      # Different md5, last synced bytes known: who moved since then?
+      synced <- as.character(baseline$synced_md5[baseline$name == fname][[1L]])
+      .baseline_state(
+        drive_changed = !identical(drv_md5, synced),
+        local_changed = !identical(loc_md5, synced)
+      )
     } else {
-      # Different md5 -- use mtime tiebreaker
+      # Different md5, no baseline -- use mtime tiebreaker
       if (is.na(drv_mtime) || is.na(loc_mtime)) {
         "conflict"
       } else if (drv_mtime > loc_mtime) {
@@ -593,6 +915,11 @@ gdpins_sync.default <- function(
   conflicts       <- character()
   unversioned_hit <- FALSE
   n_actions       <- 0L
+  # Pins whose two sides agree after this sync: their latest hashes become
+  # the last-synced baseline (H6). in_sync rows are recorded too, which
+  # bootstraps boards that predate the baseline.
+  synced          <- character()
+  in_sync_rows    <- status$state == "in_sync"
 
   for (i in seq_len(nrow(status))) {
     row      <- status[i, ]
@@ -608,8 +935,8 @@ gdpins_sync.default <- function(
         # Versioned boards: both contents become versions on both boards,
         # the newer one (tie: Drive) is the latest on both -- no loss.
         if (.resolve_versioned_conflict(drive_board, local_board, pin_name)) {
-          # Both boards now have the same latest version: this is where the
-          # last-synced baseline is recorded (H6).
+          # Both boards now have the same latest version.
+          synced    <- c(synced, pin_name)
           n_actions <- n_actions + 1L
           cli::cli_inform(c(
             "i" = paste0(
@@ -622,6 +949,7 @@ gdpins_sync.default <- function(
         choice <- .prompt_conflict(pin_name, row)
         if (choice == "local") {
           if (.copy_pin_to_board(local_board, drive_board, pin_name)) {
+            synced    <- c(synced, pin_name)
             n_actions <- n_actions + 1L
             cli::cli_inform(c(
               "v" = "Board {.val {x$name}}: synced {.val {pin_name}} local -> Drive."
@@ -629,6 +957,7 @@ gdpins_sync.default <- function(
           }
         } else if (choice == "drive") {
           if (.copy_pin_to_board(drive_board, local_board, pin_name)) {
+            synced    <- c(synced, pin_name)
             n_actions <- n_actions + 1L
             cli::cli_inform(c(
               "v" = "Board {.val {x$name}}: synced {.val {pin_name}} Drive -> local."
@@ -647,6 +976,7 @@ gdpins_sync.default <- function(
     # Non-conflict directional copy
     if (effective_dir == "to_drive") {
       if (.copy_pin_to_board(local_board, drive_board, pin_name)) {
+        synced    <- c(synced, pin_name)
         n_actions <- n_actions + 1L
         cli::cli_inform(c(
           "v" = "Board {.val {x$name}}: synced {.val {pin_name}} local -> Drive."
@@ -654,6 +984,7 @@ gdpins_sync.default <- function(
       }
     } else if (effective_dir == "from_drive") {
       if (.copy_pin_to_board(drive_board, local_board, pin_name)) {
+        synced    <- c(synced, pin_name)
         n_actions <- n_actions + 1L
         cli::cli_inform(c(
           "v" = "Board {.val {x$name}}: synced {.val {pin_name}} Drive -> local."
@@ -661,6 +992,19 @@ gdpins_sync.default <- function(
       }
     }
   }
+
+  # Record the baseline before any conflict abort: the pins copied above are
+  # in sync even when others are not. Copies re-read each side's latest hash
+  # (a copy can re-serialise); in_sync rows reuse the status hashes.
+  if (any(in_sync_rows)) {
+    .baseline_set(
+      x,
+      status$name[in_sync_rows],
+      drive_hash = status$drive_hash[in_sync_rows],
+      local_hash = status$local_hash[in_sync_rows]
+    )
+  }
+  if (length(synced) > 0L) .baseline_set(x, synced)
 
   # Nothing moved and nothing blocked -- say so, rather than exiting silently.
   if (n_actions == 0L && length(conflicts) == 0L) {
@@ -954,6 +1298,10 @@ gdpins_sync.default <- function(
   fail_msgs  <- character()
   unreadable <- logical()
   n_actions  <- 0L
+  # Files whose two sides agree after this sync: their md5 becomes the
+  # last-synced baseline (H6). in_sync rows bootstrap older mirrors.
+  synced       <- character()
+  in_sync_rows <- status$state == "in_sync"
 
   # One unreadable/locked file must not abandon the remaining files: each
   # transfer is isolated and its error collected for a summary at the end.
@@ -985,9 +1333,15 @@ gdpins_sync.default <- function(
       } else if (on_conflict == "prompt") {
         choice <- .prompt_raw_conflict(fname, row)
         if (choice == "local") {
-          if (attempt(fname, .raw_copy_to_drive(x, fname))) n_actions <- n_actions + 1L
+          if (attempt(fname, .raw_copy_to_drive(x, fname))) {
+            synced    <- c(synced, fname)
+            n_actions <- n_actions + 1L
+          }
         } else if (choice == "drive") {
-          if (attempt(fname, .raw_copy_to_local(x, fname))) n_actions <- n_actions + 1L
+          if (attempt(fname, .raw_copy_to_local(x, fname))) {
+            synced    <- c(synced, fname)
+            n_actions <- n_actions + 1L
+          }
         }
       } else {
         # on_conflict == "version" on raw: back up the local file, then let
@@ -998,9 +1352,9 @@ gdpins_sync.default <- function(
           .raw_copy_to_local(x, fname)
         })
         if (ok) {
+          # Drive and local now agree.
+          synced    <- c(synced, fname)
           n_actions <- n_actions + 1L
-          # Drive and local now agree: this is where the last-synced raw
-          # baseline is recorded (H6).
           if (!is.null(backup)) {
             cli::cli_warn(
               c(
@@ -1028,16 +1382,26 @@ gdpins_sync.default <- function(
 
     if (effective_dir == "to_drive") {
       if (attempt(fname, .raw_copy_to_drive(x, fname))) {
+        synced    <- c(synced, fname)
         n_actions <- n_actions + 1L
         cli::cli_inform(c("v" = "Synced {.val {fname}}: local -> Drive."))
       }
     } else if (effective_dir == "from_drive") {
       if (attempt(fname, .raw_copy_to_local(x, fname))) {
+        synced    <- c(synced, fname)
         n_actions <- n_actions + 1L
         cli::cli_inform(c("v" = "Synced {.val {fname}}: Drive -> local."))
       }
     }
   }
+
+  # Record the baseline before any conflict abort. Copies are byte-exact, so
+  # the local file's md5 is both sides' md5.
+  if (any(in_sync_rows)) {
+    .raw_baseline_set(x, status$name[in_sync_rows],
+                      md5 = status$local_md5[in_sync_rows])
+  }
+  if (length(synced) > 0L) .raw_baseline_set(x, synced)
 
   if (length(failures) > 0L) {
     # File names and error messages are arbitrary text that may itself

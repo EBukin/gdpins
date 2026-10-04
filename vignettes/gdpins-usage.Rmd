@@ -444,7 +444,7 @@ gdpins_raw_remove(conn, "kadaster_raw.geojson")
 Sync is **always explicit** — never automatic.
 
 ```{r sync}
-# Auto: newer side wins, both directions
+# Auto: the side that changed since the last sync wins
 gdpins_sync(bd_raw)
 
 # Explicit direction
@@ -455,7 +455,19 @@ gdpins_sync(bd_raw, direction = "to_drive")     # push local → Drive
 gdpins_board_status(bd_raw)
 ```
 
-Conflict handling (an item changed on both sides, no clear newer side):
+How status decides: content is compared first (latest pin hash, file MD5).
+When it differs, each side is compared with the **last-synced baseline**,
+what that side held the last time gdpins saw both sides agree. gdpins records
+it on `gdpins_pin_write()`, `gdpins_raw_put_object()`/`_put_file()`, the
+connect-time sync and every `gdpins_sync()`, in a local file
+(`<cache_dir>/.gdpins-sync.rds` for a board, under
+`getOption("gdpins.cache_dir")` for a raw connection). If only one side
+changed, that side is ahead. If both changed, it is a conflict, even when one
+side has the newer timestamp. Items without a baseline entry (written outside
+gdpins, or before this rule) fall back to "newer timestamp wins"; the first
+sync records their baseline.
+
+Conflict handling (an item changed on both sides since the last sync):
 
 - Versioned boards: both contents, with their metadata, become versions on
   Drive and local. The newer one (tie: Drive) is the latest version on both,
