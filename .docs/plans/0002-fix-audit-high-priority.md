@@ -1,7 +1,7 @@
 ---
-status: pending
+status: review
 issue:
-pr:
+pr: https://github.com/EBukin/gdpins/pull/21
 ---
 
 # Fix audit high-priority bugs H1–H8 (TDD, one branch, one PR)
@@ -437,7 +437,7 @@ Returning a tibble instead of a character vector (and one tibble instead of a na
 - [x] 9. H8 (red): the eight prune tests in `test-prune.R`; run; confirm (vector return, v_old deleted, threshold not triggered, offline board pruned, Drive-only pin errors).
 - [x] 10. H8 (green): `.local_versions_to_remove()`, plan tibble, `max()` threshold, board-level total, messages, 0-row early returns, single parquet write in `gdpins_pin_write()`; flip the listed `test-prune.R` assertions; roxygen; full suite; commit `fix: prune keeps unsynced local versions and reports every deletion (H8)`.
 - [x] 11. Docs and hygiene: `NEWS.md` complete (Breaking changes, Bug fixes incl. L5, Security, Known limitations, H3 duplicate remediation); `README.md:97`, `:149-162`, `:188-191` and `vignettes/gdpins-usage.Rmd:186`, `:447-460`, `:540` re-read and corrected (vignette chunks are `eval = FALSE`, `gdpins-usage.Rmd:14`); `roxygen2::roxygenise()` with an empty `NAMESPACE` diff; `Rscript -e "devtools::check(args = '--no-manual')"` → 0 errors, 0 warnings, notes reviewed; commit `docs: NEWS and documentation for audit fixes`.
-- [ ] 12. Push and open the PR as described; link the audit note and this plan in the body; record the PR URL here and in the front matter; set `status: review`.
+- [x] 12. Push and open the PR as described; link the audit note and this plan in the body; record the PR URL here and in the front matter; set `status: review`.
 
 ## Open questions
 
@@ -451,4 +451,4 @@ Returning a tibble instead of a character vector (and one tibble instead of a na
 
 ## Outcome
 
-Filled in when the status becomes done or superseded.
+Implemented on `fix/audit-high-priority` (7 commits), PR https://github.com/EBukin/gdpins/pull/21, status review (2026-10-04). Full suite 0 failed / 0 warnings (2182 pass); R CMD check 0 errors, 0 warnings, one pre-existing vignette-link note. Deviations: versioned boards still ignore `on_conflict` (as on main), so the H6 versioned test asserts lossless resolution; prune `.local_versions_to_remove()` takes listings plus a mode; arrow parquet writes were already hash-identical, single write done anyway; one transient EPERM warning from the baseline temp-file move on Windows.
