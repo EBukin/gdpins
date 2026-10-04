@@ -143,7 +143,8 @@ NULL
 #' outside R.
 #'
 #' @param board A `gdpins_board` object.
-#' @param name Character scalar. Pin name.
+#' @param name Character scalar. Pin name. Must be a valid pin name; see the
+#'   Pin names section of [verbs].
 #' @param keep Integer scalar. Number of most-recent versions to keep. Default
 #'   `1`.
 #' @param dry_run Logical. If `TRUE` (default), show what would be removed
@@ -184,6 +185,7 @@ gdpins_prune_pin_versions <- function(
       x = "Got {.cls {class(board)}}."
     ))
   }
+  .check_pin_name(name)
   keep <- as.integer(keep)
   if (length(keep) != 1L || is.na(keep) || keep < 1L) {
     cli::cli_abort(c(
@@ -299,6 +301,7 @@ gdpins_prune_board_versions <- function(
   # -- enumerate pins --------------------------------------------------------
   primary  <- .prune_primary_board(board)
   all_pins <- pins::pin_list(primary)
+  all_pins <- .drop_invalid_names(all_pins, .check_pin_name, "pin name")
 
   if (length(all_pins) == 0L) {
     cli::cli_inform(c(i = "No pins found in board {.val {board$name}}."))

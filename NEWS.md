@@ -4,7 +4,40 @@
 
 ## Bug fixes
 
+* **Pin names are validated (H1).** `gdpins_pin_write()`, `gdpins_pin_read()`,
+  `gdpins_pin_path()`, `gdpins_pin_remove()`, `gdpins_pin_info()` and
+  `gdpins_prune_pin_versions()` reject `"."`, `".."`, names starting with a
+  dot, and names containing `/`, `\` or a control character, with an error of
+  class `gdpins_error_invalid_name`. Previously `gdpins_pin_remove(board, "..")`
+  deleted the parent directory of the board's local copy, and
+  `gdpins_prune_pin_versions(board, "..")` deleted its siblings.
+  `gdpins_prune_pin_versions()` checked no name at all, and `NA` passed every
+  verb's check. Pin names that arrive from a Drive listing and break these
+  rules are skipped with a `gdpins_warning_invalid_name` warning by
+  `gdpins_board_status()`, `gdpins_sync()` and
+  `gdpins_prune_board_versions()`. See the "Pin names" section of `?verbs`.
+* **Raw file names are validated (H2).** `gdpins_raw_put_object()`,
+  `gdpins_raw_put_file()`, `gdpins_raw_remove()`, `gdpins_raw_get()` and
+  `gdpins_raw_path()` reject names with a `..` or `.` segment, an absolute path
+  or drive letter, a backslash, a segment ending in a dot or space, or a control
+  character (`gdpins_error_invalid_name`). `gdpins_raw_put_object(conn, x,
+  "../x.csv")` used to overwrite a file next to `local_path`, and on a real
+  Drive created a folder literally named `..`. A vector `name` given to the put
+  verbs now fails with that class instead of base R's "the condition has
+  length > 1".
+* Every local path built from a raw name, including names read from a Drive
+  listing, is checked to stay inside `local_path` (`gdpins_error_path_escape`).
+  `gdpins_raw_connect(on_discrepancy = "sync_from_drive")` and
+  `gdpins_refresh_disconnect()` skip an unsafe Drive name with a
+  `gdpins_warning_invalid_name` warning; `gdpins_sync()` reports it as a failed
+  file.
+
 ## Security
+
+* Pin names and raw file names can no longer escape the board or the raw
+  connection's `local_path`. A crafted name -- typed by a user, or a Drive item
+  named `..` created by a collaborator -- could previously write, overwrite or
+  delete files outside the gdpins directories (H1, H2).
 
 ## Known limitations
 

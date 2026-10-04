@@ -220,6 +220,7 @@ gdpins_sync.default <- function(
   drive_pins <- tryCatch(pins::pin_list(drive_board), error = function(e) character())
   local_pins <- tryCatch(pins::pin_list(local_board), error = function(e) character())
   all_pins   <- union(drive_pins, local_pins)
+  all_pins   <- .drop_invalid_names(all_pins, .check_pin_name, "pin name")
 
   if (length(all_pins) == 0L) {
     return(.empty_board_status_tbl())
@@ -700,6 +701,9 @@ gdpins_sync.default <- function(
 
 #' @keywords internal
 .copy_pin_to_board <- function(src_board, dst_board, pin_name) {
+  # Backstop: names here come from pin_list(), which on a Drive board lists
+  # every Drive item, so a Drive folder named ".." would reach this point.
+  .check_pin_name(pin_name)
   pin_type <- tryCatch(
     pins::pin_meta(src_board, pin_name)$type,
     error = function(e) NULL
@@ -953,10 +957,12 @@ gdpins_sync.default <- function(
 
 #' @keywords internal
 .raw_copy_to_drive <- function(conn, rel_name) {
+  .check_rel_name(rel_name)
   local_file <- file.path(
     conn$local_path,
     gsub("/", .Platform$file.sep, rel_name, fixed = TRUE)
   )
+  .check_local_dest(local_file, conn$local_path)
   drive_path <- paste0(conn$drive_path, "/", rel_name)
   if (!file.exists(local_file)) {
     cli::cli_abort("Local file not found: {.path {local_file}}")
@@ -981,6 +987,7 @@ gdpins_sync.default <- function(
     conn$local_path,
     gsub("/", .Platform$file.sep, rel_name, fixed = TRUE)
   )
+  .check_local_dest(local_file, conn$local_path)
   fs::dir_create(dirname(local_file))
   gd_download(conn$adapter, drive_path, local_file)
   invisible(NULL)

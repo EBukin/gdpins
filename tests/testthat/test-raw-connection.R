@@ -1300,3 +1300,19 @@ test_that("on_discrepancy='prompt' interactive: 'n' answer skips sync", {
   # File should NOT be synced locally (user said 'n')
   expect_false(file.exists(file.path(local_path, "drive_file.csv")))
 })
+
+test_that("put verbs reject a vector name with a gdpins class (not base R if())", {
+  # Pre-fix: .raw_ext() hit if (!nzchar(ext)) on a length-2 vector and failed
+  # with base R's "the condition has length > 1".
+  conn <- new_fake_raw_conn("local_only")
+  src  <- withr::local_tempfile(fileext = ".csv")
+  writeLines("x", src)
+  expect_error(
+    gdpins_raw_put_object(conn, mtcars, c("a.csv", "b.csv")),
+    class = "gdpins_error_invalid_name"
+  )
+  expect_error(
+    gdpins_raw_put_file(conn, src, c("a.csv", "b.csv")),
+    class = "gdpins_error_invalid_name"
+  )
+})

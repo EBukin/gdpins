@@ -390,8 +390,13 @@ print.gdpins_raw_listing <- function(x, ...) {
 }
 
 # Build the full local path for a name relative to conn$local_path
-.local_full_path <- function(conn, name) {
-  file.path(conn$local_path, gsub("/", .Platform$file.sep, name, fixed = TRUE))
+# Aborts (gdpins_error_path_escape) when the result would leave local_path, so
+# every caller -- including names resolved from a Drive listing -- is covered.
+.local_full_path <- function(conn, name, call = rlang::caller_env()) {
+  local_dest <- file.path(conn$local_path,
+                          gsub("/", .Platform$file.sep, name, fixed = TRUE))
+  .check_local_dest(local_dest, conn$local_path, call = call)
+  local_dest
 }
 
 # Normalise paths returned by gd_ls (may be absolute on Windows fake adapter)
@@ -642,9 +647,12 @@ gdpins_raw_connect <- function(
           )
           answer <- .raw_readline("Sync from Drive? [y/N] ")
           if (tolower(trimws(answer)) == "y") {
-            for (f in drive_files[!.is_sync_sidecar(drive_files)]) {
+            pull <- .drop_invalid_names(drive_files[!.is_sync_sidecar(drive_files)],
+                                        .check_rel_name, "Drive file name")
+            for (f in pull) {
               local_dest <- file.path(local_path,
                                       gsub("/", .Platform$file.sep, f, fixed = TRUE))
+              .check_local_dest(local_dest, local_path)
               fs::dir_create(dirname(local_dest))
               gd_download(adapter, paste0(drive_path, "/", f), local_dest)
             }
@@ -661,9 +669,12 @@ gdpins_raw_connect <- function(
         )
       },
       "sync_from_drive" = {
-        for (f in drive_files[!.is_sync_sidecar(drive_files)]) {
+        pull <- .drop_invalid_names(drive_files[!.is_sync_sidecar(drive_files)],
+                                    .check_rel_name, "Drive file name")
+        for (f in pull) {
           local_dest <- file.path(local_path,
                                   gsub("/", .Platform$file.sep, f, fixed = TRUE))
+          .check_local_dest(local_dest, local_path)
           fs::dir_create(dirname(local_dest))
           gd_download(adapter, paste0(drive_path, "/", f), local_dest)
         }
@@ -701,6 +712,10 @@ gdpins_raw_connect <- function(
 #' @param x An R object.
 #' @param name Character scalar. Relative path within the raw-root, including
 #'   extension (e.g. `"worldbank-api/gdp_2024.parquet"`).
+#'   Must stay inside the raw-root: `/` separators only, no `..` or `.`
+#'   segment, no absolute path or drive letter, no backslash, no segment ending
+#'   in a dot or space, no control character; otherwise an error of class
+#'   `gdpins_error_invalid_name`.
 #' @param wkt_engine Character scalar or `NULL`. WKT engine used to encode `sf`
 #'   geometry when writing `.parquet`: `"wk"` (default) or `"sf"`. `NULL` uses
 #'   the `gdpins.wkt_engine` option. See [gdpins_sf_to_parquet()].
@@ -710,6 +725,7 @@ gdpins_raw_connect <- function(
 #' @family raw-connection
 #' @export
 gdpins_raw_put_object <- function(conn, x, name, wkt_engine = NULL) {
+  .check_rel_name(name)
   .check_ext(name)
 
   tmp        <- .raw_write_tmp(x, name, wkt_engine = wkt_engine)
@@ -737,12 +753,17 @@ gdpins_raw_put_object <- function(conn, x, name, wkt_engine = NULL) {
 #' @param conn A `gdpins_raw_conn` object.
 #' @param path Character scalar. Path to the local source file.
 #' @param name Character scalar. Relative destination path within the raw-root.
+#'   Must stay inside the raw-root: `/` separators only, no `..` or `.`
+#'   segment, no absolute path or drive letter, no backslash, no segment ending
+#'   in a dot or space, no control character; otherwise an error of class
+#'   `gdpins_error_invalid_name`.
 #'
 #' @return Invisibly `NULL`.
 #' @inheritSection raw-connection Objects vs paths
 #' @family raw-connection
 #' @export
 gdpins_raw_put_file <- function(conn, path, name) {
+  .check_rel_name(name)
   if (!file.exists(path)) {
     cli::cli_abort("Source file not found: {.path {path}}")
   }
@@ -780,6 +801,10 @@ gdpins_raw_put_file <- function(conn, path, name) {
 #'
 #' @param conn A `gdpins_raw_conn` object.
 #' @param name Character scalar. Relative file path within the raw-root.
+#'   Must stay inside the raw-root: `/` separators only, no `..` or `.`
+#'   segment, no absolute path or drive letter, no backslash, no segment ending
+#'   in a dot or space, no control character; otherwise an error of class
+#'   `gdpins_error_invalid_name`.
 #'
 #' @return Invisibly `NULL`.
 #' @seealso [gdpins_raw_put_object()], [gdpins_raw_put_file()], [gdpins_raw_get()].
@@ -804,9 +829,7 @@ gdpins_raw_remove <- function(conn, name) {
       x = "Got {.cls {class(conn)}}."
     ))
   }
-  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
-    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
-  }
+  .check_rel_name(name)
 
   # Listing mode. Never bulk-deletes -- a glob shows what *would* match, and the
   # caller removes files one exact path at a time.
@@ -860,7 +883,9 @@ gdpins_raw_remove <- function(conn, name) {
 #' @param name_or_id Character scalar. Either:
 #'   \describe{
 #'     \item{Relative path}{A path within the raw-root, using `"/"` as
-#'       separator (e.g. `"api/gdp_2024.parquet"` or `"my data (2024).csv"`).}
+#'       separator (e.g. `"api/gdp_2024.parquet"` or `"my data (2024).csv"`).
+#'       The same rules as `name` in [gdpins_raw_get()] apply: no `..` or `.`
+#'       segment, no absolute path, no backslash.}
 #'     \item{Drive file ID}{A Google Drive file ID (≥ 25 alphanumeric
 #'       characters, no slashes or hyphens). Only supported with a real adapter.}
 #'   }
@@ -929,9 +954,7 @@ gdpins_raw_path <- function(conn, name_or_id) {
       x = "Got {.cls {class(conn)}}."
     ))
   }
-  if (!is.character(name_or_id) || length(name_or_id) != 1L || !nzchar(name_or_id)) {
-    cli::cli_abort("{.arg name_or_id} must be a non-empty character scalar.")
-  }
+  .check_name_scalar(name_or_id, arg = "name_or_id", call = rlang::current_env())
 
   # ── Listing branch ───────────────────────────────────────────────────────────
   # Checked before the Drive-ID heuristic: a Drive ID is purely alphanumeric and
@@ -972,6 +995,7 @@ gdpins_raw_path <- function(conn, name_or_id) {
     }
     filename   <- d$name[[1L]]
     local_dest <- file.path(conn$local_path, filename)
+    .check_local_dest(local_dest, conn$local_path)
     if (file.exists(local_dest)) return(local_dest)
     fs::dir_create(dirname(local_dest))
     googledrive::drive_download(d, path = local_dest, overwrite = TRUE)
@@ -982,6 +1006,7 @@ gdpins_raw_path <- function(conn, name_or_id) {
   # ── Relative path branch ─────────────────────────────────────────────────────
   # Fast path: already mirrored locally under exactly this spelling, so there is
   # nothing to resolve and no reason to list Drive.
+  .check_rel_name(name_or_id)
   if (.local_exists_exact(conn, name_or_id)) {
     return(.local_full_path(conn, name_or_id))
   }
@@ -1021,6 +1046,10 @@ gdpins_raw_path <- function(conn, name_or_id) {
 #'
 #' @param conn A `gdpins_raw_conn` object.
 #' @param name Character scalar. Relative path within the raw-root.
+#'   Must stay inside the raw-root: `/` separators only, no `..` or `.`
+#'   segment, no absolute path or drive letter, no backslash, no segment ending
+#'   in a dot or space, no control character; otherwise an error of class
+#'   `gdpins_error_invalid_name`.
 #' @param force_refresh Logical. `TRUE` re-pulls from Drive before reading.
 #'   Default `FALSE`.
 #' @param wkt_engine Character scalar or `NULL`. WKT engine used to decode `sf`
@@ -1041,9 +1070,7 @@ gdpins_raw_get <- function(conn, name, force_refresh = FALSE, wkt_engine = NULL)
       x = "Got {.cls {class(conn)}}."
     ))
   }
-  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
-    cli::cli_abort("{.arg name} must be a non-empty character scalar.")
-  }
+  .check_rel_name(name)
 
   # Listing mode never reads: a glob asks what is there, not for its contents.
   if (.is_glob(name)) {
@@ -1224,6 +1251,7 @@ gdpins_refresh_disconnect <- function(conn) {
     listing     <- gd_ls(conn$adapter, conn$drive_path, recursive = TRUE)
     all_rel     <- .gd_ls_to_rel(listing$path, conn$adapter, conn$drive_path)
     drive_files <- all_rel[!listing$is_dir]
+    drive_files <- .drop_invalid_names(drive_files, .check_rel_name, "Drive file name")
 
     for (rel in drive_files) {
       local_dest <- .local_full_path(conn, rel)
