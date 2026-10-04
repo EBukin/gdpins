@@ -14,8 +14,38 @@
   exists. A transient error means "re-run". `gdpins_raw_remove()` deletes the
   local file before trashing it on Drive, so a Drive error there now surfaces
   after the local delete; before, the Drive failure was silently ignored.
+* **A conflict on an unversioned board now stops (H5).** `gdpins_sync(x,
+  on_conflict = "version")` (the default) on an unversioned board used to copy
+  Drive over local and lose the local content. A one-slot board cannot keep
+  both sides, so `"version"` now behaves like `"stop"`: non-conflicting pins
+  are still copied, conflicting pins are left unchanged, and sync aborts with
+  an error of class `gdpins_error_unversioned_conflict`,
+  `gdpins_error_sync_conflict` and `gdpins_error`. Use `on_conflict =
+  "prompt"` to choose a side. `gdpins_init_board(on_discrepancy = "sync_*")`
+  on such a board now warns "Sync ... failed" instead of silently
+  overwriting. The `"stop"` aborts for boards and raw connections now carry
+  the classes `gdpins_error_sync_conflict` and `gdpins_error`.
 
 ## Bug fixes
+
+* **Versioned conflicts keep both sides on both boards (H5).** Conflict
+  resolution copied Drive to local and then local's *new* latest (Drive's
+  content) back to Drive, so the local content never reached Drive and the pin
+  was reported in sync. Now both pre-conflict contents become versions on both
+  boards; the one with the later `created` time (tie: Drive) is the latest on
+  both. Writes wait for the next second when needed, because pins version ids
+  have one-second resolution and same-second ids sort by hash, not by write
+  order. Copies between boards (conflicts and normal sync) now keep `title`,
+  `description`, user `metadata`, `tags` and `urls`, not only `type`. A copy
+  whose source cannot be read is no longer counted or reported as synced.
+* **Raw conflicts back up the local file (H7).** With the default
+  `on_conflict = "version"`, a raw file that changed on both sides was
+  overwritten by Drive's copy with only an info message. The local file is
+  now first copied to `<name>.conflict-<UTC timestamp>.<ext>` in the same
+  folder, then Drive's copy replaces it, with a warning of class
+  `gdpins_warning_raw_conflict_backup`. The backup is a normal file in
+  `local_path`, so the next `gdpins_sync()` uploads it to Drive unless you
+  delete it.
 
 * **Pin names are validated (H1).** `gdpins_pin_write()`, `gdpins_pin_read()`,
   `gdpins_pin_path()`, `gdpins_pin_remove()`, `gdpins_pin_info()` and

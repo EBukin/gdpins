@@ -157,9 +157,17 @@ gdpins_sync(bd_raw, direction = "to_drive")     # push local → Drive
 gdpins_board_status(bd_raw)   # in_sync / local_ahead / drive_ahead / offline
 ```
 
-For versioned boards, conflicts create new versions (zero data loss). For raw
-or unversioned boards, conflicts prompt interactively or stop with a report.
-Nothing is silently overwritten.
+A conflict is an item that changed on both sides with no clear newer side.
+Nothing is silently overwritten:
+
+- **Versioned boards:** both contents become versions on Drive and local
+  (with their metadata). The newer one (tie: Drive) is the latest on both.
+- **Unversioned boards:** conflicting pins are left unchanged and sync stops
+  with an error. Use `on_conflict = "prompt"` to pick a side.
+- **Raw connections:** the local file is saved as
+  `<name>.conflict-<timestamp>.<ext>`, then Drive's copy replaces it, with a
+  warning. The backup is uploaded on the next sync unless you delete it. Use
+  `on_conflict = "stop"` or `"prompt"` to decide yourself.
 
 ## Discovery and output
 

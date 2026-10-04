@@ -455,9 +455,18 @@ gdpins_sync(bd_raw, direction = "to_drive")     # push local → Drive
 gdpins_board_status(bd_raw)
 ```
 
-Conflict handling for versioned boards: both sides simply become new versions
-(zero data loss). For raw/unversioned boards: `on_conflict = "stop"` halts
-and reports; `"prompt"` asks per conflict.
+Conflict handling (an item changed on both sides, no clear newer side):
+
+- Versioned boards: both contents, with their metadata, become versions on
+  Drive and local. The newer one (tie: Drive) is the latest version on both,
+  so the pin is in sync afterwards.
+- Unversioned boards: one slot per pin cannot hold both sides. The default
+  `on_conflict = "version"` and `"stop"` leave conflicting pins unchanged and
+  stop with an error; `"prompt"` asks which side to keep.
+- Raw connections: the default copies the local file to
+  `<name>.conflict-<timestamp>.<ext>`, lets Drive's copy replace it and warns.
+  The backup is a normal file, so the next sync uploads it unless you delete
+  it. `"stop"` halts and reports; `"prompt"` asks per conflict.
 
 ## Discovery
 

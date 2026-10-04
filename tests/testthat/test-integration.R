@@ -188,36 +188,61 @@ test_that("versioned board offline writes create multiple versions, survive sync
 
 test_that("versioned conflict resolved as new versions without data loss", {
   board <- new_fake_board("drive_cache", versioned = TRUE)
+  drive_tbl <- fx_plain_tbl()
+  local_tbl <- dplyr::mutate(fx_plain_tbl(), value = value * 10)
 
+  # Seed both sides in the same second so the real status reports a
+  # conflict (equal `created`, different hash) rather than local_ahead.
+  Sys.sleep(1 - as.numeric(Sys.time()) %% 1)
   suppressMessages(
-    pins::pin_write(board$drive_board, fx_plain_tbl(), "conflicted_pin",
+    pins::pin_write(board$drive_board, drive_tbl, "conflicted_pin",
                     type = "parquet")
   )
   suppressMessages(
-    pins::pin_write(
-      board$local_board,
-      dplyr::mutate(fx_plain_tbl(), value = value * 10),
-      "conflicted_pin", type = "parquet"
-    )
+    pins::pin_write(board$local_board, local_tbl, "conflicted_pin",
+                    type = "parquet")
   )
-
-  drive_v_before <- nrow(pins::pin_versions(board$drive_board, "conflicted_pin"))
-  cache_v_before <- nrow(pins::pin_versions(board$local_board, "conflicted_pin"))
 
   testthat::local_mocked_bindings(
     gdpins_is_online = function() TRUE,
     .package = "gdpins"
   )
+  st <- gdpins_board_status(board)
+  expect_identical(st$state[st$name == "conflicted_pin"], "conflict")
+
   suppressMessages(
     gdpins_sync(board, direction = "auto", on_conflict = "version")
   )
 
-  drive_v_after <- nrow(pins::pin_versions(board$drive_board, "conflicted_pin"))
-  cache_v_after <- nrow(pins::pin_versions(board$local_board, "conflicted_pin"))
+  # Legacy "parquet" pins are re-encoded on copy, so compare content, not
+  # hashes: each board must hold both pre-conflict contents as versions.
+  contents <- function(b) {
+    vs <- pins::pin_versions(b, "conflicted_pin")$version
+    lapply(vs, function(v) {
+      as.data.frame(gdpins:::.read_from_board(b, "conflicted_pin", v))
+    })
+  }
+  has <- function(objs, tbl) {
+    any(vapply(objs, function(o) isTRUE(all.equal(o, as.data.frame(tbl))),
+               logical(1)))
+  }
+  for (b in list(board$drive_board, board$local_board)) {
+    objs <- contents(b)
+    expect_true(has(objs, drive_tbl))
+    expect_true(has(objs, local_tbl))
+  }
 
-  # Both sides should have at least as many versions as before
-  expect_gte(drive_v_after, drive_v_before)
-  expect_gte(cache_v_after, cache_v_before)
+  # Tie on `created` -> Drive's content is the latest on both sides.
+  expect_equal(
+    as.data.frame(gdpins:::.read_from_board(board$drive_board, "conflicted_pin", NULL)),
+    as.data.frame(drive_tbl)
+  )
+  expect_equal(
+    as.data.frame(gdpins:::.read_from_board(board$local_board, "conflicted_pin", NULL)),
+    as.data.frame(drive_tbl)
+  )
+  st <- gdpins_board_status(board)
+  expect_identical(st$state[st$name == "conflicted_pin"], "in_sync")
 })
 
 # ── 3. New-computer: empty local + non-empty Drive → init pulls Drive→local ──

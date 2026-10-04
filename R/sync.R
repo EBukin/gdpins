@@ -100,13 +100,24 @@ gdpins_board_status.default <- function(x) {
 #' - Raw files: compare MD5 (`drive`'s `md5Checksum`).
 #' - mtime only as tiebreaker.
 #'
-#' **Conflict handling:**
-#' - Versioned boards: both writes simply become versions (`pins` handles
-#'   it, zero loss). `on_conflict` is effectively `"version"` regardless.
-#' - Raw / unversioned boards with `on_conflict = "stop"`: abort with a
-#'   report of the conflicting items; change nothing.
-#' - Raw / unversioned boards with `on_conflict = "prompt"`: ask the user
-#'   interactively per conflict.
+#' **Conflict handling** (a conflict is a pin or file that differs on both
+#' sides with no clear newer side):
+#' - Versioned boards: both contents become versions on **both** boards,
+#'   with their title, description and metadata. The content with the later
+#'   `created` time (tie: Drive) is the latest version on both boards, so the
+#'   pin is in sync afterwards. `on_conflict` is ignored.
+#' - Unversioned boards: a board with one slot per pin cannot keep both
+#'   sides. `"version"` and `"stop"` leave conflicting pins unchanged, copy
+#'   the non-conflicting ones, and then abort with an error of class
+#'   `gdpins_error_sync_conflict` (plus `gdpins_error_unversioned_conflict`
+#'   for `"version"`). `"prompt"` asks which side to keep.
+#' - Raw connections with `"version"` (default): the local file is copied to
+#'   `<name>.conflict-<UTC timestamp>.<ext>` next to it, then the Drive copy
+#'   replaces it, with a warning of class
+#'   `gdpins_warning_raw_conflict_backup`. The backup is a normal file in
+#'   `local_path`: the next sync uploads it unless you delete it. `"stop"`
+#'   aborts (class `gdpins_error_sync_conflict`) and changes no conflicting
+#'   file; `"prompt"` asks per file.
 #' - **Never silent overwrite.**
 #'
 #' Writes and syncs are blocked when offline (`gdpins_is_online()` is
@@ -116,7 +127,10 @@ gdpins_board_status.default <- function(x) {
 #' @param direction Character scalar. One of `c("auto", "to_drive",
 #'   "from_drive")`. Default `"auto"`.
 #' @param on_conflict Character scalar. One of `c("version", "prompt",
-#'   "stop")`. Default `"version"`.
+#'   "stop")`. Default `"version"`: keep both sides as versions on a
+#'   versioned board, back up the local file and keep Drive's on a raw
+#'   connection, and stop (like `"stop"`) on an unversioned board. See
+#'   "Conflict handling" above.
 #'
 #' @return Invisibly `x`. Called for its side effect.
 #' @seealso [gdpins_real_drive()], [gdpins_init_board()],
@@ -576,8 +590,9 @@ gdpins_sync.default <- function(
     ))
   }
 
-  conflicts <- character()
-  n_actions <- 0L
+  conflicts       <- character()
+  unversioned_hit <- FALSE
+  n_actions       <- 0L
 
   for (i in seq_len(nrow(status))) {
     row      <- status[i, ]
@@ -590,62 +605,60 @@ gdpins_sync.default <- function(
 
     if (state == "conflict") {
       if (x$versioned) {
-        # Versioned boards: both writes become versions -- no loss
-        .copy_pin_to_board(drive_board, local_board, pin_name)
-        .copy_pin_to_board(local_board, drive_board, pin_name)
-        n_actions <- n_actions + 1L
-        cli::cli_inform(c(
-          "i" = paste0(
-            "Board {.val {x$name}}: pin {.val {pin_name}} conflict resolved ",
-            "as new versions (versioned board)."
-          )
-        ))
-      } else if (on_conflict == "stop") {
-        conflicts <- c(conflicts, pin_name)
-        next
+        # Versioned boards: both contents become versions on both boards,
+        # the newer one (tie: Drive) is the latest on both -- no loss.
+        if (.resolve_versioned_conflict(drive_board, local_board, pin_name)) {
+          # Both boards now have the same latest version: this is where the
+          # last-synced baseline is recorded (H6).
+          n_actions <- n_actions + 1L
+          cli::cli_inform(c(
+            "i" = paste0(
+              "Board {.val {x$name}}: pin {.val {pin_name}} conflict resolved ",
+              "-- both contents kept as versions on Drive and local."
+            )
+          ))
+        }
       } else if (on_conflict == "prompt") {
         choice <- .prompt_conflict(pin_name, row)
         if (choice == "local") {
-          .copy_pin_to_board(local_board, drive_board, pin_name)
-          n_actions <- n_actions + 1L
-          cli::cli_inform(c(
-            "v" = "Board {.val {x$name}}: synced {.val {pin_name}} local -> Drive."
-          ))
+          if (.copy_pin_to_board(local_board, drive_board, pin_name)) {
+            n_actions <- n_actions + 1L
+            cli::cli_inform(c(
+              "v" = "Board {.val {x$name}}: synced {.val {pin_name}} local -> Drive."
+            ))
+          }
         } else if (choice == "drive") {
-          .copy_pin_to_board(drive_board, local_board, pin_name)
-          n_actions <- n_actions + 1L
-          cli::cli_inform(c(
-            "v" = "Board {.val {x$name}}: synced {.val {pin_name}} Drive -> local."
-          ))
+          if (.copy_pin_to_board(drive_board, local_board, pin_name)) {
+            n_actions <- n_actions + 1L
+            cli::cli_inform(c(
+              "v" = "Board {.val {x$name}}: synced {.val {pin_name}} Drive -> local."
+            ))
+          }
         }
       } else {
-        # on_conflict == "version" on unversioned -- copy both directions
-        .copy_pin_to_board(drive_board, local_board, pin_name)
-        .copy_pin_to_board(local_board, drive_board, pin_name)
-        n_actions <- n_actions + 1L
-        cli::cli_inform(c(
-          "i" = paste0(
-            "Board {.val {x$name}}: pin {.val {pin_name}} conflict -- copied ",
-            "both directions."
-          )
-        ))
+        # "stop", and "version" on an unversioned board: a one-slot board
+        # cannot keep both sides, so the conflict is reported, not resolved.
+        if (on_conflict == "version") unversioned_hit <- TRUE
+        conflicts <- c(conflicts, pin_name)
       }
       next
     }
 
     # Non-conflict directional copy
     if (effective_dir == "to_drive") {
-      .copy_pin_to_board(local_board, drive_board, pin_name)
-      n_actions <- n_actions + 1L
-      cli::cli_inform(c(
-        "v" = "Board {.val {x$name}}: synced {.val {pin_name}} local -> Drive."
-      ))
+      if (.copy_pin_to_board(local_board, drive_board, pin_name)) {
+        n_actions <- n_actions + 1L
+        cli::cli_inform(c(
+          "v" = "Board {.val {x$name}}: synced {.val {pin_name}} local -> Drive."
+        ))
+      }
     } else if (effective_dir == "from_drive") {
-      .copy_pin_to_board(drive_board, local_board, pin_name)
-      n_actions <- n_actions + 1L
-      cli::cli_inform(c(
-        "v" = "Board {.val {x$name}}: synced {.val {pin_name}} Drive -> local."
-      ))
+      if (.copy_pin_to_board(drive_board, local_board, pin_name)) {
+        n_actions <- n_actions + 1L
+        cli::cli_inform(c(
+          "v" = "Board {.val {x$name}}: synced {.val {pin_name}} Drive -> local."
+        ))
+      }
     }
   }
 
@@ -661,14 +674,28 @@ gdpins_sync.default <- function(
 
   # Report conflicts that were stopped -- abort after processing all items
   if (length(conflicts) > 0L) {
-    cli::cli_abort(c(
-      "Sync aborted: {length(conflicts)} conflict{?s} found.",
-      "!" = "Conflicting pin{?s}: {.val {conflicts}}.",
-      "i" = paste0(
-        "Nothing was changed. Resolve conflicts manually ",
-        "or use {.code on_conflict = 'prompt'}."
+    cli::cli_abort(
+      c(
+        "Sync aborted: {length(conflicts)} conflict{?s} found.",
+        "!" = "Conflicting pin{?s}: {.val {conflicts}}.",
+        "i" = "Conflicting pins were not changed.",
+        "i" = if (unversioned_hit) {
+          paste0(
+            "Board {.val {x$name}} is unversioned, so it cannot keep both ",
+            "sides as versions."
+          )
+        },
+        "i" = paste0(
+          "Use {.code on_conflict = \"prompt\"} to choose a side, or write ",
+          "the local data under a new pin name first."
+        )
+      ),
+      class = c(
+        if (unversioned_hit) "gdpins_error_unversioned_conflict",
+        "gdpins_error_sync_conflict",
+        "gdpins_error"
       )
-    ))
+    )
   }
 
   invisible(x)
@@ -694,54 +721,182 @@ gdpins_sync.default <- function(
   "skip"
 }
 
+#' Copy the latest version of a pin from one board to another
+#'
+#' Composition of `.snapshot_pin()` and `.write_pin_snapshot()`.
+#'
+#' @param src_board,dst_board pins boards.
+#' @param pin_name Character scalar.
+#'
+#' @return `TRUE` when the pin was written to `dst_board`, `FALSE` when the
+#'   source could not be read (a warning has been raised).
 #' @keywords internal
 .copy_pin_to_board <- function(src_board, dst_board, pin_name) {
+  snap <- .snapshot_pin(src_board, pin_name)
+  if (is.null(snap)) return(FALSE)
+  .write_pin_snapshot(dst_board, snap, pin_name)
+}
+
+#' Read the latest version of a pin into memory, without writing anything
+#'
+#' Captures the content (file paths for `"file"` pins, the R object
+#' otherwise) and the metadata needed to re-create that version on another
+#' board: `type`, `title`, `description`, `user`, `tags`, `urls`, plus
+#' `pin_hash`, `created` and `version` for the caller.
+#'
+#' @param src_board A pins board.
+#' @param pin_name Character scalar.
+#'
+#' @return A list, or `NULL` after a warning when the pin cannot be read.
+#' @keywords internal
+.snapshot_pin <- function(src_board, pin_name) {
   # Backstop: names here come from pin_list(), which on a Drive board lists
   # every Drive item, so a Drive folder named ".." would reach this point.
   .check_pin_name(pin_name)
-  pin_type <- tryCatch(
-    pins::pin_meta(src_board, pin_name)$type,
-    error = function(e) NULL
-  )
-  pin_type <- if (length(pin_type)) pin_type[[1L]] else NULL
-  if (!is.null(pin_type) && is.na(pin_type)) pin_type <- NULL
+  tryCatch({
+    meta    <- pins::pin_meta(src_board, pin_name)
+    version <- meta$local$version
+    type    <- meta$type
+    type    <- if (length(type) && !is.na(type[[1L]])) type[[1L]] else NULL
 
-  # "file" pins (how gdpins now stores parquet) are copied byte-for-byte with
-  # download + upload; pins::pin_read() cannot read them and pin_write() cannot
-  # re-emit them.
-  if (identical(pin_type, "file")) {
-    paths <- tryCatch(
-      pins::pin_download(src_board, pin_name),
-      error = function(e) {
-        cli::cli_warn(
-          "Could not read pin {.val {pin_name}} from source board: {e$message}"
-        )
-        NULL
-      }
+    snap <- list(
+      type        = type,
+      title       = meta$title,
+      description = meta$description,
+      user        = if (length(meta$user)) meta$user else NULL,
+      tags        = meta$tags,
+      urls        = meta$urls,
+      pin_hash    = meta$pin_hash,
+      created     = meta$created,
+      version     = version,
+      paths       = NULL,
+      object      = NULL
     )
-    if (!is.null(paths)) {
-      suppressMessages(pins::pin_upload(dst_board, as.character(paths), pin_name))
-    }
-    return(invisible(NULL))
-  }
-
-  # Other pins: read the object (parquet routed through the arrow engine by
-  # .read_from_board, avoiding nanoparquet's read-time memory blow-up) and
-  # re-write preserving the original pin type.
-  obj <- tryCatch(
-    .read_from_board(src_board, pin_name, NULL),
-    error = function(e) {
-      cli::cli_warn(
-        "Could not read pin {.val {pin_name}} from source board: {e$message}"
+    # "file" pins (how gdpins now stores parquet) are copied byte-for-byte with
+    # download + upload; pins::pin_read() cannot read them and pin_write()
+    # cannot re-emit them. Other pins are read as an object (parquet routed
+    # through the arrow engine by .read_from_board) and re-written with their
+    # original type.
+    if (identical(type, "file")) {
+      snap$paths <- as.character(
+        pins::pin_download(src_board, pin_name, version = version)
       )
-      NULL
+    } else {
+      snap["object"] <- list(.read_from_board(src_board, pin_name, version))
     }
-  )
-  if (!is.null(obj)) {
-    suppressMessages(pins::pin_write(dst_board, obj, pin_name, type = pin_type))
+    snap
+  }, error = function(e) {
+    cli::cli_warn(
+      "Could not read pin {.val {pin_name}} from source board: {conditionMessage(e)}"
+    )
+    NULL
+  })
+}
+
+#' Write a pin snapshot to a board
+#'
+#' @param dst_board A pins board.
+#' @param snap A snapshot from `.snapshot_pin()`.
+#' @param pin_name Character scalar.
+#'
+#' @return `TRUE`, invisibly.
+#' @keywords internal
+.write_pin_snapshot <- function(dst_board, snap, pin_name) {
+  if (identical(snap$type, "file")) {
+    suppressMessages(pins::pin_upload(
+      dst_board, snap$paths, pin_name,
+      title       = snap$title,
+      description = snap$description,
+      metadata    = snap$user,
+      tags        = snap$tags,
+      urls        = snap$urls
+    ))
+  } else {
+    suppressMessages(pins::pin_write(
+      dst_board, snap$object, pin_name,
+      type        = snap$type,
+      title       = snap$title,
+      description = snap$description,
+      metadata    = snap$user,
+      tags        = snap$tags,
+      urls        = snap$urls
+    ))
   }
+  invisible(TRUE)
+}
+
+#' Wait until a new write to a pin gets a version id after the latest one
+#'
+#' pins version ids have one-second resolution, and ids in the same second
+#' sort by hash prefix, not by write order. A write in the same second as the
+#' current latest version may therefore not become the latest, or may land in
+#' the existing version directory. Sleeping until the next second avoids both.
+#'
+#' @param board A pins board.
+#' @param pin_name Character scalar.
+#'
+#' @return `NULL`, invisibly.
+#' @keywords internal
+.await_new_version_second <- function(board, pin_name) {
+  lv <- .latest_version(board, pin_name)
+  if (is.null(lv)) return(invisible(NULL))
+  created <- lv$created
+  if (is.list(created)) created <- created[[1L]]
+  if (!inherits(created, "POSIXct") || is.na(created)) return(invisible(NULL))
+  wait <- as.numeric(floor(as.numeric(created)) + 1 - as.numeric(Sys.time()))
+  # Bounded: a clock far ahead on another machine is caught by the post-check
+  # in .resolve_versioned_conflict(), not by sleeping.
+  if (wait > 0 && wait <= 2) Sys.sleep(wait)
   invisible(NULL)
 }
+
+#' Resolve a conflict on a versioned board without losing either side
+#'
+#' Both pre-conflict contents become versions on both boards. The snapshot
+#' with the later `created` time (tie: Drive) is written last, so it is the
+#' latest version on both boards.
+#'
+#' @param drive_board,local_board pins boards.
+#' @param pin_name Character scalar.
+#'
+#' @return `TRUE` when resolved, `FALSE` when a side could not be read (a
+#'   warning has been raised).
+#' @keywords internal
+.resolve_versioned_conflict <- function(drive_board, local_board, pin_name) {
+  drive_snap <- .snapshot_pin(drive_board, pin_name)
+  local_snap <- .snapshot_pin(local_board, pin_name)
+  if (is.null(drive_snap) || is.null(local_snap)) return(FALSE)
+
+  local_newer <- isTRUE(local_snap$created > drive_snap$created)
+  winner <- if (local_newer) local_snap else drive_snap
+  loser  <- if (local_newer) drive_snap else local_snap
+  # Board that already holds the winner as its latest gets the loser, then
+  # the winner again; the other board just gets the winner.
+  winner_board <- if (local_newer) local_board else drive_board
+  loser_board  <- if (local_newer) drive_board else local_board
+
+  write <- function(board, snap) {
+    .await_new_version_second(board, pin_name)
+    .write_pin_snapshot(board, snap, pin_name)
+  }
+  write(loser_board, winner)
+  write(winner_board, loser)
+  write(winner_board, winner)
+
+  dv <- .latest_version(drive_board, pin_name)
+  lv <- .latest_version(local_board, pin_name)
+  if (is.null(dv) || is.null(lv) || !identical(dv$hash, lv$hash)) {
+    cli::cli_abort(
+      c(
+        "Internal error: conflict resolution for pin {.val {pin_name}} left different latest versions.",
+        i = "Drive: {.val {dv$version}}; local: {.val {lv$version}}. Both contents are kept as versions on both boards."
+      ),
+      .internal = TRUE
+    )
+  }
+  TRUE
+}
+
 
 #' @keywords internal
 .prompt_conflict <- function(pin_name, row) {
@@ -835,12 +990,37 @@ gdpins_sync.default <- function(
           if (attempt(fname, .raw_copy_to_local(x, fname))) n_actions <- n_actions + 1L
         }
       } else {
-        # on_conflict == "version" on raw -- drive wins as safest default
-        if (attempt(fname, .raw_copy_to_local(x, fname))) {
+        # on_conflict == "version" on raw: back up the local file, then let
+        # Drive win. The backup is a normal file in local_path.
+        backup <- NULL
+        ok <- attempt(fname, {
+          backup <- .raw_conflict_backup(x, fname)
+          .raw_copy_to_local(x, fname)
+        })
+        if (ok) {
           n_actions <- n_actions + 1L
-          cli::cli_inform(c(
-            "i" = "File {.val {fname}}: conflict -- Drive version kept (raw connection)."
-          ))
+          # Drive and local now agree: this is where the last-synced raw
+          # baseline is recorded (H6).
+          if (!is.null(backup)) {
+            cli::cli_warn(
+              c(
+                "!" = paste0(
+                  "File {.val {fname}}: conflict -- Drive version kept, ",
+                  "previous local copy saved as {.path {backup}}."
+                ),
+                "i" = paste0(
+                  "Resolve by reading the backup, or re-run with ",
+                  "{.code on_conflict = \"prompt\"}. The backup is uploaded ",
+                  "on the next sync unless you delete it."
+                )
+              ),
+              class = "gdpins_warning_raw_conflict_backup"
+            )
+          } else {
+            cli::cli_inform(c(
+              "i" = "File {.val {fname}}: conflict -- Drive version kept (no local copy to back up)."
+            ))
+          }
         }
       }
       next
@@ -896,14 +1076,17 @@ gdpins_sync.default <- function(
   }
 
   if (length(conflicts) > 0L) {
-    cli::cli_abort(c(
-      "Sync aborted: {length(conflicts)} conflict{?s} found.",
-      "!" = "Conflicting file{?s}: {.val {conflicts}}.",
-      "i" = paste0(
-        "Nothing was changed. Resolve conflicts manually ",
-        "or use {.code on_conflict = 'prompt'}."
-      )
-    ))
+    cli::cli_abort(
+      c(
+        "Sync aborted: {length(conflicts)} conflict{?s} found.",
+        "!" = "Conflicting file{?s}: {.val {conflicts}}.",
+        "i" = paste0(
+          "Nothing was changed. Resolve conflicts manually ",
+          "or use {.code on_conflict = 'prompt'}."
+        )
+      ),
+      class = c("gdpins_error_sync_conflict", "gdpins_error")
+    )
   }
 
   invisible(x)
@@ -986,6 +1169,54 @@ gdpins_sync.default <- function(
   fs::dir_create(dirname(local_file))
   gd_download(conn$adapter, drive_path, local_file)
   invisible(NULL)
+}
+
+#' Path of the backup file written before Drive overwrites a conflicting file
+#'
+#' `<dir>/<stem>.conflict-<UTC timestamp>.<ext>`, or
+#' `<dir>/<name>.conflict-<UTC timestamp>` when the name has no extension.
+#' The timestamp has no `:`, so the name is valid on Windows.
+#'
+#' @param conn A `gdpins_raw_conn`.
+#' @param rel_name Character scalar. Relative file name.
+#'
+#' @return Character scalar, a local path.
+#' @keywords internal
+.raw_conflict_backup_path <- function(conn, rel_name) {
+  local_file <- file.path(
+    conn$local_path,
+    gsub("/", .Platform$file.sep, rel_name, fixed = TRUE)
+  )
+  ts   <- format(Sys.time(), "%Y%m%dT%H%M%SZ", tz = "UTC")
+  base <- basename(local_file)
+  ext  <- tools::file_ext(base)
+  stem <- tools::file_path_sans_ext(base)
+  name <- if (nzchar(ext) && nzchar(stem)) {
+    paste0(stem, ".conflict-", ts, ".", ext)
+  } else {
+    paste0(base, ".conflict-", ts)
+  }
+  file.path(dirname(local_file), name)
+}
+
+#' Back up a conflicting local file before Drive overwrites it
+#'
+#' @inheritParams .raw_conflict_backup_path
+#'
+#' @return The backup path, or `NULL` when there is no local file. Errors if
+#'   the backup path already exists (never overwrites).
+#' @keywords internal
+.raw_conflict_backup <- function(conn, rel_name) {
+  .check_rel_name(rel_name)
+  local_file <- file.path(
+    conn$local_path,
+    gsub("/", .Platform$file.sep, rel_name, fixed = TRUE)
+  )
+  .check_local_dest(local_file, conn$local_path)
+  if (!file.exists(local_file)) return(NULL)
+  backup <- .raw_conflict_backup_path(conn, rel_name)
+  fs::file_copy(local_file, backup, overwrite = FALSE)
+  backup
 }
 
 #' @keywords internal
