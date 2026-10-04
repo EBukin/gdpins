@@ -27,10 +27,18 @@ NULL
 #' @param name Pin name.
 #' @param fmt Character scalar: `"parquet"` or `"rds"`.
 #' @param versioned Logical. Whether this write creates a version.
+#' @param parquet_path Character scalar or `NULL`. A `.parquet` file already
+#'   written from `x`; uploaded as is instead of writing a new one, so every
+#'   board receives the same bytes (and the same content hash).
 #'
 #' @keywords internal
-.write_to_board <- function(pins_board, x, name, fmt, versioned) {
-  if (identical(fmt, "parquet")) {
+.write_to_board <- function(pins_board, x, name, fmt, versioned,
+                            parquet_path = NULL) {
+  if (identical(fmt, "parquet") && !is.null(parquet_path)) {
+    suppressMessages(
+      pins::pin_upload(pins_board, as.character(parquet_path), name = name)
+    )
+  } else if (identical(fmt, "parquet")) {
     # Write parquet through the configured engine (default arrow) rather than
     # pins::pin_write(type = "parquet"), which is hardwired to nanoparquet.
     # nanoparquet-authored files can also make its own reader allocate tens of
@@ -195,9 +203,24 @@ gdpins_pin_write <- function(board, x, name, version = NULL, format = NULL,
     local = board$local_board
   )
 
+  # Parquet is serialised once and the same file is uploaded to every
+  # component, so Drive and local versions carry the same content hash
+  # (prune and sync match versions across boards on that hash).
+  parquet_path <- NULL
+  if (identical(fmt, "parquet")) {
+    pq_dir <- tempfile("gdpins_pq_")
+    fs::dir_create(pq_dir)
+    on.exit(unlink(pq_dir, recursive = TRUE), add = TRUE)
+    parquet_path <- fs::path(pq_dir, paste0(name, ".parquet"))
+    .write_parquet_file(x_to_write, parquet_path)
+  }
+
   for (component in boards_to_write) {
     if (!is.null(component)) {
-      .write_to_board(component, x_to_write, name, fmt, versioned_write)
+      .write_to_board(
+        component, x_to_write, name, fmt, versioned_write,
+        parquet_path = parquet_path
+      )
     }
   }
 

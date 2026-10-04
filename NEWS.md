@@ -25,6 +25,16 @@
   on such a board now warns "Sync ... failed" instead of silently
   overwriting. The `"stop"` aborts for boards and raw connections now carry
   the classes `gdpins_error_sync_conflict` and `gdpins_error`.
+* **Prune functions return a plan tibble (H8).**
+  `gdpins_prune_pin_versions()` used to return a character vector of the
+  Drive version ids it removed, and `gdpins_prune_board_versions()` a named
+  list of such vectors. Both now return, invisibly, one tibble with columns
+  `name`, `version`, `side` (`"drive"` or `"local"`), `hash` and `action`
+  (`"remove"` or `"keep_unsynced"`): one row per version removed (or, in a dry
+  run, to be removed) and per unsynced local version that was kept. The board
+  function returns one tibble for all pins instead of a named list. The old
+  value could not report local deletions. Read Drive removals with
+  `plan$version[plan$side == "drive" & plan$action == "remove"]`.
 
 ## Bug fixes
 
@@ -110,6 +120,33 @@
   timestamp rule until the first sync records one. An unreadable baseline file
   raises one warning of class `gdpins_warning_baseline_unreadable` and is
   ignored. The status tibble's columns are unchanged.
+* **Pruning no longer deletes unsynced local versions, and reports every
+  deletion (H8).** The plan, the dry-run listing, the threshold count and the
+  return value came from Drive only, while the local copy was pruned on its
+  own list: a local version that never reached Drive was hard-deleted when it
+  was older than the newest `keep`, and local deletions were never shown or
+  counted. Now a local version beyond `keep` is deleted only when its content
+  hash is also on Drive; otherwise it is kept and reported as
+  `"keep_unsynced"`. The dry run lists Drive removals, local removals and kept
+  versions. The threshold counts the larger of the Drive and local removal
+  counts, so local-only deletions can trigger it. "No versions to remove"
+  reports the real number of versions present.
+* **Board-level prune threshold uses the total (H8, closes audit L5).**
+  `gdpins_prune_board_versions()` asked for confirmation (or `force = TRUE`)
+  only when a single pin exceeded `threshold`; many pins just under it were
+  pruned without a check. The total removal count over all pins is now
+  compared with `threshold`.
+* **Offline boards never delete unsynced versions (H8).** On a board switched
+  with `gdpins_go_offline()`, Drive cannot be checked, so pruning keeps every
+  local version (`"keep_unsynced"`) instead of deleting the offline writes.
+  A board built as `local_only` prunes as before.
+* **Pins present on Drive only no longer break board pruning (H8).**
+  `gdpins_prune_board_versions()` errored with "Can't find pin" for a pin
+  that was on Drive but not in the local copy; such a pin is now pruned on
+  Drive with no local rows.
+* **Parquet is written once per `gdpins_pin_write()` (H8).** The same file is
+  uploaded to Drive and to the local copy, so both versions carry the same
+  content hash by construction; prune and sync match versions on that hash.
 
 ## Security
 

@@ -136,6 +136,7 @@ test_that("board prune skips and warns on an unsafe pin name", {
   board  <- new_sandboxed_board(parent, "local_only")
   local_mocked_bindings(gdpins_is_online = function() TRUE, .package = "gdpins")
   gdpins_pin_write(board, data.frame(x = 1), "ok")
+  gdpins_pin_write(board, data.frame(x = 2), "ok")
 
   real_pin_list <- pins::pin_list
   local_mocked_bindings(
@@ -147,7 +148,7 @@ test_that("board prune skips and warns on an unsafe pin name", {
     res <- suppressMessages(gdpins_prune_board_versions(board, dry_run = TRUE)),
     class = "gdpins_warning_invalid_name"
   )
-  expect_identical(names(res), "ok")
+  expect_identical(unique(res$name), "ok")
 })
 
 # ── H2: raw file names ────────────────────────────────────────────────────────
